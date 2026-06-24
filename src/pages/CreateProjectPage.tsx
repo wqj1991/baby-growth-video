@@ -18,7 +18,7 @@ const steps = [
 
 export default function CreateProjectPage() {
   const navigate = useNavigate();
-  const { currentStep, setCurrentStep, reset, selectedBaby } = useCreateProjectStore();
+  const { currentStep, setCurrentStep, reset, selectedBaby, projectName, periodDays } = useCreateProjectStore();
 
   const handleNext = () => {
     if (currentStep < 5) {
@@ -66,6 +66,8 @@ export default function CreateProjectPage() {
     switch (currentStep) {
       case 1:
         return !!selectedBaby;
+      case 2:
+        return projectName.trim().length > 0 && periodDays >= 1 && periodDays <= 365;
       // 其他步骤后续添加
       default:
         return currentStep < 5;
