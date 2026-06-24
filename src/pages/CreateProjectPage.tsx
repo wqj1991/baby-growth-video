@@ -18,7 +18,7 @@ const steps = [
 
 export default function CreateProjectPage() {
   const navigate = useNavigate();
-  const { currentStep, setCurrentStep, reset } = useCreateProjectStore();
+  const { currentStep, setCurrentStep, reset, selectedBaby } = useCreateProjectStore();
 
   const handleNext = () => {
     if (currentStep < 5) {
@@ -62,7 +62,15 @@ export default function CreateProjectPage() {
     }
   };
 
-  const canGoNext = currentStep < 5;
+  const canGoNext = () => {
+    switch (currentStep) {
+      case 1:
+        return !!selectedBaby;
+      // 其他步骤后续添加
+      default:
+        return currentStep < 5;
+    }
+  };
   const canGoPrev = currentStep > 1;
 
   return (
@@ -113,8 +121,8 @@ export default function CreateProjectPage() {
               </button>
               <button
                 onClick={handleNext}
-                disabled={!canGoNext}
-                className={`btn ${canGoNext ? 'btn-primary' : 'opacity-50 cursor-not-allowed'}`}
+                disabled={!canGoNext()}
+                className={`btn ${canGoNext() ? 'btn-primary' : 'opacity-50 cursor-not-allowed'}`}
               >
                 {currentStep === 4 ? '创建项目' : '下一步'}
               </button>
