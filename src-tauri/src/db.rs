@@ -145,11 +145,9 @@ impl Database {
     }
 
     fn get_db_path() -> PathBuf {
-        let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        path.push("data");
-        if let Err(e) = std::fs::create_dir_all(&path) {
-            eprintln!("Failed to create data directory: {}", e);
-        }
+        let mut path = dirs_next::data_dir().unwrap_or_else(|| PathBuf::from("."));
+        path.push("baby-growth-video");
+        std::fs::create_dir_all(&path).ok();
         path.push("app.db");
         path
     }
