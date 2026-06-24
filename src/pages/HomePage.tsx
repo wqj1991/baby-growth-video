@@ -57,6 +57,10 @@ export default function HomePage() {
     navigate('/baby-setup');
   };
 
+  const handleCreateProject = () => {
+    navigate('/create-project');
+  };
+
   return (
     <div className="p-8">
       {/* 欢迎标题 */}
@@ -146,7 +150,7 @@ export default function HomePage() {
                 <div className="text-center py-12">
                   <Video className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500 mb-4">还没有视频项目</p>
-                  <button className="btn btn-primary">
+                  <button onClick={handleCreateProject} className="btn btn-primary">
                     <Plus className="w-4 h-4" />
                     创建新项目
                   </button>
@@ -193,7 +197,7 @@ export default function HomePage() {
 
           {/* 快速操作 */}
           <div className="grid grid-cols-3 gap-4 mt-6">
-            <div className="card p-4 cursor-pointer hover:shadow-md transition-shadow">
+            <div onClick={handleCreateProject} className="card p-4 cursor-pointer hover:shadow-md transition-shadow">
               <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-3">
                 <Plus className="w-5 h-5 text-blue-600" />
               </div>

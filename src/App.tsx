@@ -7,6 +7,7 @@ import ProjectPage from './pages/ProjectPage';
 import PeriodSelectPage from './pages/PeriodSelectPage';
 import VideoGeneratePage from './pages/VideoGeneratePage';
 import HistoryPage from './pages/HistoryPage';
+import CreateProjectPage from './pages/CreateProjectPage';
 import { initDatabase } from './utils/tauriCommands';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="baby-setup" element={<BabySetupPage />} />
+        <Route path="create-project" element={<CreateProjectPage />} />
         <Route path="project/:projectId" element={<ProjectPage />}>
           <Route index element={<Navigate to="periods" replace />} />
           <Route path="periods" element={<PeriodSelectPage />} />
