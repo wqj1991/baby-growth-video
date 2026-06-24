@@ -1,0 +1,26 @@
+[package]
+name = "baby-growth-video"
+version = "0.1.0"
+description = "宝宝成长视频制作工具"
+authors = ["you"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = ["dialog-open", "dialog-save", "fs-read-file", "fs-write-file", "fs-read-dir", "fs-create-dir", "fs-remove-file", "path-all", "shell-open"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.31", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+walkdir = "2.3"
+image = "0.24"
+uuid = { version = "1.0", features = ["v4"] }
+regex = "1.10"
+dirs-next = "2.0"
+lazy_static = "1.4"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
