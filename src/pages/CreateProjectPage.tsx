@@ -79,7 +79,7 @@ export default function CreateProjectPage() {
   const canGoPrev = currentStep > 1;
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-screen flex flex-col bg-white">
       {/* 顶部栏 */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
         <div className="flex items-center gap-4">

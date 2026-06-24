@@ -19,10 +19,13 @@ function App() {
 
   return (
     <Routes>
+      {/* 独立页面（无侧边栏） */}
+      <Route path="/create-project" element={<CreateProjectPage />} />
+
+      {/* 带侧边栏的主布局 */}
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="baby-setup" element={<BabySetupPage />} />
-        <Route path="create-project" element={<CreateProjectPage />} />
         <Route path="project/:projectId" element={<ProjectPage />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<ProjectOverviewPage />} />
