@@ -8,8 +8,18 @@ export default defineConfig({
   clearScreen: false,
   // Tauri expects a fixed port, fail if that port is not available
   server: {
+    host: "localhost",
     strictPort: true,
     port: 1420,
+    hmr: {
+      host: "localhost",
+      port: 1420,
+      protocol: "ws",
+    },
+    watch: {
+      // 告诉 Vite 忽略监听 node_modules 目录，提高性能
+      ignored: ["**/node_modules/**", "**/src-tauri/**"],
+    },
   },
   // to make use of `TAURI_PLATFORM`, `TAURI_ARCH`, `TAURI_FAMILY`,
   // `TAURI_PLATFORM_VERSION`, `TAURI_DEBUG` and other env variables
