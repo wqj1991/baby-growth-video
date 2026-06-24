@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, X } from 'lucide-react';
+import { useEffect } from 'react';
 import WizardSidebar from '../components/WizardSidebar';
+import ErrorBoundary from '../components/ErrorBoundary';
 import { useCreateProjectStore } from '../store/createProjectStore';
 import Step1SelectBaby from './create-project/Step1SelectBaby';
 import Step2ProjectInfo from './create-project/Step2ProjectInfo';
@@ -19,6 +21,11 @@ const steps = [
 export default function CreateProjectPage() {
   const navigate = useNavigate();
   const { currentStep, setCurrentStep, reset, selectedBaby, projectName, periodDays, scanResult, periods } = useCreateProjectStore();
+
+  useEffect(() => {
+    console.log('CreateProjectPage 已加载，当前步骤:', currentStep);
+    console.log('窗口尺寸:', window.innerWidth, 'x', window.innerHeight);
+  }, []);
 
   const handleNext = () => {
     if (currentStep < 5) {
@@ -79,62 +86,66 @@ export default function CreateProjectPage() {
   const canGoPrev = currentStep > 1;
 
   return (
-    <div className="w-full h-screen flex flex-col bg-white">
-      {/* 顶部栏 */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
-        <div className="flex items-center gap-4">
+    <ErrorBoundary>
+      <div className="w-full h-screen flex flex-col bg-white">
+        {/* 顶部栏 */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleCancel}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-semibold text-gray-900">新建成长视频项目</h1>
+          </div>
           <button
             onClick={handleCancel}
             className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <X className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">新建成长视频项目</h1>
         </div>
-        <button
-          onClick={handleCancel}
-          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
 
-      {/* 主体内容 */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* 左侧步骤栏 */}
-        <WizardSidebar
-          steps={steps}
-          currentStep={currentStep}
-          onStepClick={handleStepClick}
-        />
+        {/* 主体内容 */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* 左侧步骤栏 */}
+          <WizardSidebar
+            steps={steps}
+            currentStep={currentStep}
+            onStepClick={handleStepClick}
+          />
 
-        {/* 右侧内容区 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-auto">
-            {renderStepContent()}
-          </div>
-
-          {/* 底部操作栏 */}
-          {currentStep < 5 && (
-            <div className="flex items-center justify-between px-8 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-              <button
-                onClick={handlePrev}
-                disabled={!canGoPrev}
-                className={`btn ${canGoPrev ? 'btn-secondary' : 'opacity-50 cursor-not-allowed'}`}
-              >
-                上一步
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={!canGoNext()}
-                className={`btn ${canGoNext() ? 'btn-primary' : 'opacity-50 cursor-not-allowed'}`}
-              >
-                {currentStep === 4 ? '创建项目' : '下一步'}
-              </button>
+          {/* 右侧内容区 */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-auto">
+              <ErrorBoundary>
+                {renderStepContent()}
+              </ErrorBoundary>
             </div>
-          )}
+
+            {/* 底部操作栏 */}
+            {currentStep < 5 && (
+              <div className="flex items-center justify-between px-8 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+                <button
+                  onClick={handlePrev}
+                  disabled={!canGoPrev}
+                  className={`btn ${canGoPrev ? 'btn-secondary' : 'opacity-50 cursor-not-allowed'}`}
+                >
+                  上一步
+                </button>
+                <button
+                  onClick={handleNext}
+                  disabled={!canGoNext()}
+                  className={`btn ${canGoNext() ? 'btn-primary' : 'opacity-50 cursor-not-allowed'}`}
+                >
+                  {currentStep === 4 ? '创建项目' : '下一步'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
