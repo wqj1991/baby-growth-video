@@ -33,7 +33,7 @@ export default function CreateProjectPage() {
   };
 
   const handleCancel = () => {
-    if (confirm('确定要取消创建吗？已填写的信息将会丢失。')) {
+    if (window.confirm('确定要取消创建吗？已填写的信息将会丢失。')) {
       reset();
       navigate('/');
     }
@@ -79,9 +79,9 @@ export default function CreateProjectPage() {
   const canGoPrev = currentStep > 1;
 
   return (
-    <div className="h-screen flex flex-col bg-white">
+    <div className="w-full h-screen flex flex-col bg-white">
       {/* 顶部栏 */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center gap-4">
           <button
             onClick={handleCancel}
@@ -116,7 +116,7 @@ export default function CreateProjectPage() {
 
           {/* 底部操作栏 */}
           {currentStep < 5 && (
-            <div className="flex items-center justify-between px-8 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between px-8 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
               <button
                 onClick={handlePrev}
                 disabled={!canGoPrev}
