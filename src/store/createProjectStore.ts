@@ -33,7 +33,7 @@ interface CreateProjectState {
     includeSpecialDates: boolean;
   }) => void;
   setFolderPath: (path: string) => void;
-  setScanResult: (result: ScanResult) => void;
+  setScanResult: (result: ScanResult | null) => void;
   setIsScanning: (scanning: boolean) => void;
   setPeriods: (periods: Period[]) => void;
   setIsGeneratingPeriods: (generating: boolean) => void;
