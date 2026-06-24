@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Outlet, NavLink } from 'react-router-dom';
-import { Calendar, Video, History, Settings, ArrowLeft } from 'lucide-react';
+import { Calendar, Video, History, Settings, ArrowLeft, LayoutDashboard } from 'lucide-react';
 import { useAppStore } from '../store';
 import { getProjects } from '../utils/tauriCommands';
 
@@ -42,6 +42,7 @@ export default function ProjectPage() {
   }
 
   const navItems = [
+    { path: 'overview', icon: LayoutDashboard, label: '项目概览' },
     { path: 'periods', icon: Calendar, label: '周期选择' },
     { path: 'generate', icon: Video, label: '生成视频' },
     { path: 'history', icon: History, label: '历史记录' },
