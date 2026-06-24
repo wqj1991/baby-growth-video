@@ -7,6 +7,9 @@ mod video;
 use db::Database;
 use std::sync::Mutex;
 use tauri::State;
+use tauri_plugin_dialog::init as init_dialog;
+use tauri_plugin_fs::init as init_fs;
+use tauri_plugin_shell::init as init_shell;
 
 struct AppState {
     db: Mutex<Database>,
@@ -209,10 +212,18 @@ fn get_export_records(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut db = Database::new();
+    if let Err(e) = db.init() {
+        eprintln!("Failed to initialize database: {}", e);
+    }
+    
     tauri::Builder::default()
         .manage(AppState {
-            db: Mutex::new(Database::new()),
+            db: Mutex::new(db),
         })
+        .plugin(init_dialog())
+        .plugin(init_fs())
+        .plugin(init_shell())
         .invoke_handler(tauri::generate_handler![
             init_database,
             get_babies,

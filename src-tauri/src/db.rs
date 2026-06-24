@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
+use chrono::{Duration, Local, NaiveDate};
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -145,10 +145,11 @@ impl Database {
     }
 
     fn get_db_path() -> PathBuf {
-        // 使用应用数据目录
-        let mut path = dirs_next::data_dir().unwrap_or_else(|| PathBuf::from("."));
-        path.push("baby-growth-video");
-        std::fs::create_dir_all(&path).ok();
+        let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        path.push("data");
+        if let Err(e) = std::fs::create_dir_all(&path) {
+            eprintln!("Failed to create data directory: {}", e);
+        }
         path.push("app.db");
         path
     }
@@ -497,7 +498,6 @@ impl Database {
             .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
 
         let today = Local::now().date_naive();
-        let mut periods = Vec::new();
         let mut week_num = 1;
         let mut current_start = birth;
 

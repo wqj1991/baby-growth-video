@@ -1,4 +1,4 @@
-use crate::db::{Database, ExportRecord, NewExportRecord, Photo, Period, Video, VideoFrame, NewVideoFrame};
+use crate::db::{Database, ExportRecord, NewExportRecord, Photo, Period, VideoFrame, NewVideoFrame};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
