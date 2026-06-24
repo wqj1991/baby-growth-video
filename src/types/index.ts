@@ -112,3 +112,16 @@ export interface VideoConfig {
   background_music?: string; // 背景音乐路径
   output_format: 'mp4' | 'mov' | 'avi';
 }
+
+// ==================== 创建项目向导相关类型 ====================
+
+// 向导步骤类型
+export type WizardStep = 1 | 2 | 3 | 4 | 5;
+
+// 项目信息（向导步骤2使用）
+export interface ProjectInfo {
+  name: string;
+  description: string;
+  period_days: number;
+  include_special_dates: boolean;
+}
