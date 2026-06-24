@@ -58,7 +58,14 @@ export default function HomePage() {
   };
 
   const handleCreateProject = () => {
-    navigate('/create-project');
+    console.log('handleCreateProject 被点击了');
+    console.log('当前路由:', window.location.hash);
+    try {
+      navigate('/create-project');
+      console.log('navigate 调用成功');
+    } catch (error) {
+      console.error('navigate 调用失败:', error);
+    }
   };
 
   return (
