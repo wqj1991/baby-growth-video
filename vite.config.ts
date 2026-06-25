@@ -10,10 +10,10 @@ export default defineConfig({
   server: {
     host: "localhost",
     strictPort: true,
-    port: 1420,
+    port: 8092,
     hmr: {
       host: "localhost",
-      port: 1420,
+      port: 8092,
       protocol: "ws",
     },
     watch: {
