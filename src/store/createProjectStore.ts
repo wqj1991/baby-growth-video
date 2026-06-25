@@ -14,6 +14,9 @@ interface CreateProjectState {
   periodDays: number;
   includeSpecialDates: boolean;
 
+  // 项目ID（创建后保存）
+  projectId: number | null;
+
   // 步骤3：选择文件夹
   folderPath: string | null;
   scanResult: ScanResult | null;
@@ -32,6 +35,7 @@ interface CreateProjectState {
     periodDays: number;
     includeSpecialDates: boolean;
   }) => void;
+  setProjectId: (id: number) => void;
   setFolderPath: (path: string) => void;
   setScanResult: (result: ScanResult | null) => void;
   setIsScanning: (scanning: boolean) => void;
@@ -47,6 +51,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   projectDescription: '',
   periodDays: 7,
   includeSpecialDates: false,
+  projectId: null,
   folderPath: null,
   scanResult: null,
   isScanning: false,
@@ -64,6 +69,8 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
       periodDays: info.periodDays,
       includeSpecialDates: info.includeSpecialDates,
     }),
+
+  setProjectId: (id) => set({ projectId: id }),
 
   setFolderPath: (path) => set({ folderPath: path }),
 
@@ -83,6 +90,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
       projectDescription: '',
       periodDays: 7,
       includeSpecialDates: false,
+      projectId: null,
       folderPath: null,
       scanResult: null,
       isScanning: false,

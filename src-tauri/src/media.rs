@@ -13,6 +13,7 @@ pub struct ScanResult {
     pub total_photos: i64,
     pub total_videos: i64,
     pub skipped_duplicates: i64,
+    pub skipped_no_period: i64,
 }
 
 const PHOTO_EXTENSIONS: &[&str] = &[
@@ -120,6 +121,7 @@ pub fn scan_media_folder(
     let mut photos: Vec<Photo> = Vec::new();
     let mut videos: Vec<Video> = Vec::new();
     let mut skipped_duplicates = 0;
+    let mut skipped_no_period = 0;
 
     // 遍历文件夹
     for entry in WalkDir::new(folder).into_iter().filter_map(|e| e.ok()) {
@@ -152,7 +154,10 @@ pub fn scan_media_folder(
 
         let period_id = match period_id {
             Some(id) => id,
-            None => continue, // 没有找到对应的周期，跳过
+            None => {
+                skipped_no_period += 1;
+                continue;
+            }
         };
 
         let file_size = get_file_size(path);
@@ -207,5 +212,6 @@ pub fn scan_media_folder(
         photos,
         videos,
         skipped_duplicates,
+        skipped_no_period,
     })
 }

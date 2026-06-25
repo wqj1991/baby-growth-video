@@ -13,6 +13,7 @@ export default function Step4GeneratePeriods() {
     includeSpecialDates,
     periods,
     isGeneratingPeriods,
+    projectId,
     setPeriods,
     setIsGeneratingPeriods,
   } = useCreateProjectStore();
@@ -25,7 +26,7 @@ export default function Step4GeneratePeriods() {
     setIsGeneratingPeriods(true);
     try {
       const result: Period[] = await generatePeriods(
-        0, // projectId 临时用0
+        projectId || 0,
         selectedBaby.birth_date,
         periodDays
       );

@@ -1,34 +1,55 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import WizardSidebar from '../components/WizardSidebar';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { useCreateProjectStore } from '../store/createProjectStore';
+import { createProject } from '../utils/tauriCommands';
 import Step1SelectBaby from './create-project/Step1SelectBaby';
 import Step2ProjectInfo from './create-project/Step2ProjectInfo';
-import Step3SelectFolder from './create-project/Step3SelectFolder';
-import Step4GeneratePeriods from './create-project/Step4GeneratePeriods';
+import Step3GeneratePeriods from './create-project/Step4GeneratePeriods';
+import Step4SelectFolder from './create-project/Step3SelectFolder';
 import Step5Complete from './create-project/Step5Complete';
 
 const steps = [
   { number: 1, title: '选择宝宝' },
   { number: 2, title: '项目信息' },
-  { number: 3, title: '选择照片' },
-  { number: 4, title: '生成周期' },
+  { number: 3, title: '生成周期' },
+  { number: 4, title: '选择照片' },
   { number: 5, title: '完成' },
 ];
 
 export default function CreateProjectPage() {
   const navigate = useNavigate();
-  const { currentStep, setCurrentStep, reset, selectedBaby, projectName, periodDays, scanResult, periods } = useCreateProjectStore();
+  const { currentStep, setCurrentStep, reset, selectedBaby, projectName, periodDays, scanResult, periods, setProjectId, projectId } = useCreateProjectStore();
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     console.log('CreateProjectPage 已加载，当前步骤:', currentStep);
     console.log('窗口尺寸:', window.innerWidth, 'x', window.innerHeight);
   }, []);
 
-  const handleNext = () => {
-    if (currentStep < 5) {
+  const handleNext = async () => {
+    if (currentStep === 2 && !projectId) {
+      setIsCreating(true);
+      try {
+        if (!selectedBaby) return;
+        const project = await createProject({
+          baby_id: selectedBaby.id,
+          name: projectName,
+          description: '',
+          period_days: periodDays,
+          status: 'draft',
+        });
+        setProjectId(project.id);
+        setCurrentStep(3);
+      } catch (error) {
+        console.error('创建项目失败:', error);
+        alert('创建项目失败，请重试');
+      } finally {
+        setIsCreating(false);
+      }
+    } else if (currentStep < 5) {
       setCurrentStep((currentStep + 1) as 1 | 2 | 3 | 4 | 5);
     }
   };
@@ -59,9 +80,9 @@ export default function CreateProjectPage() {
       case 2:
         return <Step2ProjectInfo />;
       case 3:
-        return <Step3SelectFolder />;
+        return <Step3GeneratePeriods />;
       case 4:
-        return <Step4GeneratePeriods />;
+        return <Step4SelectFolder />;
       case 5:
         return <Step5Complete />;
       default:
@@ -76,9 +97,9 @@ export default function CreateProjectPage() {
       case 2:
         return projectName.trim().length > 0 && periodDays >= 1 && periodDays <= 365;
       case 3:
-        return !!scanResult;
-      case 4:
         return periods.length > 0;
+      case 4:
+        return !!scanResult;
       default:
         return currentStep < 5;
     }
@@ -136,10 +157,15 @@ export default function CreateProjectPage() {
                 </button>
                 <button
                   onClick={handleNext}
-                  disabled={!canGoNext()}
-                  className={`btn ${canGoNext() ? 'btn-primary' : 'opacity-50 cursor-not-allowed'}`}
+                  disabled={!canGoNext() || isCreating}
+                  className={`btn ${canGoNext() && !isCreating ? 'btn-primary' : 'opacity-50 cursor-not-allowed'}`}
                 >
-                  {currentStep === 4 ? '创建项目' : '下一步'}
+                  {isCreating ? (
+                    <>
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      创建中...
+                    </>
+                  ) : currentStep === 4 ? '创建项目' : '下一步'}
                 </button>
               </div>
             )}

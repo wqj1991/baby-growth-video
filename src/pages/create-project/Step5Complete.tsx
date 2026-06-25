@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Baby, Calendar, Image, ArrowRight, Play } from 'lucide-react';
 import { useCreateProjectStore } from '../../store/createProjectStore';
 import { useAppStore } from '../../store';
-import { createProject } from '../../utils/tauriCommands';
+import { getProjects } from '../../utils/tauriCommands';
 import type { Project } from '../../types';
 
 export default function Step5Complete() {
@@ -11,50 +11,35 @@ export default function Step5Complete() {
   const {
     selectedBaby,
     projectName,
-    projectDescription,
-    periodDays,
+    projectId,
     scanResult,
     periods,
     reset,
   } = useCreateProjectStore();
   const { setCurrentProject, setCurrentBaby, setPeriods } = useAppStore();
 
-  const [creating, setCreating] = useState(true);
   const [createdProject, setCreatedProject] = useState<Project | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    createTheProject();
+    loadProject();
   }, []);
 
-  const createTheProject = async () => {
-    if (!selectedBaby) {
-      setError('未选择宝宝');
-      setCreating(false);
-      return;
-    }
+  const loadProject = async () => {
+    if (!selectedBaby || !projectId) return;
 
-    setCreating(true);
     try {
-      const project: Project = await createProject({
-        baby_id: selectedBaby.id,
-        name: projectName,
-        description: projectDescription,
-        period_days: periodDays,
-        status: 'draft',
-      });
-
-      setCreatedProject(project);
-      setCurrentProject(project);
-      setCurrentBaby(selectedBaby);
-      if (periods.length > 0) {
-        setPeriods(periods);
+      const projects = await getProjects(selectedBaby.id);
+      const project = projects.find((p) => p.id === projectId);
+      if (project) {
+        setCreatedProject(project);
+        setCurrentProject(project);
+        setCurrentBaby(selectedBaby);
+        if (periods.length > 0) {
+          setPeriods(periods);
+        }
       }
     } catch (err) {
-      console.error('创建项目失败:', err);
-      setError('创建项目失败，请重试');
-    } finally {
-      setCreating(false);
+      console.error('加载项目失败:', err);
     }
   };
 
@@ -71,42 +56,6 @@ export default function Step5Complete() {
       navigate(`/project/${createdProject.id}/periods`);
     }
   };
-
-  const handleRetry = () => {
-    setError(null);
-    createTheProject();
-  };
-
-  if (creating) {
-    return (
-      <div className="p-8 text-center">
-        <div className="py-16">
-          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <Calendar className="w-8 h-8 text-primary-500" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">正在创建项目...</h2>
-          <p className="text-gray-500">请稍候，正在为您创建成长视频项目</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-8 text-center">
-        <div className="py-16">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-3xl">😕</span>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">创建失败</h2>
-          <p className="text-gray-500 mb-6">{error}</p>
-          <button onClick={handleRetry} className="btn btn-primary">
-            重试
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-8">

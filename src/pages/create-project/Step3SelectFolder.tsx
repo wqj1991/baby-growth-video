@@ -9,6 +9,7 @@ export default function Step3SelectFolder() {
     folderPath,
     scanResult,
     isScanning,
+    projectId,
     setFolderPath,
     setScanResult,
     setIsScanning,
@@ -46,7 +47,7 @@ export default function Step3SelectFolder() {
         });
       }, 200);
 
-      const result: ScanResult = await scanMediaFolder(0, folderPath); // projectId 临时用0
+      const result: ScanResult = await scanMediaFolder(projectId || 0, folderPath);
 
       clearInterval(progressInterval);
       setScanProgress(100);
@@ -68,6 +69,8 @@ export default function Step3SelectFolder() {
   const unrecognizedCount = scanResult
     ? scanResult.total_photos - (scanResult.photos?.length || 0)
     : 0;
+
+  const skippedNoPeriod = scanResult?.skipped_no_period || 0;
 
   return (
     <div className="p-8 max-w-2xl">
@@ -175,14 +178,24 @@ export default function Step3SelectFolder() {
             </div>
 
             <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <AlertCircle className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm">未识别/重复</span>
+                <div className="flex items-center gap-2 text-gray-600 mb-1">
+                  <AlertCircle className="w-4 h-4 text-yellow-500" />
+                  <span className="text-sm">未识别/重复</span>
+                </div>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {unrecognizedCount + scanResult.skipped_duplicates}
+                </p>
               </div>
-              <p className="text-2xl font-bold text-yellow-600">
-                {unrecognizedCount + scanResult.skipped_duplicates}
-              </p>
-            </div>
+
+              <div className="bg-white rounded-lg p-4">
+                <div className="flex items-center gap-2 text-gray-600 mb-1">
+                  <AlertCircle className="w-4 h-4 text-orange-500" />
+                  <span className="text-sm">日期不匹配周期</span>
+                </div>
+                <p className="text-2xl font-bold text-orange-600">
+                  {skippedNoPeriod}
+                </p>
+              </div>
           </div>
 
           {scanResult.total_photos === 0 && (

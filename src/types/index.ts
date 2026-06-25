@@ -100,6 +100,7 @@ export interface ScanResult {
   total_photos: number;
   total_videos: number;
   skipped_duplicates: number;
+  skipped_no_period: number;
 }
 
 // 视频生成配置
