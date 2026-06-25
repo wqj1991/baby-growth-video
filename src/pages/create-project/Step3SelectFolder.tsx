@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Folder, Image, Film, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { useCreateProjectStore } from '../../store/createProjectStore';
-import { scanMediaFolder, selectFolder } from '../../utils/tauriCommands';
+import { scanMediaFolder, selectFolder, onScanLog } from '../../utils/tauriCommands';
 import type { ScanResult } from '../../types';
+import ScanLogPanel from '../../components/ScanLogPanel';
 
 export default function Step3SelectFolder() {
   const {
@@ -10,12 +11,19 @@ export default function Step3SelectFolder() {
     scanResult,
     isScanning,
     projectId,
+    scanLogs,
+    isLogExpanded,
+    autoScrollLog,
     setFolderPath,
     setScanResult,
     setIsScanning,
+    addScanLog,
+    clearScanLogs,
+    toggleLogExpanded,
+    toggleAutoScrollLog,
   } = useCreateProjectStore();
 
-  const [scanProgress, setScanProgress] = useState(0);
+  const unlistenScanLogRef = useRef<(() => void) | null>(null);
 
   const handleSelectFolder = async () => {
     try {
@@ -33,38 +41,43 @@ export default function Step3SelectFolder() {
     if (!folderPath) return;
 
     setIsScanning(true);
-    setScanProgress(0);
+    clearScanLogs();
 
     try {
-      // 模拟进度（实际扫描进度可以通过事件获取，这里先简化）
-      const progressInterval = setInterval(() => {
-        setScanProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 200);
+      // 注册日志事件监听
+      const unlisten = await onScanLog((log) => {
+        addScanLog(log);
+      });
+      unlistenScanLogRef.current = unlisten;
 
       const result: ScanResult = await scanMediaFolder(projectId || 0, folderPath);
-
-      clearInterval(progressInterval);
-      setScanProgress(100);
       setScanResult(result);
     } catch (error) {
       console.error('扫描失败:', error);
       alert('扫描文件夹失败，请重试');
     } finally {
       setIsScanning(false);
+      // 移除事件监听
+      if (unlistenScanLogRef.current) {
+        unlistenScanLogRef.current();
+        unlistenScanLogRef.current = null;
+      }
     }
   };
 
   const handleRescan = () => {
     setScanResult(null);
-    setScanProgress(0);
     handleScan();
   };
+
+  // 组件卸载时清理事件监听
+  useEffect(() => {
+    return () => {
+      if (unlistenScanLogRef.current) {
+        unlistenScanLogRef.current();
+      }
+    };
+  }, []);
 
   
 
@@ -109,17 +122,16 @@ export default function Step3SelectFolder() {
             )}
           </button>
 
-          {isScanning && (
-            <div className="mt-3">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-primary-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${scanProgress}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1 text-center">
-                正在扫描照片... {scanProgress}%
-              </p>
+          {/* 实时日志 */}
+          {(isScanning || scanLogs.length > 0) && (
+            <div className="mt-4">
+              <ScanLogPanel
+                logs={scanLogs}
+                isExpanded={isLogExpanded}
+                onToggleExpand={toggleLogExpanded}
+                autoScroll={autoScrollLog}
+                onToggleAutoScroll={toggleAutoScrollLog}
+              />
             </div>
           )}
         </div>

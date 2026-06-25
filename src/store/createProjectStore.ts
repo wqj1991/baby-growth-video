@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WizardStep, Baby, Period, ScanResult } from '../types';
+import type { WizardStep, Baby, Period, ScanResult, ScanLog } from '../types';
 
 interface CreateProjectState {
   // 当前步骤
@@ -22,6 +22,11 @@ interface CreateProjectState {
   scanResult: ScanResult | null;
   isScanning: boolean;
 
+  // 扫描日志
+  scanLogs: ScanLog[];
+  isLogExpanded: boolean;
+  autoScrollLog: boolean;
+
   // 步骤4：生成周期
   periods: Period[];
   isGeneratingPeriods: boolean;
@@ -39,6 +44,10 @@ interface CreateProjectState {
   setFolderPath: (path: string) => void;
   setScanResult: (result: ScanResult | null) => void;
   setIsScanning: (scanning: boolean) => void;
+  addScanLog: (log: Omit<ScanLog, 'id'>) => void;
+  clearScanLogs: () => void;
+  toggleLogExpanded: () => void;
+  toggleAutoScrollLog: () => void;
   setPeriods: (periods: Period[]) => void;
   setIsGeneratingPeriods: (generating: boolean) => void;
   reset: () => void;
@@ -55,6 +64,9 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   folderPath: null,
   scanResult: null,
   isScanning: false,
+  scanLogs: [],
+  isLogExpanded: false,
+  autoScrollLog: true,
   periods: [],
   isGeneratingPeriods: false,
 
@@ -78,6 +90,25 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
 
   setIsScanning: (scanning) => set({ isScanning: scanning }),
 
+  addScanLog: (log) =>
+    set((state) => ({
+      scanLogs: [
+        ...state.scanLogs,
+        {
+          ...log,
+          id: `${log.timestamp}-${state.scanLogs.length}`,
+        },
+      ],
+    })),
+
+  clearScanLogs: () => set({ scanLogs: [] }),
+
+  toggleLogExpanded: () =>
+    set((state) => ({ isLogExpanded: !state.isLogExpanded })),
+
+  toggleAutoScrollLog: () =>
+    set((state) => ({ autoScrollLog: !state.autoScrollLog })),
+
   setPeriods: (periods) => set({ periods }),
 
   setIsGeneratingPeriods: (generating) => set({ isGeneratingPeriods: generating }),
@@ -94,6 +125,9 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
       folderPath: null,
       scanResult: null,
       isScanning: false,
+      scanLogs: [],
+      isLogExpanded: false,
+      autoScrollLog: true,
       periods: [],
       isGeneratingPeriods: false,
     }),

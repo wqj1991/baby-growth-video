@@ -72,7 +72,8 @@ fn update_project(project: db::Project, state: State<AppState>) -> Result<db::Pr
 #[tauri::command]
 fn delete_project(project_id: i64, state: State<AppState>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.delete_project(project_id).map_err(|e| e.to_string())
+    db.delete_project(project_id).map_err(|e| e.to_string())?;
+    media::delete_project_dir(project_id).map_err(|e| e.to_string())
 }
 
 // ==================== 周期相关 ====================
@@ -174,10 +175,11 @@ fn set_final_video_frame(
 fn scan_media_folder(
     project_id: i64,
     folder_path: String,
+    window: tauri::Window,
     state: State<AppState>,
 ) -> Result<media::ScanResult, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    media::scan_media_folder(&db, project_id, &folder_path).map_err(|e| e.to_string())
+    media::scan_media_folder(&db, project_id, &folder_path, window).map_err(|e| e.to_string())
 }
 
 // ==================== 视频生成 ====================

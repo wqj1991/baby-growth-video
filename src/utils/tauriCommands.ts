@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type {
   Baby,
@@ -9,6 +10,7 @@ import type {
   VideoFrame,
   ExportRecord,
   ScanResult,
+  ScanLog,
   VideoConfig,
 } from '../types';
 
@@ -141,6 +143,27 @@ export async function scanMediaFolder(
   folderPath: string
 ): Promise<ScanResult> {
   return invoke('scan_media_folder', { projectId, folderPath });
+}
+
+// 监听扫描日志事件
+export async function onScanLog(
+  callback: (log: Omit<ScanLog, 'id'>) => void
+): Promise<() => void> {
+  const unlisten = await listen<{
+    level: ScanLog['level'];
+    message: string;
+    timestamp: number;
+    file_name?: string;
+  }>('scan://log', (event) => {
+    callback({
+      level: event.payload.level,
+      message: event.payload.message,
+      timestamp: event.payload.timestamp,
+      fileName: event.payload.file_name,
+    });
+  });
+
+  return unlisten;
 }
 
 // ==================== 视频生成 ====================

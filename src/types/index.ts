@@ -107,6 +107,17 @@ export interface ScanResult {
   skipped_no_date_videos: number;
   skipped_no_period_photos: number;
   skipped_no_period_videos: number;
+  skipped_copy_failed_photos: number;
+  skipped_copy_failed_videos: number;
+}
+
+// 扫描日志
+export interface ScanLog {
+  id: string;
+  level: 'success' | 'warn' | 'error' | 'info';
+  message: string;
+  timestamp: number;
+  fileName?: string;
 }
 
 // 视频生成配置
