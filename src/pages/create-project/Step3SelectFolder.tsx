@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Folder, Image, Film, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { useCreateProjectStore } from '../../store/createProjectStore';
 import { scanMediaFolder, selectFolder, onScanLog } from '../../utils/tauriCommands';
