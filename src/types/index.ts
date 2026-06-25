@@ -99,8 +99,14 @@ export interface ScanResult {
   videos: Video[];
   total_photos: number;
   total_videos: number;
-  skipped_duplicates: number;
-  skipped_no_period: number;
+  recognized_photos: number;
+  recognized_videos: number;
+  skipped_duplicate_photos: number;
+  skipped_duplicate_videos: number;
+  skipped_no_date_photos: number;
+  skipped_no_date_videos: number;
+  skipped_no_period_photos: number;
+  skipped_no_period_videos: number;
 }
 
 // 视频生成配置

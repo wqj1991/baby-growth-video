@@ -12,8 +12,14 @@ pub struct ScanResult {
     pub videos: Vec<Video>,
     pub total_photos: i64,
     pub total_videos: i64,
-    pub skipped_duplicates: i64,
-    pub skipped_no_period: i64,
+    pub recognized_photos: i64,
+    pub recognized_videos: i64,
+    pub skipped_duplicate_photos: i64,
+    pub skipped_duplicate_videos: i64,
+    pub skipped_no_date_photos: i64,
+    pub skipped_no_date_videos: i64,
+    pub skipped_no_period_photos: i64,
+    pub skipped_no_period_videos: i64,
 }
 
 const PHOTO_EXTENSIONS: &[&str] = &[
@@ -120,8 +126,14 @@ pub fn scan_media_folder(
 
     let mut photos: Vec<Photo> = Vec::new();
     let mut videos: Vec<Video> = Vec::new();
-    let mut skipped_duplicates = 0;
-    let mut skipped_no_period = 0;
+    let mut total_photos = 0i64;
+    let mut total_videos = 0i64;
+    let mut skipped_duplicate_photos = 0i64;
+    let mut skipped_duplicate_videos = 0i64;
+    let mut skipped_no_date_photos = 0i64;
+    let mut skipped_no_date_videos = 0i64;
+    let mut skipped_no_period_photos = 0i64;
+    let mut skipped_no_period_videos = 0i64;
 
     // 遍历文件夹
     for entry in WalkDir::new(folder).into_iter().filter_map(|e| e.ok()) {
@@ -131,10 +143,26 @@ pub fn scan_media_folder(
         }
 
         let file_path = path.to_string_lossy().to_string();
+        let is_photo = is_photo_file(path);
+        let is_video = is_video_file(path);
+
+        if !is_photo && !is_video {
+            continue;
+        }
+
+        if is_photo {
+            total_photos += 1;
+        } else {
+            total_videos += 1;
+        }
 
         // 检查是否已经存在（去重）
         if existing_paths.contains(&file_path) {
-            skipped_duplicates += 1;
+            if is_photo {
+                skipped_duplicate_photos += 1;
+            } else {
+                skipped_duplicate_videos += 1;
+            }
             continue;
         }
 
@@ -147,22 +175,35 @@ pub fn scan_media_folder(
         // 尝试从文件名提取日期
         let date_str = extract_date_from_filename(&file_name);
 
-        // 查找对应的周期
-        let period_id = date_str
-            .as_ref()
-            .and_then(|d| find_period_for_date(&periods, d));
+        // 如果无法提取日期，跳过
+        if date_str.is_none() {
+            if is_photo {
+                skipped_no_date_photos += 1;
+            } else {
+                skipped_no_date_videos += 1;
+            }
+            continue;
+        }
 
+        // 查找对应的周期
+        let period_id = find_period_for_date(&periods, date_str.as_ref().unwrap());
+
+        // 如果没有匹配的周期，跳过
         let period_id = match period_id {
             Some(id) => id,
             None => {
-                skipped_no_period += 1;
+                if is_photo {
+                    skipped_no_period_photos += 1;
+                } else {
+                    skipped_no_period_videos += 1;
+                }
                 continue;
             }
         };
 
         let file_size = get_file_size(path);
 
-        if is_photo_file(path) {
+        if is_photo {
             let (width, height) = get_image_dimensions(path);
 
             let new_photo = NewPhoto {
@@ -182,7 +223,7 @@ pub fn scan_media_folder(
                 }
                 Err(e) => eprintln!("添加照片失败: {}", e),
             }
-        } else if is_video_file(path) {
+        } else {
             let (duration, width, height) = get_video_info(path);
 
             let new_video = NewVideo {
@@ -206,12 +247,21 @@ pub fn scan_media_folder(
         }
     }
 
+    let recognized_photos_count = photos.len() as i64;
+    let recognized_videos_count = videos.len() as i64;
+
     Ok(ScanResult {
-        total_photos: photos.len() as i64,
-        total_videos: videos.len() as i64,
         photos,
         videos,
-        skipped_duplicates,
-        skipped_no_period,
+        total_photos,
+        total_videos,
+        recognized_photos: recognized_photos_count,
+        recognized_videos: recognized_videos_count,
+        skipped_duplicate_photos,
+        skipped_duplicate_videos,
+        skipped_no_date_photos,
+        skipped_no_date_videos,
+        skipped_no_period_photos,
+        skipped_no_period_videos,
     })
 }

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Baby, Plus, Video, Clock, ChevronRight } from 'lucide-react';
+import { Baby, Plus, Video, Clock, ChevronRight, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store';
-import { getBabies, getProjects } from '../utils/tauriCommands';
+import { getBabies, getProjects, deleteProject } from '../utils/tauriCommands';
 import type { Baby as BabyType, Project } from '../types';
 
 export default function HomePage() {
@@ -65,6 +65,22 @@ export default function HomePage() {
       console.log('navigate 调用成功');
     } catch (error) {
       console.error('navigate 调用失败:', error);
+    }
+  };
+
+  const handleDeleteProject = async (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    if (!window.confirm(`确定要删除项目"${project.name}"吗？此操作不可恢复。`)) {
+      return;
+    }
+    try {
+      await deleteProject(project.id);
+      if (selectedBaby) {
+        loadProjects(selectedBaby.id);
+      }
+    } catch (error) {
+      console.error('删除项目失败:', error);
+      alert('删除项目失败，请重试');
     }
   };
 
@@ -168,7 +184,7 @@ export default function HomePage() {
                     <div
                       key={project.id}
                       onClick={() => handleOpenProject(project)}
-                      className="p-4 rounded-lg bg-gray-50 border-2 border-transparent hover:border-primary-200 hover:bg-primary-50 cursor-pointer transition-all"
+                      className="p-4 rounded-lg bg-gray-50 border-2 border-transparent hover:border-primary-200 hover:bg-primary-50 cursor-pointer transition-all group"
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div>
@@ -177,11 +193,20 @@ export default function HomePage() {
                             {project.description || '暂无描述'}
                           </p>
                         </div>
-                        <span className={`badge ${
-                          project.status === 'completed' ? 'badge-success' : 'badge-primary'
-                        }`}>
-                          {project.status === 'completed' ? '已完成' : '进行中'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`badge ${
+                            project.status === 'completed' ? 'badge-success' : 'badge-primary'
+                          }`}>
+                            {project.status === 'completed' ? '已完成' : '进行中'}
+                          </span>
+                          <button
+                            onClick={(e) => handleDeleteProject(e, project)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                            title="删除项目"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <span className="flex items-center gap-1">

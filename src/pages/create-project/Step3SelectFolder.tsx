@@ -66,11 +66,7 @@ export default function Step3SelectFolder() {
     handleScan();
   };
 
-  const unrecognizedCount = scanResult
-    ? scanResult.total_photos - (scanResult.photos?.length || 0)
-    : 0;
-
-  const skippedNoPeriod = scanResult?.skipped_no_period || 0;
+  
 
   return (
     <div className="p-8 max-w-2xl">
@@ -146,7 +142,7 @@ export default function Step3SelectFolder() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="bg-white rounded-lg p-4">
               <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <Image className="w-4 h-4" />
@@ -170,32 +166,92 @@ export default function Step3SelectFolder() {
             <div className="bg-white rounded-lg p-4">
               <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <CheckCircle className="w-4 h-4 text-green-500" />
-                <span className="text-sm">已识别日期</span>
+                <span className="text-sm">已识别总数</span>
               </div>
               <p className="text-2xl font-bold text-green-600">
-                {scanResult.photos?.length || 0}
+                {(scanResult.recognized_photos || 0) + (scanResult.recognized_videos || 0)}
               </p>
             </div>
 
             <div className="bg-white rounded-lg p-4">
-                <div className="flex items-center gap-2 text-gray-600 mb-1">
-                  <AlertCircle className="w-4 h-4 text-yellow-500" />
-                  <span className="text-sm">未识别/重复</span>
-                </div>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {unrecognizedCount + scanResult.skipped_duplicates}
-                </p>
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
+                <Image className="w-4 h-4 text-green-500" />
+                <span className="text-sm">已识别照片</span>
               </div>
+              <p className="text-2xl font-bold text-green-600">
+                {scanResult.recognized_photos || 0}
+              </p>
+            </div>
 
-              <div className="bg-white rounded-lg p-4">
-                <div className="flex items-center gap-2 text-gray-600 mb-1">
-                  <AlertCircle className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm">日期不匹配周期</span>
-                </div>
-                <p className="text-2xl font-bold text-orange-600">
-                  {skippedNoPeriod}
-                </p>
+            <div className="bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
+                <Film className="w-4 h-4 text-green-500" />
+                <span className="text-sm">已识别视频</span>
               </div>
+              <p className="text-2xl font-bold text-green-600">
+                {scanResult.recognized_videos || 0}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
+                <AlertCircle className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm">重复照片</span>
+              </div>
+              <p className="text-2xl font-bold text-yellow-600">
+                {scanResult.skipped_duplicate_photos || 0}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
+                <AlertCircle className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm">重复视频</span>
+              </div>
+              <p className="text-2xl font-bold text-yellow-600">
+                {scanResult.skipped_duplicate_videos || 0}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
+                <AlertCircle className="w-4 h-4 text-orange-500" />
+                <span className="text-sm">日期不匹配照片</span>
+              </div>
+              <p className="text-2xl font-bold text-orange-600">
+                {scanResult.skipped_no_period_photos || 0}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
+                <AlertCircle className="w-4 h-4 text-orange-500" />
+                <span className="text-sm">日期不匹配视频</span>
+              </div>
+              <p className="text-2xl font-bold text-orange-600">
+                {scanResult.skipped_no_period_videos || 0}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
+                <AlertCircle className="w-4 h-4 text-red-500" />
+                <span className="text-sm">未识别日期照片</span>
+              </div>
+              <p className="text-2xl font-bold text-red-600">
+                {scanResult.skipped_no_date_photos || 0}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
+                <AlertCircle className="w-4 h-4 text-red-500" />
+                <span className="text-sm">未识别日期视频</span>
+              </div>
+              <p className="text-2xl font-bold text-red-600">
+                {scanResult.skipped_no_date_videos || 0}
+              </p>
+            </div>
           </div>
 
           {scanResult.total_photos === 0 && (
