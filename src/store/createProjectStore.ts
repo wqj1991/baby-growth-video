@@ -45,6 +45,7 @@ interface CreateProjectState {
   setScanResult: (result: ScanResult | null) => void;
   setIsScanning: (scanning: boolean) => void;
   addScanLog: (log: Omit<ScanLog, 'id'>) => void;
+  addScanLogs: (logs: Array<Omit<ScanLog, 'id'>>) => void;
   clearScanLogs: () => void;
   toggleLogExpanded: () => void;
   toggleAutoScrollLog: () => void;
@@ -91,15 +92,38 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   setIsScanning: (scanning) => set({ isScanning: scanning }),
 
   addScanLog: (log) =>
-    set((state) => ({
-      scanLogs: [
-        ...state.scanLogs,
-        {
-          ...log,
-          id: `${log.timestamp}-${state.scanLogs.length}`,
-        },
-      ],
-    })),
+    set((state) => {
+      const newLog = {
+        ...log,
+        id: `${log.timestamp}-${state.scanLogs.length}`,
+      };
+      const allLogs = [...state.scanLogs, newLog];
+      const maxLogs = 1000;
+      const trimmedLogs = allLogs.length > maxLogs
+        ? allLogs.slice(allLogs.length - maxLogs)
+        : allLogs;
+      return {
+        scanLogs: trimmedLogs,
+      };
+    }),
+
+  addScanLogs: (logs) =>
+    set((state) => {
+      const startIndex = state.scanLogs.length;
+      const newLogs = logs.map((log, index) => ({
+        ...log,
+        id: `${log.timestamp}-${startIndex + index}`,
+      }));
+      const allLogs = [...state.scanLogs, ...newLogs];
+      // 最多保留 1000 条日志，防止内存占用过大
+      const maxLogs = 1000;
+      const trimmedLogs = allLogs.length > maxLogs
+        ? allLogs.slice(allLogs.length - maxLogs)
+        : allLogs;
+      return {
+        scanLogs: trimmedLogs,
+      };
+    }),
 
   clearScanLogs: () => set({ scanLogs: [] }),
 

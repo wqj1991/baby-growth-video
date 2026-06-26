@@ -59,12 +59,17 @@ export default function ScanLogPanel({
     ? logs
     : logs.filter((log) => log.level === filter);
 
+  // 收起状态下只显示最后 20 条
+  const displayLogs = isExpanded
+    ? filteredLogs
+    : filteredLogs.slice(-20);
+
   // 自动滚动
   useEffect(() => {
     if (autoScroll && logContainerRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [filteredLogs, autoScroll]);
+  }, [displayLogs, autoScroll]);
 
   // 复制全部日志
   const handleCopyAll = async () => {
@@ -137,12 +142,12 @@ export default function ScanLogPanel({
           isExpanded ? 'max-h-[60vh]' : 'max-h-[120px]'
         }`}
       >
-        {filteredLogs.length === 0 ? (
+        {displayLogs.length === 0 ? (
           <div className="p-4 text-center text-gray-400">
             暂无日志
           </div>
         ) : (
-          filteredLogs.map((log) => {
+          displayLogs.map((log) => {
             const config = levelConfig[log.level];
             const Icon = config.icon;
             return (

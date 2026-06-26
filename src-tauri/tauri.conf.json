@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,7 +35,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "category": "PhotoVideo",
+    "category": "Productivity",
     "shortDescription": "宝宝成长视频制作工具",
     "longDescription": "制作宝宝成长视频的桌面应用，按周期整理照片，生成精美成长视频。",
     "copyright": "© 2024 Baby Growth Video"

@@ -18,12 +18,33 @@ export default function Step3SelectFolder() {
     setScanResult,
     setIsScanning,
     addScanLog,
+    addScanLogs,
     clearScanLogs,
     toggleLogExpanded,
     toggleAutoScrollLog,
   } = useCreateProjectStore();
 
   const unlistenScanLogRef = useRef<(() => void) | null>(null);
+  const pendingLogsRef = useRef<Array<Parameters<typeof addScanLog>[0]>>([]);
+  const flushTimerRef = useRef<number | null>(null);
+
+  // 批量刷新日志
+  const flushLogs = () => {
+    if (pendingLogsRef.current.length > 0) {
+      const logs = pendingLogsRef.current;
+      pendingLogsRef.current = [];
+      addScanLogs(logs);
+    }
+    flushTimerRef.current = null;
+  };
+
+  // 添加日志到缓冲，定时批量刷新
+  const enqueueLog = (log: Parameters<typeof addScanLog>[0]) => {
+    pendingLogsRef.current.push(log);
+    if (flushTimerRef.current === null) {
+      flushTimerRef.current = window.setTimeout(flushLogs, 100);
+    }
+  };
 
   const handleSelectFolder = async () => {
     try {
@@ -46,7 +67,7 @@ export default function Step3SelectFolder() {
     try {
       // 注册日志事件监听
       const unlisten = await onScanLog((log) => {
-        addScanLog(log);
+        enqueueLog(log);
       });
       unlistenScanLogRef.current = unlisten;
 
@@ -57,6 +78,11 @@ export default function Step3SelectFolder() {
       alert('扫描文件夹失败，请重试');
     } finally {
       setIsScanning(false);
+      // 强制刷新剩余日志
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushLogs();
+      }
       // 移除事件监听
       if (unlistenScanLogRef.current) {
         unlistenScanLogRef.current();
@@ -70,11 +96,14 @@ export default function Step3SelectFolder() {
     handleScan();
   };
 
-  // 组件卸载时清理事件监听
+  // 组件卸载时清理事件监听和定时器
   useEffect(() => {
     return () => {
       if (unlistenScanLogRef.current) {
         unlistenScanLogRef.current();
+      }
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
       }
     };
   }, []);

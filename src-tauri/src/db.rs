@@ -615,25 +615,45 @@ impl Database {
         photos.collect()
     }
 
-    pub fn add_photo(&self, photo: &NewPhoto) -> Result<Photo> {
+    // 批量插入照片（事务）
+    pub fn add_photos(&self, photos: &[NewPhoto]) -> Result<Vec<Photo>> {
         let conn = self.get_conn();
         let now = Self::now();
-        conn.execute(
-            "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![
-                photo.period_id,
-                photo.file_path,
-                photo.file_name,
-                photo.file_size,
-                photo.width,
-                photo.height,
-                photo.taken_at,
-                &now,
-            ],
-        )?;
-        let id = conn.last_insert_rowid();
-        self.get_photo_by_id(id)
+        let mut result = Vec::with_capacity(photos.len());
+
+        // 开启事务，批量插入性能提升 10-100 倍
+        conn.execute("BEGIN TRANSACTION", params![])?;
+
+        for photo in photos {
+            match conn.execute(
+                "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    photo.period_id,
+                    photo.file_path,
+                    photo.file_name,
+                    photo.file_size,
+                    photo.width,
+                    photo.height,
+                    photo.taken_at,
+                    &now,
+                ],
+            ) {
+                Ok(_) => {
+                    let id = conn.last_insert_rowid();
+                    let photo = self.get_photo_by_id(id)?;
+                    result.push(photo);
+                }
+                Err(e) => {
+                    // 出错回滚
+                    conn.execute("ROLLBACK", params![]).ok();
+                    return Err(e);
+                }
+            }
+        }
+
+        conn.execute("COMMIT", params![])?;
+        Ok(result)
     }
 
     pub fn update_photo(&self, photo: &Photo) -> Result<Photo> {
@@ -714,26 +734,46 @@ impl Database {
         videos.collect()
     }
 
-    pub fn add_video(&self, video: &NewVideo) -> Result<Video> {
+    // 批量插入视频（事务）
+    pub fn add_videos(&self, videos: &[NewVideo]) -> Result<Vec<Video>> {
         let conn = self.get_conn();
         let now = Self::now();
-        conn.execute(
-            "INSERT INTO videos (period_id, file_path, file_name, file_size, duration, width, height, taken_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![
-                video.period_id,
-                video.file_path,
-                video.file_name,
-                video.file_size,
-                video.duration,
-                video.width,
-                video.height,
-                video.taken_at,
-                &now,
-            ],
-        )?;
-        let id = conn.last_insert_rowid();
-        self.get_video_by_id(id)
+        let mut result = Vec::with_capacity(videos.len());
+
+        // 开启事务，批量插入性能提升 10-100 倍
+        conn.execute("BEGIN TRANSACTION", params![])?;
+
+        for video in videos {
+            match conn.execute(
+                "INSERT INTO videos (period_id, file_path, file_name, file_size, duration, width, height, taken_at, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    video.period_id,
+                    video.file_path,
+                    video.file_name,
+                    video.file_size,
+                    video.duration,
+                    video.width,
+                    video.height,
+                    video.taken_at,
+                    &now,
+                ],
+            ) {
+                Ok(_) => {
+                    let id = conn.last_insert_rowid();
+                    let video = self.get_video_by_id(id)?;
+                    result.push(video);
+                }
+                Err(e) => {
+                    // 出错回滚
+                    conn.execute("ROLLBACK", params![]).ok();
+                    return Err(e);
+                }
+            }
+        }
+
+        conn.execute("COMMIT", params![])?;
+        Ok(result)
     }
 
     pub fn get_video_by_id(&self, id: i64) -> Result<Video> {

@@ -5,14 +5,14 @@ mod media;
 mod video;
 
 use db::Database;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::State;
 use tauri_plugin_dialog::init as init_dialog;
 use tauri_plugin_fs::init as init_fs;
 use tauri_plugin_shell::init as init_shell;
 
 struct AppState {
-    db: Mutex<Database>,
+    db: Arc<Mutex<Database>>,
 }
 
 // ==================== 数据库操作 ====================
@@ -172,14 +172,21 @@ fn set_final_video_frame(
 // ==================== 扫描文件 ====================
 
 #[tauri::command]
-fn scan_media_folder(
+async fn scan_media_folder(
     project_id: i64,
     folder_path: String,
     window: tauri::Window,
-    state: State<AppState>,
+    state: State<'_, AppState>,
 ) -> Result<media::ScanResult, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    media::scan_media_folder(&db, project_id, &folder_path, window).map_err(|e| e.to_string())
+    let db = state.db.clone();
+    let window = window.clone();
+    
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let db = db.lock().map_err(|e| e.to_string())?;
+        media::scan_media_folder(&db, project_id, &folder_path, window)
+    }).await.map_err(|e| format!("Task failed: {}", e))?;
+    
+    result
 }
 
 // ==================== 视频生成 ====================
@@ -221,7 +228,7 @@ pub fn run() {
     
     tauri::Builder::default()
         .manage(AppState {
-            db: Mutex::new(db),
+            db: Arc::new(Mutex::new(db)),
         })
         .plugin(init_dialog())
         .plugin(init_fs())

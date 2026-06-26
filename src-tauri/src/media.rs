@@ -105,34 +105,54 @@ fn get_jpeg_dimensions(path: &Path) -> (i64, i64) {
     let mut reader = BufReader::new(file);
     let mut buf = [0u8; 4];
 
-    if reader.read(&mut buf).is_err() {
-        return (0, 0);
+    // 读取 SOI 标记
+    match reader.read(&mut buf) {
+        Ok(n) if n >= 2 => {}
+        _ => return (0, 0),
     }
     if &buf[0..2] != b"\xFF\xD8" {
         return (0, 0);
     }
 
+    let mut loop_count = 0;
+    let max_loops = 100; // 防止无限循环
+
     loop {
-        if reader.read(&mut buf).is_err() {
+        loop_count += 1;
+        if loop_count > max_loops {
             return (0, 0);
         }
+
+        // 读取段长度和标记
+        match reader.read(&mut buf) {
+            Ok(n) if n >= 4 => {}
+            _ => return (0, 0), // 读取不足，文件可能损坏
+        }
+
         let len = ((buf[0] as u32) << 8) | (buf[1] as u32);
         let marker = buf[2];
         let marker2 = buf[3];
 
-        if marker == 0xFF && (marker2 >= 0xC0 && marker2 <= 0xC3) {
-            let mut tmp = vec![0u8; len as usize - 2];
-            if reader.read(&mut tmp).is_err() {
-                return (0, 0);
-            }
-            if tmp.len() >= 5 {
-                let height = ((tmp[3] as u32) << 8) | (tmp[4] as u32);
-                let width = ((tmp[5] as u32) << 8) | (tmp[6] as u32);
-                return (width as i64, height as i64);
-            }
+        // 检查 len 是否合理（至少为 2，否则 skip_len 会是负数）
+        if len < 2 {
             return (0, 0);
         }
 
+        // SOF0 - SOF3 标记包含图像尺寸
+        if marker == 0xFF && (marker2 >= 0xC0 && marker2 <= 0xC3) {
+            let data_len = (len - 2) as usize;
+            let mut tmp = vec![0u8; data_len];
+            match reader.read(&mut tmp) {
+                Ok(n) if n >= 5 => {
+                    let height = ((tmp[3] as u32) << 8) | (tmp[4] as u32);
+                    let width = ((tmp[5] as u32) << 8) | (tmp[6] as u32);
+                    return (width as i64, height as i64);
+                }
+                _ => return (0, 0),
+            }
+        }
+
+        // 跳过当前段
         let skip_len = (len - 2) as i64;
         if reader.seek_relative(skip_len).is_err() {
             return (0, 0);
@@ -357,8 +377,8 @@ pub fn scan_media_folder(
         }
     }
 
-    let mut photos: Vec<Photo> = Vec::new();
-    let mut videos: Vec<Video> = Vec::new();
+    let mut new_photos: Vec<NewPhoto> = Vec::new();
+    let mut new_videos: Vec<NewVideo> = Vec::new();
     let mut total_photos = 0i64;
     let mut total_videos = 0i64;
     let mut skipped_duplicate_photos = 0i64;
@@ -383,17 +403,16 @@ pub fn scan_media_folder(
             continue;
         }
 
+        let file_name = path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
         if is_photo {
             total_photos += 1;
         } else {
             total_videos += 1;
         }
-
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("")
-            .to_string();
 
         let date_str = extract_date_from_filename(&file_name);
 
@@ -481,22 +500,14 @@ pub fn scan_media_folder(
                 taken_at: date_str.clone(),
             };
 
-            match db.add_photo(&new_photo) {
-                Ok(photo) => {
-                    existing_paths.insert(copied_path);
-                    photos.push(photo);
-                    emit_scan_log(
-                        &window,
-                        "success",
-                        format!("✓ 已识别照片: {} ({})", file_name, date_str.clone().unwrap_or_default()),
-                        Some(file_name.clone()),
-                    );
-                }
-                Err(e) => {
-                    fs::remove_file(&copied_path).ok();
-                    eprintln!("添加照片失败: {}", e);
-                }
-            }
+            existing_paths.insert(copied_path);
+            new_photos.push(new_photo);
+            emit_scan_log(
+                &window,
+                "success",
+                format!("✓ 已识别照片: {} ({})", file_name, date_str.clone().unwrap_or_default()),
+                Some(file_name.clone()),
+            );
         } else {
             let new_video = NewVideo {
                 period_id,
@@ -509,24 +520,26 @@ pub fn scan_media_folder(
                 taken_at: date_str.clone(),
             };
 
-            match db.add_video(&new_video) {
-                Ok(video) => {
-                    existing_paths.insert(copied_path);
-                    videos.push(video);
-                    emit_scan_log(
-                        &window,
-                        "success",
-                        format!("✓ 已识别视频: {} ({})", file_name, date_str.clone().unwrap_or_default()),
-                        Some(file_name.clone()),
-                    );
-                }
-                Err(e) => {
-                    fs::remove_file(&copied_path).ok();
-                    eprintln!("添加视频失败: {}", e);
-                }
-            }
+            existing_paths.insert(copied_path);
+            new_videos.push(new_video);
+            emit_scan_log(
+                &window,
+                "success",
+                format!("✓ 已识别视频: {} ({})", file_name, date_str.clone().unwrap_or_default()),
+                Some(file_name.clone()),
+            );
         }
     }
+
+    // 批量插入数据库（事务，性能提升 10-100 倍）
+    let photos = db.add_photos(&new_photos).unwrap_or_else(|e| {
+        eprintln!("批量插入照片失败: {}", e);
+        Vec::new()
+    });
+    let videos = db.add_videos(&new_videos).unwrap_or_else(|e| {
+        eprintln!("批量插入视频失败: {}", e);
+        Vec::new()
+    });
 
     let recognized_photos_count = photos.len() as i64;
     let recognized_videos_count = videos.len() as i64;
