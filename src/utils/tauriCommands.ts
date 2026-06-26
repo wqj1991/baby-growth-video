@@ -11,6 +11,7 @@ import type {
   ExportRecord,
   ScanResult,
   ScanLog,
+  ScanLogFile,
   VideoConfig,
 } from '../types';
 
@@ -164,6 +165,13 @@ export async function onScanLog(
   });
 
   return unlisten;
+}
+
+// 获取项目的历史扫描日志
+export async function getScanLog(
+  projectId: number
+): Promise<ScanLogFile | null> {
+  return invoke('get_scan_log', { projectId });
 }
 
 // ==================== 视频生成 ====================

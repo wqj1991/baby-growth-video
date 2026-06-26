@@ -120,6 +120,15 @@ export interface ScanLog {
   fileName?: string;
 }
 
+// 扫描日志文件（持久化格式）
+export interface ScanLogFile {
+  project_id: number;
+  scanned_at: string; // ISO date string
+  folder_path: string;
+  total_files: number;
+  logs: Array<Omit<ScanLog, 'id'>>;
+}
+
 // 视频生成配置
 export interface VideoConfig {
   resolution: '720p' | '1080p' | '4k';

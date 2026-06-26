@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Copy,
   Filter,
+  Download,
 } from 'lucide-react';
 import type { ScanLog } from '../types';
 
@@ -17,6 +18,7 @@ interface ScanLogPanelProps {
   onToggleExpand: () => void;
   autoScroll: boolean;
   onToggleAutoScroll: () => void;
+  onDownload?: () => void;
 }
 
 const levelConfig = {
@@ -50,6 +52,7 @@ export default function ScanLogPanel({
   onToggleExpand,
   autoScroll,
   onToggleAutoScroll,
+  onDownload,
 }: ScanLogPanelProps) {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<LogLevel | 'all'>('all');
@@ -123,6 +126,16 @@ export default function ScanLogPanel({
               />
               自动滚动
             </label>
+            {onDownload && (
+              <button
+                onClick={onDownload}
+                className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+                title="下载日志"
+              >
+                <Download className="w-4 h-4" />
+                下载
+              </button>
+            )}
             <button
               onClick={handleCopyAll}
               className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"

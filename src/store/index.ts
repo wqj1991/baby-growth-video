@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord } from '../types';
+import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog } from '../types';
 
 interface AppState {
   // 当前选中的宝宝
@@ -41,6 +41,16 @@ interface AppState {
   // UI状态
   isScanning: boolean;
   setIsScanning: (scanning: boolean) => void;
+
+  // 扫描日志
+  scanLogs: ScanLog[];
+  isLogExpanded: boolean;
+  autoScrollLog: boolean;
+  addScanLog: (log: Omit<ScanLog, 'id'>) => void;
+  addScanLogs: (logs: Array<Omit<ScanLog, 'id'>>) => void;
+  clearScanLogs: () => void;
+  toggleLogExpanded: () => void;
+  toggleAutoScrollLog: () => void;
 
   isGenerating: boolean;
   setIsGenerating: (generating: boolean) => void;
@@ -86,6 +96,51 @@ export const useAppStore = create<AppState>((set) => ({
 
   isScanning: false,
   setIsScanning: (scanning) => set({ isScanning: scanning }),
+
+  scanLogs: [],
+  isLogExpanded: false,
+  autoScrollLog: true,
+
+  addScanLog: (log) =>
+    set((state) => {
+      const newLog = {
+        ...log,
+        id: `${log.timestamp}-${state.scanLogs.length}`,
+      };
+      const allLogs = [...state.scanLogs, newLog];
+      const maxLogs = 1000;
+      const trimmedLogs = allLogs.length > maxLogs
+        ? allLogs.slice(allLogs.length - maxLogs)
+        : allLogs;
+      return {
+        scanLogs: trimmedLogs,
+      };
+    }),
+
+  addScanLogs: (logs) =>
+    set((state) => {
+      const startIndex = state.scanLogs.length;
+      const newLogs = logs.map((log, index) => ({
+        ...log,
+        id: `${log.timestamp}-${startIndex + index}`,
+      }));
+      const allLogs = [...state.scanLogs, ...newLogs];
+      const maxLogs = 1000;
+      const trimmedLogs = allLogs.length > maxLogs
+        ? allLogs.slice(allLogs.length - maxLogs)
+        : allLogs;
+      return {
+        scanLogs: trimmedLogs,
+      };
+    }),
+
+  clearScanLogs: () => set({ scanLogs: [] }),
+
+  toggleLogExpanded: () =>
+    set((state) => ({ isLogExpanded: !state.isLogExpanded })),
+
+  toggleAutoScrollLog: () =>
+    set((state) => ({ autoScrollLog: !state.autoScrollLog })),
 
   isGenerating: false,
   setIsGenerating: (generating) => set({ isGenerating: generating }),

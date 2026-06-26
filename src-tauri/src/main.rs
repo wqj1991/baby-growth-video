@@ -189,6 +189,11 @@ async fn scan_media_folder(
     result
 }
 
+#[tauri::command]
+fn get_scan_log(project_id: i64) -> Result<Option<media::ScanLogFile>, String> {
+    media::load_scan_log(project_id)
+}
+
 // ==================== 视频生成 ====================
 
 #[tauri::command]
@@ -256,6 +261,7 @@ pub fn run() {
             generate_video_frames,
             set_final_video_frame,
             scan_media_folder,
+            get_scan_log,
             generate_growth_video,
             get_generation_progress,
             get_export_records,

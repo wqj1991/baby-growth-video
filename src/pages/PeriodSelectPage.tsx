@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   FolderOpen,
@@ -21,8 +21,12 @@ import {
   selectFolder,
   updatePhoto,
   setFinalPhoto,
+  onScanLog,
+  getScanLog,
 } from '../utils/tauriCommands';
-import type { Period, Photo } from '../types';
+import { downloadJson } from '../utils/download';
+import type { Period, Photo, ScanLog } from '../types';
+import ScanLogPanel from '../components/ScanLogPanel';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -38,12 +42,24 @@ export default function PeriodSelectPage() {
     isScanning,
     setIsScanning,
     currentBaby,
+    scanLogs,
+    isLogExpanded,
+    autoScrollLog,
+    addScanLog,
+    addScanLogs,
+    clearScanLogs,
+    toggleLogExpanded,
+    toggleAutoScrollLog,
   } = useAppStore();
 
   const [showAddPeriod, setShowAddPeriod] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newPeriodDate, setNewPeriodDate] = useState('');
   const [selectedTab, setSelectedTab] = useState<'photos' | 'videos'>('photos');
+
+  const unlistenScanLogRef = useRef<(() => void) | null>(null);
+  const pendingLogsRef = useRef<Array<Parameters<typeof addScanLog>[0]>>([]);
+  const flushTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -56,6 +72,42 @@ export default function PeriodSelectPage() {
       loadPeriodMedia(currentPeriod.id);
     }
   }, [currentPeriod]);
+
+  // 加载历史日志
+  useEffect(() => {
+    if (!projectId) return;
+    
+    const loadHistoryLog = async () => {
+      try {
+        const logFile = await getScanLog(parseInt(projectId));
+        if (logFile && logFile.logs && logFile.logs.length > 0) {
+          // 转换为带 id 的格式
+          const logsWithId: ScanLog[] = logFile.logs.map((log, index) => ({
+            ...log,
+            id: `${log.timestamp}-${index}`,
+          }));
+          // 批量添加到 store
+          addScanLogs(logsWithId);
+        }
+      } catch (error) {
+        console.error('加载历史日志失败:', error);
+      }
+    };
+    
+    loadHistoryLog();
+  }, [projectId]);
+
+  // 组件卸载时清理事件监听和定时器
+  useEffect(() => {
+    return () => {
+      if (unlistenScanLogRef.current) {
+        unlistenScanLogRef.current();
+      }
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+      }
+    };
+  }, []);
 
   const loadPeriods = async (pid: number) => {
     try {
@@ -79,6 +131,24 @@ export default function PeriodSelectPage() {
       setCurrentVideos(videos);
     } catch (error) {
       console.error('加载周期媒体失败:', error);
+    }
+  };
+
+  // 批量刷新日志
+  const flushLogs = () => {
+    if (pendingLogsRef.current.length > 0) {
+      const logs = pendingLogsRef.current;
+      pendingLogsRef.current = [];
+      addScanLogs(logs);
+    }
+    flushTimerRef.current = null;
+  };
+
+  // 添加日志到缓冲，定时批量刷新
+  const enqueueLog = (log: Parameters<typeof addScanLog>[0]) => {
+    pendingLogsRef.current.push(log);
+    if (flushTimerRef.current === null) {
+      flushTimerRef.current = window.setTimeout(flushLogs, 100);
     }
   };
 
@@ -107,7 +177,15 @@ export default function PeriodSelectPage() {
     if (!folderPath) return;
 
     setIsScanning(true);
+    clearScanLogs();
+
     try {
+      // 注册日志事件监听
+      const unlisten = await onScanLog((log) => {
+        enqueueLog(log);
+      });
+      unlistenScanLogRef.current = unlisten;
+
       await scanMediaFolder(parseInt(projectId), folderPath);
       // 重新加载当前周期的媒体
       if (currentPeriod) {
@@ -118,7 +196,33 @@ export default function PeriodSelectPage() {
       alert('扫描文件夹失败');
     } finally {
       setIsScanning(false);
+      // 强制刷新剩余日志
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushLogs();
+      }
+      // 移除事件监听
+      if (unlistenScanLogRef.current) {
+        unlistenScanLogRef.current();
+        unlistenScanLogRef.current = null;
+      }
     }
+  };
+
+  // 下载日志
+  const handleDownloadLog = () => {
+    if (scanLogs.length === 0 || !projectId) return;
+    
+    const logData = {
+      project_id: parseInt(projectId),
+      scanned_at: new Date().toISOString(),
+      folder_path: '',
+      total_files: currentPhotos.length + currentVideos.length,
+      logs: scanLogs.map(({ id, ...rest }) => rest),
+    };
+    
+    const fileName = `scan-log-${projectId}-${Date.now()}.json`;
+    downloadJson(logData, fileName);
   };
 
   const handleAddPeriod = async () => {
@@ -340,6 +444,20 @@ export default function PeriodSelectPage() {
             </button>
           </div>
         </div>
+
+        {/* 日志面板 */}
+        {(isScanning || scanLogs.length > 0) && (
+          <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
+            <ScanLogPanel
+              logs={scanLogs}
+              isExpanded={isLogExpanded}
+              onToggleExpand={toggleLogExpanded}
+              autoScroll={autoScrollLog}
+              onToggleAutoScroll={toggleAutoScrollLog}
+              onDownload={handleDownloadLog}
+            />
+          </div>
+        )}
 
         {/* Tab切换 */}
         <div className="px-4 border-b border-gray-200 bg-white">

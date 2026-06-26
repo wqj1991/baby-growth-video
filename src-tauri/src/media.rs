@@ -54,11 +54,93 @@ impl ScanLogEvent {
     }
 }
 
-fn emit_scan_log(window: &tauri::Window, level: &str, message: String, file_name: Option<String>) {
-    let event = ScanLogEvent::new(level, message, file_name);
-    if let Err(e) = window.emit("scan://log", &event) {
+fn emit_scan_log(
+    window: &tauri::Window,
+    level: &str,
+    message: String,
+    file_name: Option<String>,
+    logs: &mut Vec<ScanLogEntry>,
+) {
+    let entry = ScanLogEntry {
+        level: level.to_string(),
+        message: message.clone(),
+        timestamp: chrono::Local::now().timestamp_millis(),
+        file_name: file_name.clone(),
+    };
+    
+    // emit 事件到前端
+    if let Err(e) = window.emit("scan://log", &entry) {
         eprintln!("Failed to emit scan log event: {}", e);
     }
+    
+    // 收集到日志列表（用于持久化）
+    logs.push(entry);
+}
+
+// ==================== 日志持久化 ====================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ScanLogEntry {
+    pub level: String,
+    pub message: String,
+    pub timestamp: i64,
+    pub file_name: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScanLogFile {
+    pub project_id: i64,
+    pub scanned_at: String,
+    pub folder_path: String,
+    pub total_files: i64,
+    pub logs: Vec<ScanLogEntry>,
+}
+
+fn get_scan_log_path(project_id: i64) -> PathBuf {
+    let mut path = get_project_data_dir();
+    path.push(project_id.to_string());
+    path.push("scan-log.json");
+    path
+}
+
+pub fn save_scan_log(
+    project_id: i64,
+    folder_path: &str,
+    total_files: i64,
+    logs: Vec<ScanLogEntry>,
+) -> Result<(), String> {
+    let log_file = ScanLogFile {
+        project_id,
+        scanned_at: chrono::Local::now().to_rfc3339(),
+        folder_path: folder_path.to_string(),
+        total_files,
+        logs,
+    };
+
+    let path = get_scan_log_path(project_id);
+    
+    // 确保目录存在
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let json = serde_json::to_string_pretty(&log_file).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}
+
+pub fn load_scan_log(project_id: i64) -> Result<Option<ScanLogFile>, String> {
+    let path = get_scan_log_path(project_id);
+    
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let log_file: ScanLogFile = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    
+    Ok(Some(log_file))
 }
 
 fn is_photo_file(path: &Path) -> bool {
@@ -356,7 +438,9 @@ pub fn scan_media_folder(
         return Err("文件夹不存在".to_string());
     }
 
-    emit_scan_log(&window, "info", format!("开始扫描文件夹: {}", folder_path), None);
+    let mut scan_logs: Vec<ScanLogEntry> = Vec::new();
+
+    emit_scan_log(&window, "info", format!("开始扫描文件夹: {}", folder_path), None, &mut scan_logs);
 
     let periods = db.get_periods(project_id).map_err(|e| e.to_string())?;
 
@@ -427,6 +511,7 @@ pub fn scan_media_folder(
                 "warn",
                 format!("⚠ 无法识别日期: {}", file_name),
                 Some(file_name.clone()),
+                &mut scan_logs,
             );
             continue;
         }
@@ -444,6 +529,7 @@ pub fn scan_media_folder(
                     "warn",
                     format!("⚠ 日期不在周期内: {}", file_name),
                     Some(file_name.clone()),
+                    &mut scan_logs,
                 );
                 continue;
             }
@@ -464,6 +550,7 @@ pub fn scan_media_folder(
                     "error",
                     format!("✗ 复制失败: {} - {}", file_name, e),
                     Some(file_name.clone()),
+                    &mut scan_logs,
                 );
                 continue;
             }
@@ -481,6 +568,7 @@ pub fn scan_media_folder(
                 "warn",
                 format!("⚠ 跳过重复: {}", file_name),
                 Some(file_name.clone()),
+                &mut scan_logs,
             );
             continue;
         }
@@ -507,6 +595,7 @@ pub fn scan_media_folder(
                 "success",
                 format!("✓ 已识别照片: {} ({})", file_name, date_str.clone().unwrap_or_default()),
                 Some(file_name.clone()),
+                &mut scan_logs,
             );
         } else {
             let new_video = NewVideo {
@@ -527,6 +616,7 @@ pub fn scan_media_folder(
                 "success",
                 format!("✓ 已识别视频: {} ({})", file_name, date_str.clone().unwrap_or_default()),
                 Some(file_name.clone()),
+                &mut scan_logs,
             );
         }
     }
@@ -545,7 +635,12 @@ pub fn scan_media_folder(
     let recognized_videos_count = videos.len() as i64;
 
     let total_files = total_photos + total_videos;
-    emit_scan_log(&window, "info", format!("扫描完成，共处理 {} 个文件", total_files), None);
+    emit_scan_log(&window, "info", format!("扫描完成，共处理 {} 个文件", total_files), None, &mut scan_logs);
+
+    // 保存日志到文件（失败不影响扫描结果）
+    if let Err(e) = save_scan_log(project_id, folder_path, total_files, scan_logs) {
+        eprintln!("保存扫描日志失败: {}", e);
+    }
 
     Ok(ScanResult {
         photos,

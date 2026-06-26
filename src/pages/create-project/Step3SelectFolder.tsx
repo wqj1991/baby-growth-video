@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Folder, Image, Film, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { useCreateProjectStore } from '../../store/createProjectStore';
-import { scanMediaFolder, selectFolder, onScanLog } from '../../utils/tauriCommands';
-import type { ScanResult } from '../../types';
+import { scanMediaFolder, selectFolder, onScanLog, getScanLog } from '../../utils/tauriCommands';
+import { downloadJson } from '../../utils/download';
+import type { ScanResult, ScanLog } from '../../types';
 import ScanLogPanel from '../../components/ScanLogPanel';
 
 export default function Step3SelectFolder() {
@@ -96,6 +97,46 @@ export default function Step3SelectFolder() {
     handleScan();
   };
 
+  // 下载日志
+  const handleDownloadLog = () => {
+    if (scanLogs.length === 0) return;
+    
+    const logData = {
+      project_id: projectId,
+      scanned_at: new Date().toISOString(),
+      folder_path: folderPath,
+      total_files: scanResult ? scanResult.total_photos + scanResult.total_videos : 0,
+      logs: scanLogs.map(({ id, ...rest }) => rest),
+    };
+    
+    const fileName = `scan-log-${projectId}-${Date.now()}.json`;
+    downloadJson(logData, fileName);
+  };
+
+  // 加载历史日志
+  useEffect(() => {
+    if (!projectId) return;
+    
+    const loadHistoryLog = async () => {
+      try {
+        const logFile = await getScanLog(projectId);
+        if (logFile && logFile.logs && logFile.logs.length > 0) {
+          // 转换为带 id 的格式
+          const logsWithId: ScanLog[] = logFile.logs.map((log, index) => ({
+            ...log,
+            id: `${log.timestamp}-${index}`,
+          }));
+          // 批量添加到 store
+          addScanLogs(logsWithId);
+        }
+      } catch (error) {
+        console.error('加载历史日志失败:', error);
+      }
+    };
+    
+    loadHistoryLog();
+  }, [projectId]);
+
   // 组件卸载时清理事件监听和定时器
   useEffect(() => {
     return () => {
@@ -150,19 +191,20 @@ export default function Step3SelectFolder() {
               '开始扫描'
             )}
           </button>
+        </div>
+      )}
 
-          {/* 实时日志 */}
-          {(isScanning || scanLogs.length > 0) && (
-            <div className="mt-4">
-              <ScanLogPanel
-                logs={scanLogs}
-                isExpanded={isLogExpanded}
-                onToggleExpand={toggleLogExpanded}
-                autoScroll={autoScrollLog}
-                onToggleAutoScroll={toggleAutoScrollLog}
-              />
-            </div>
-          )}
+      {/* 日志面板 - 扫描中和扫描完成后都显示 */}
+      {folderPath && (isScanning || scanLogs.length > 0) && (
+        <div className="mb-6">
+          <ScanLogPanel
+            logs={scanLogs}
+            isExpanded={isLogExpanded}
+            onToggleExpand={toggleLogExpanded}
+            autoScroll={autoScrollLog}
+            onToggleAutoScroll={toggleAutoScrollLog}
+            onDownload={handleDownloadLog}
+          />
         </div>
       )}
 
