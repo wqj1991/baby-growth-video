@@ -1,4 +1,5 @@
 use crate::db::{Database, NewPhoto, NewVideo, Photo, Video};
+use crate::video;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -579,14 +580,22 @@ pub fn scan_media_folder(
                 &mut scan_logs,
             );
         } else {
+            let (duration, width, height) = match video::get_video_info(&copied_path) {
+                Ok(info) => info,
+                Err(e) => {
+                    eprintln!("获取视频信息失败: {} - {}", file_name, e);
+                    (0.0, 0, 0)
+                }
+            };
+
             let new_video = NewVideo {
                 period_id,
                 file_path: copied_path.clone(),
                 file_name: file_name.clone(),
                 file_size,
-                duration: 0.0,
-                width: 0,
-                height: 0,
+                duration,
+                width,
+                height,
                 taken_at: date_str.clone(),
             };
 

@@ -35,6 +35,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": [
+      "resources/ffmpeg/ffmpeg.exe",
+      "resources/ffmpeg/ffprobe.exe"
+    ],
     "category": "Productivity",
     "shortDescription": "宝宝成长视频制作工具",
     "longDescription": "制作宝宝成长视频的桌面应用，按周期整理照片，生成精美成长视频。",

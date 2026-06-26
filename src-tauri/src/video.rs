@@ -1,9 +1,45 @@
 use crate::db::{Database, ExportRecord, NewExportRecord, Photo, Period, VideoFrame, NewVideoFrame};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 use std::collections::HashMap;
+
+fn get_ffmpeg_path() -> PathBuf {
+    let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
+    let exe_dir = exe_path.parent().unwrap_or_else(|| Path::new("."));
+    
+    let ffmpeg_name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    
+    let resources_dirs = [
+        exe_dir.join("resources").join("ffmpeg"),
+        exe_dir.join("..").join("resources").join("ffmpeg"),
+        exe_dir.to_path_buf(),
+    ];
+    
+    for dir in resources_dirs {
+        let ffmpeg_path = dir.join(ffmpeg_name);
+        if ffmpeg_path.exists() {
+            return ffmpeg_path;
+        }
+    }
+    
+    PathBuf::from(ffmpeg_name)
+}
+
+fn get_ffprobe_path() -> PathBuf {
+    let ffmpeg_path = get_ffmpeg_path();
+    if ffmpeg_path.file_name().is_some() {
+        let ffprobe_name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };
+        let mut ffprobe_path = ffmpeg_path.clone();
+        ffprobe_path.set_file_name(ffprobe_name);
+        if ffprobe_path.exists() {
+            return ffprobe_path;
+        }
+    }
+    
+    PathBuf::from(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" })
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VideoConfig {
@@ -207,7 +243,7 @@ pub fn generate_growth_video(
     set_progress(&task_id, 10);
 
     // 执行ffmpeg命令
-    let status = Command::new("ffmpeg")
+    let status = Command::new(get_ffmpeg_path())
         .args(&ffmpeg_args)
         .status()
         .map_err(|e| format!("执行FFmpeg失败: {}", e))?;
@@ -235,7 +271,7 @@ pub fn generate_growth_video(
 
 // 获取视频信息（时长、分辨率）
 pub fn get_video_info(path: &str) -> Result<(f64, i64, i64), String> {
-    let output = Command::new("ffprobe")
+    let output = Command::new(get_ffprobe_path())
         .args([
             "-v", "error",
             "-select_streams", "v:0",
@@ -266,6 +302,45 @@ pub fn get_video_info(path: &str) -> Result<(f64, i64, i64), String> {
     }
 
     Ok((duration, width as i64, height as i64))
+}
+
+pub fn get_video_thumbnail(video_path: &str) -> Result<String, String> {
+    let output_path = dirs_next::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("baby-growth-video")
+        .join("thumbnails")
+        .join(format!("{}.jpg", uuid::Uuid::new_v4()));
+    
+    std::fs::create_dir_all(output_path.parent().unwrap_or_else(|| std::path::Path::new(".")))
+        .map_err(|e| e.to_string())?;
+    
+    let status = Command::new(get_ffmpeg_path())
+        .args([
+            "-ss", "0",
+            "-i", video_path,
+            "-vframes", "1",
+            "-q:v", "2",
+            "-y",
+            output_path.to_str().unwrap_or("thumbnail.jpg"),
+        ])
+        .status();
+    
+    match status {
+        Ok(s) if s.success() => {
+            let image_data = std::fs::read(&output_path).map_err(|e| e.to_string())?;
+            let base64 = base64::encode(&image_data);
+            let _ = std::fs::remove_file(output_path);
+            Ok(format!("data:image/jpeg;base64,{}", base64))
+        }
+        Ok(_) => Err("ffmpeg执行失败".to_string()),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Err("未找到ffmpeg，请确保已安装并添加到系统PATH".to_string())
+            } else {
+                Err(format!("截图失败: {}", e))
+            }
+        }
+    }
 }
 
 // 生成视频截图
@@ -317,7 +392,7 @@ pub fn generate_video_frames(
         let frame_path = frames_dir.join(&frame_file_name);
 
         // 使用ffmpeg截图
-        let status = Command::new("ffmpeg")
+        let status = Command::new(get_ffmpeg_path())
             .args([
                 "-ss", &time_seconds.to_string(),
                 "-i", video_path,

@@ -149,14 +149,34 @@ export async function getVideoFrames(videoId: number): Promise<VideoFrame[]> {
   return invoke('get_video_frames', { videoId });
 }
 
-// 生成视频截图
+// 生成视频截图（按数量）
 export async function generateVideoFrames(videoId: number, count: number): Promise<VideoFrame[]> {
   return invoke('generate_video_frames', { videoId, count });
+}
+
+// 生成视频截图（按间隔）
+export async function generateVideoFramesByInterval(videoId: number, intervalSeconds: number): Promise<VideoFrame[]> {
+  return invoke('generate_video_frames_by_interval', { videoId, intervalSeconds });
 }
 
 // 设置最终选中的视频截图
 export async function setFinalVideoFrame(periodId: number, frameId: number): Promise<void> {
   return invoke('set_final_video_frame', { periodId, frameId });
+}
+
+// 更新视频帧
+export async function updateVideoFrame(frame: VideoFrame): Promise<VideoFrame> {
+  return invoke('update_video_frame', { frame });
+}
+
+// 取消最终选中的视频帧
+export async function cancelFinalVideoFrame(periodId: number): Promise<void> {
+  return invoke('cancel_final_video_frame', { periodId });
+}
+
+// 获取视频缩略图
+export async function getVideoThumbnail(videoPath: string): Promise<string> {
+  return invoke('get_video_thumbnail', { videoPath });
 }
 
 // ==================== 扫描文件 ====================

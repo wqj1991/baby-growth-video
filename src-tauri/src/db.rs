@@ -878,6 +878,16 @@ impl Database {
         Ok(())
     }
 
+    pub fn cancel_final_video_frame(&self, period_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        // 取消该周期所有截图的final状态
+        conn.execute(
+            "UPDATE video_frames SET is_final = 0 WHERE period_id = ?1",
+            params![period_id],
+        )?;
+        Ok(())
+    }
+
     pub fn add_video_frame(&self, frame: &NewVideoFrame) -> Result<VideoFrame> {
         let conn = self.get_conn();
         let now = Self::now();
@@ -910,6 +920,19 @@ impl Database {
                 created_at: row.get(7)?,
             })
         })
+    }
+
+    pub fn update_video_frame(&self, frame: &VideoFrame) -> Result<VideoFrame> {
+        let conn = self.get_conn();
+        conn.execute(
+            "UPDATE video_frames SET is_selected = ?1, is_final = ?2 WHERE id = ?3",
+            params![
+                frame.is_selected as i64,
+                frame.is_final as i64,
+                frame.id,
+            ],
+        )?;
+        self.get_video_frame_by_id(frame.id)
     }
 
     // ==================== 导出记录操作 ====================

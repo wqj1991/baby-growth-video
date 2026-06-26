@@ -152,3 +152,8 @@ export interface ProjectInfo {
   period_days: number;
   include_special_dates: boolean;
 }
+
+// 待选区项目（照片 + 视频帧）
+export type SelectableItem = 
+  | { type: 'photo'; item: Photo }
+  | { type: 'frame'; item: VideoFrame };

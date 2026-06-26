@@ -197,6 +197,29 @@ async fn scan_media_folder(
 }
 
 #[tauri::command]
+fn update_video_frame(
+    frame: db::VideoFrame,
+    state: State<AppState>,
+) -> Result<db::VideoFrame, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.update_video_frame(&frame).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cancel_final_video_frame(
+    period_id: i64,
+    state: State<AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.cancel_final_video_frame(period_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_video_thumbnail(video_path: String) -> Result<String, String> {
+    video::get_video_thumbnail(&video_path)
+}
+
+#[tauri::command]
 async fn scan_period_folder(
     project_id: i64,
     period_id: i64,
@@ -318,6 +341,9 @@ pub fn run() {
             get_video_frames,
             generate_video_frames,
             set_final_video_frame,
+            update_video_frame,
+            cancel_final_video_frame,
+            get_video_thumbnail,
             scan_media_folder,
             scan_period_folder,
             get_scan_log,

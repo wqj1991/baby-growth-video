@@ -26,9 +26,17 @@ import {
   setFinalPhoto,
   cancelFinalPhoto,
   getImageBase64,
+  generateVideoFrames,
+  generateVideoFramesByInterval,
+  updateVideoFrame,
+  setFinalVideoFrame,
+  cancelFinalVideoFrame,
+  getVideoThumbnail,
 } from '../utils/tauriCommands';
-import type { Period, Photo } from '../types';
+import type { Period, Photo, Video, VideoFrame, SelectableItem } from '../types';
 import PhotoContextMenu from '../components/PhotoContextMenu';
+import VideoFrameSettingsModal from '../components/VideoFrameSettingsModal';
+import VideoFrameViewerModal from '../components/VideoFrameViewerModal';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -41,9 +49,15 @@ export default function PeriodSelectPage() {
     setCurrentPhotos,
     currentVideos,
     setCurrentVideos,
+    currentVideoFrames,
+    setCurrentVideoFrames,
     isScanning,
     setIsScanning,
     currentBaby,
+    selectedItems,
+    setSelectedItems,
+    addToSelectedItems,
+    removeFromSelectedItems,
   } = useAppStore();
 
   const [showAddPeriod, setShowAddPeriod] = useState(false);
@@ -66,6 +80,14 @@ export default function PeriodSelectPage() {
     photo: null,
   });
 
+  // 视频帧相关状态
+  const [currentVideoForFrames, setCurrentVideoForFrames] = useState<Video | null>(null);
+  const [showFrameSettings, setShowFrameSettings] = useState(false);
+  const [showFrameViewer, setShowFrameViewer] = useState(false);
+  const [isExtractingFrames, setIsExtractingFrames] = useState(false);
+  const [videoFrameCounts, setVideoFrameCounts] = useState<Record<number, number>>({});
+  const [videoThumbnails, setVideoThumbnails] = useState<Record<number, string>>({});
+
   useEffect(() => {
     if (projectId) {
       loadPeriods(parseInt(projectId));
@@ -80,21 +102,23 @@ export default function PeriodSelectPage() {
       setPreviewIndex(0);
       // 切换周期时关闭右键菜单
       handleCloseContextMenu();
+      // 切换周期时关闭视频帧弹窗
+      setShowFrameSettings(false);
+      setShowFrameViewer(false);
+      setCurrentVideoForFrames(null);
+      setVideoFrameCounts({});
     }
   }, [currentPeriod]);
 
   // 加载图片 base64
   useEffect(() => {
     const loadImages = async () => {
-      // 只加载还没加载过的图片
       const photosToLoad = currentPhotos.filter(photo => !loadedImageIds.current.has(photo.id));
       
       if (photosToLoad.length === 0) return;
       
-      // 标记为加载中（避免重复加载）
       photosToLoad.forEach(photo => loadedImageIds.current.add(photo.id));
       
-      // 并发加载图片（限制并发数）
       const batchSize = 5;
       for (let i = 0; i < photosToLoad.length; i += batchSize) {
         const batch = photosToLoad.slice(i, i + batchSize);
@@ -105,13 +129,12 @@ export default function PeriodSelectPage() {
               return { id: photo.id, url: base64 };
             } catch (error) {
               console.error('加载图片失败:', photo.file_name, error);
-              loadedImageIds.current.delete(photo.id); // 失败的移除标记，下次可以重试
+              loadedImageIds.current.delete(photo.id);
               return { id: photo.id, url: '' };
             }
           })
         );
         
-        // 分批更新 state，提升体验
         const newLoadedImages: Record<number, string> = {};
         results.forEach(({ id, url }) => {
           if (url) newLoadedImages[id] = url;
@@ -123,6 +146,77 @@ export default function PeriodSelectPage() {
     
     loadImages();
   }, [currentPhotos]);
+
+  // 加载视频帧图片 base64
+  useEffect(() => {
+    const loadFrameImages = async () => {
+      const framesToLoad = currentVideoFrames.filter(frame => !loadedImageIds.current.has(frame.id));
+      
+      if (framesToLoad.length === 0) return;
+      
+      framesToLoad.forEach(frame => loadedImageIds.current.add(frame.id));
+      
+      const batchSize = 5;
+      for (let i = 0; i < framesToLoad.length; i += batchSize) {
+        const batch = framesToLoad.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map(async (frame) => {
+            try {
+              const base64 = await getImageBase64(frame.file_path);
+              return { id: frame.id, url: base64 };
+            } catch (error) {
+              console.error('加载视频帧失败:', frame.id, error);
+              loadedImageIds.current.delete(frame.id);
+              return { id: frame.id, url: '' };
+            }
+          })
+        );
+        
+        const newLoadedImages: Record<number, string> = {};
+        results.forEach(({ id, url }) => {
+          if (url) newLoadedImages[id] = url;
+        });
+        
+        setLoadedImages(prev => ({ ...prev, ...newLoadedImages }));
+      }
+    };
+    
+    loadFrameImages();
+  }, [currentVideoFrames]);
+
+  // 加载视频缩略图
+  useEffect(() => {
+    const loadVideoThumbnails = async () => {
+      const videosToLoad = currentVideos.filter(v => !videoThumbnails[v.id]);
+      
+      if (videosToLoad.length === 0) return;
+      
+      const batchSize = 3;
+      for (let i = 0; i < videosToLoad.length; i += batchSize) {
+        const batch = videosToLoad.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map(async (video) => {
+            try {
+              const thumbnail = await getVideoThumbnail(video.file_path);
+              return { id: video.id, thumbnail };
+            } catch (error) {
+              console.error('加载视频缩略图失败:', video.file_name, error);
+              return { id: video.id, thumbnail: '' };
+            }
+          })
+        );
+        
+        const newThumbnails: Record<number, string> = {};
+        results.forEach(({ id, thumbnail }) => {
+          if (thumbnail) newThumbnails[id] = thumbnail;
+        });
+        
+        setVideoThumbnails(prev => ({ ...prev, ...newThumbnails }));
+      }
+    };
+    
+    loadVideoThumbnails();
+  }, [currentVideos]);
 
   // 图片预览 - 键盘事件
   useEffect(() => {
@@ -179,9 +273,10 @@ export default function PeriodSelectPage() {
 
   const loadPeriodMedia = async (periodId: number) => {
     try {
-      // 切换周期时重置图片缓存
       setLoadedImages({});
       loadedImageIds.current.clear();
+      
+      setSelectedItems([]);
       
       const [photos, videos] = await Promise.all([
         getPeriodPhotos(periodId),
@@ -189,6 +284,13 @@ export default function PeriodSelectPage() {
       ]);
       setCurrentPhotos(photos);
       setCurrentVideos(videos);
+      
+      const selectedPhotos: SelectableItem[] = photos
+        .filter(p => p.is_selected)
+        .map(p => ({ type: 'photo' as const, item: p }));
+      if (selectedPhotos.length > 0) {
+        setSelectedItems(selectedPhotos);
+      }
     } catch (error) {
       console.error('加载周期媒体失败:', error);
     }
@@ -276,8 +378,119 @@ export default function PeriodSelectPage() {
         is_selected: !photo.is_selected,
       });
       setCurrentPhotos(currentPhotos.map(p => p.id === updated.id ? updated : p));
+      
+      if (updated.is_selected) {
+        addToSelectedItems({ type: 'photo', item: updated });
+      } else {
+        removeFromSelectedItems({ type: 'photo', item: updated });
+      }
     } catch (error) {
       console.error('更新照片失败:', error);
+    }
+  };
+
+  const handleExtractFrames = (video: Video) => {
+    setCurrentVideoForFrames(video);
+    setShowFrameSettings(true);
+  };
+
+  const handleGenerateFrames = async (mode: 'count' | 'interval', value: number) => {
+    setShowFrameSettings(false);
+    setIsExtractingFrames(true);
+    
+    try {
+      let frames: VideoFrame[];
+      if (mode === 'count') {
+        frames = await generateVideoFrames(currentVideoForFrames!.id, value);
+      } else {
+        frames = await generateVideoFramesByInterval(currentVideoForFrames!.id, value);
+      }
+      setCurrentVideoFrames(frames);
+      setVideoFrameCounts(prev => ({
+        ...prev,
+        [currentVideoForFrames!.id]: frames.length
+      }));
+      setShowFrameViewer(true);
+    } catch (error) {
+      console.error('抽帧失败:', error);
+      alert('抽帧失败，请重试');
+    } finally {
+      setIsExtractingFrames(false);
+    }
+  };
+
+  const handleToggleFrameSelect = async (frame: VideoFrame) => {
+    try {
+      const updated = await updateVideoFrame({
+        ...frame,
+        is_selected: !frame.is_selected,
+      });
+      
+      setCurrentVideoFrames(currentVideoFrames.map(f => 
+        f.id === updated.id ? updated : f
+      ));
+      
+      if (updated.is_selected) {
+        addToSelectedItems({ type: 'frame', item: updated });
+      } else {
+        removeFromSelectedItems({ type: 'frame', item: updated });
+      }
+    } catch (error) {
+      console.error('更新视频帧失败:', error);
+    }
+  };
+
+  const handleSetFinalVideoFrame = async (frame: VideoFrame) => {
+    if (!currentPeriod) return;
+    
+    try {
+      await setFinalVideoFrame(currentPeriod.id, frame.id);
+      
+      setCurrentVideoFrames(currentVideoFrames.map(f => ({
+        ...f,
+        is_final: f.id === frame.id,
+      })));
+      
+      const updatedPeriods = periods.map(p => 
+        p.id === currentPeriod.id 
+          ? { ...p, selected_photo_id: frame.id }
+          : p
+      );
+      setPeriods(updatedPeriods);
+      
+      setCurrentPeriod({
+        ...currentPeriod,
+        selected_photo_id: frame.id,
+      });
+    } catch (error) {
+      console.error('设置最终视频帧失败:', error);
+    }
+  };
+
+  const handleCancelFinalVideoFrame = async () => {
+    if (!currentPeriod) return;
+    
+    try {
+      await cancelFinalVideoFrame(currentPeriod.id);
+      
+      setCurrentVideoFrames(currentVideoFrames.map(f => ({
+        ...f,
+        is_final: false,
+      })));
+      
+      const updatedPeriods = periods.map(p =>
+        p.id === currentPeriod.id
+          ? { ...p, selected_photo_id: undefined }
+          : p
+      );
+      setPeriods(updatedPeriods);
+      
+      setCurrentPeriod({
+        ...currentPeriod,
+        selected_photo_id: undefined,
+      });
+    } catch (error) {
+      console.error('取消最终视频帧失败:', error);
     }
   };
 
@@ -557,7 +770,7 @@ export default function PeriodSelectPage() {
               }`}
             >
               <Plus className="w-4 h-4 inline mr-1" />
-              待选区 ({currentPhotos.filter(p => p.is_selected).length})
+              待选区 ({selectedItems.length})
             </button>
             <button
               onClick={() => {
@@ -655,56 +868,94 @@ export default function PeriodSelectPage() {
             </div>
           ) : selectedTab === 'pending' ? (
             <div>
-              {currentPhotos.filter(p => p.is_selected).length === 0 ? (
+              {selectedItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                   <Plus className="w-16 h-16 mb-4 text-gray-300" />
-                  <p>暂无待选照片</p>
-                  <p className="text-sm mt-1">在"照片"tab 中右键点击照片，选择"加入到待选区"</p>
+                  <p>暂无待选项目</p>
+                  <p className="text-sm mt-1">在"照片"或"视频"中选择项目加入待选区</p>
                 </div>
               ) : (
                 <>
                   <div className="mb-4 flex items-center justify-between">
                     <p className="text-sm text-gray-600">
-                      待选区共有 {currentPhotos.filter(p => p.is_selected).length} 张照片，
-                      {currentPhotos.find(p => p.is_final) ? '已确认最终照片' : '请确认1张最终照片'}
+                      待选区共有 {selectedItems.length} 个项目，
+                      {currentPhotos.find(p => p.is_final) || currentVideoFrames.find(f => f.is_final) 
+                        ? '已确认最终项目' 
+                        : '请确认1个最终项目'}
                     </p>
                   </div>
                   <div className="photo-grid">
-                    {currentPhotos.filter(p => p.is_selected).map((photo) => (
-                      <div
-                        key={photo.id}
-                        className={`photo-item ${
-                          photo.is_selected ? 'selected' : ''
-                        } ${photo.is_final ? 'final' : ''}`}
-                        onContextMenu={(e) => handlePhotoContextMenu(e, photo)}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          const index = currentPhotos.findIndex(p => p.id === photo.id);
-                          handleOpenPreview(index);
-                        }}
-                      >
-                        <img
-                          src={loadedImages[photo.id] || ''}
-                          alt={photo.file_name}
-                          loading="lazy"
-                        />
-                        {photo.is_final && (
-                          <div className="photo-badge final">
-                            <Check className="w-3 h-3" />
+                    {selectedItems.map((selectable) => {
+                      if (selectable.type === 'photo') {
+                        const photo = selectable.item;
+                        return (
+                          <div
+                            key={`photo-${photo.id}`}
+                            className={`photo-item ${
+                              photo.is_selected ? 'selected' : ''
+                            } ${photo.is_final ? 'final' : ''}`}
+                            onContextMenu={(e) => handlePhotoContextMenu(e, photo)}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              const index = currentPhotos.findIndex(p => p.id === photo.id);
+                              handleOpenPreview(index);
+                            }}
+                          >
+                            <img
+                              src={loadedImages[photo.id] || ''}
+                              alt={photo.file_name}
+                              loading="lazy"
+                            />
+                            {photo.is_final && (
+                              <div className="photo-badge final">
+                                <Check className="w-3 h-3" />
+                              </div>
+                            )}
+                            {photo.is_selected && !photo.is_final && (
+                              <div className="photo-badge selected">
+                                ✓
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                              <p className="text-white text-xs truncate">
+                                {photo.file_name}
+                              </p>
+                            </div>
                           </div>
-                        )}
-                        {photo.is_selected && !photo.is_final && (
-                          <div className="photo-badge selected">
-                            ✓
+                        );
+                      } else {
+                        const frame = selectable.item;
+                        return (
+                          <div
+                            key={`frame-${frame.id}`}
+                            className={`photo-item ${
+                              frame.is_selected ? 'selected' : ''
+                            } ${frame.is_final ? 'final' : ''}`}
+                          >
+                            <img
+                              src={loadedImages[frame.id] || ''}
+                              alt={`frame-${frame.id}`}
+                              loading="lazy"
+                            />
+                            {frame.is_final && (
+                              <div className="photo-badge final">
+                                <Check className="w-3 h-3" />
+                              </div>
+                            )}
+                            {frame.is_selected && !frame.is_final && (
+                              <div className="photo-badge selected">
+                                ✓
+                              </div>
+                            )}
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                              <p className="text-white text-xs font-mono text-center">
+                                {Math.floor(frame.time_seconds / 60)}:{(frame.time_seconds % 60).toString().padStart(2, '0')}
+                              </p>
+                            </div>
                           </div>
-                        )}
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                          <p className="text-white text-xs truncate">
-                            {photo.file_name}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      }
+                    })}
                   </div>
                 </>
               )}
@@ -724,8 +975,19 @@ export default function PeriodSelectPage() {
                       key={video.id}
                       className="card overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                     >
-                      <div className="aspect-video bg-gray-900 flex items-center justify-center relative">
-                        <VideoIcon className="w-12 h-12 text-gray-600" />
+                      <div className="aspect-video bg-gray-900 relative overflow-hidden">
+                        {videoThumbnails[video.id] ? (
+                          <img
+                            src={videoThumbnails[video.id]}
+                            alt={video.file_name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <VideoIcon className="w-12 h-12 text-gray-600" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors" />
                         <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
                           {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
                         </div>
@@ -735,8 +997,12 @@ export default function PeriodSelectPage() {
                         <p className="text-xs text-gray-500 mt-1">
                           {video.width}x{video.height}
                         </p>
-                        <button className="mt-2 w-full btn btn-outline btn-sm">
-                          截取画面
+                        <button
+                          onClick={() => handleExtractFrames(video)}
+                          className="mt-2 w-full btn btn-outline btn-sm"
+                          disabled={isExtractingFrames}
+                        >
+                          {isExtractingFrames ? '抽帧中...' : (videoFrameCounts[video.id] > 0 ? `查看帧(${videoFrameCounts[video.id]}张)` : '截取画面')}
                         </button>
                       </div>
                     </div>
@@ -816,6 +1082,32 @@ export default function PeriodSelectPage() {
         onCancelFinal={handleCancelFinalPhoto}
         onPreview={handleContextMenuPreview}
         onClose={handleCloseContextMenu}
+      />
+
+      {/* 视频抽帧设置弹窗 */}
+      <VideoFrameSettingsModal
+        visible={showFrameSettings}
+        video={currentVideoForFrames}
+        onClose={() => setShowFrameSettings(false)}
+        onGenerate={handleGenerateFrames}
+      />
+
+      {/* 视频帧查看弹窗 */}
+      <VideoFrameViewerModal
+        visible={showFrameViewer}
+        video={currentVideoForFrames}
+        frames={currentVideoFrames}
+        onClose={() => setShowFrameViewer(false)}
+        onReExtract={() => {
+          setShowFrameViewer(false);
+          setShowFrameSettings(true);
+        }}
+        onToggleSelect={handleToggleFrameSelect}
+        onSetFinal={handleSetFinalVideoFrame}
+        onCancelFinal={handleCancelFinalVideoFrame}
+        onPreview={(frame) => {
+          console.log('预览视频帧:', frame);
+        }}
       />
     </div>
   );

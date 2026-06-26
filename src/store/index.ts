@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog } from '../types';
+import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem } from '../types';
 
 interface AppState {
   // 当前选中的宝宝
@@ -57,6 +57,11 @@ interface AppState {
 
   generationProgress: number;
   setGenerationProgress: (progress: number) => void;
+
+  selectedItems: SelectableItem[];
+  setSelectedItems: (items: SelectableItem[]) => void;
+  addToSelectedItems: (item: SelectableItem) => void;
+  removeFromSelectedItems: (item: SelectableItem) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -147,4 +152,19 @@ export const useAppStore = create<AppState>((set) => ({
 
   generationProgress: 0,
   setGenerationProgress: (progress) => set({ generationProgress: progress }),
+
+  selectedItems: [],
+  setSelectedItems: (items) => set({ selectedItems: items }),
+  addToSelectedItems: (item) => set((state) => {
+    const exists = state.selectedItems.some(
+      i => i.type === item.type && i.item.id === item.item.id
+    );
+    if (exists) return state;
+    return { selectedItems: [...state.selectedItems, item] };
+  }),
+  removeFromSelectedItems: (item) => set((state) => ({
+    selectedItems: state.selectedItems.filter(
+      i => !(i.type === item.type && i.item.id === item.item.id)
+    )
+  })),
 }));
