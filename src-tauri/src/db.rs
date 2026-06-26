@@ -716,6 +716,21 @@ impl Database {
         Ok(())
     }
 
+    pub fn cancel_final_photo(&self, period_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        // 取消该周期所有照片的final状态
+        conn.execute(
+            "UPDATE photos SET is_final = 0 WHERE period_id = ?1",
+            params![period_id],
+        )?;
+        // 将周期的selected_photo_id设为null
+        conn.execute(
+            "UPDATE periods SET selected_photo_id = NULL WHERE id = ?1",
+            params![period_id],
+        )?;
+        Ok(())
+    }
+
     fn get_photo_by_id(&self, id: i64) -> Result<Photo> {
         let conn = self.get_conn();
         conn.query_row("SELECT * FROM photos WHERE id = ?1", params![id], |row| {

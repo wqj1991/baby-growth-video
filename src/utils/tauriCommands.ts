@@ -132,6 +132,11 @@ export async function setFinalPhoto(periodId: number, photoId: number): Promise<
   return invoke('set_final_photo', { periodId, photoId });
 }
 
+// 取消最终选中的照片
+export async function cancelFinalPhoto(periodId: number): Promise<void> {
+  return invoke('cancel_final_photo', { periodId });
+}
+
 // ==================== 视频相关 ====================
 
 // 获取周期的所有视频

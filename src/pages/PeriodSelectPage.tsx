@@ -24,9 +24,11 @@ import {
   selectFolder,
   updatePhoto,
   setFinalPhoto,
+  cancelFinalPhoto,
   getImageBase64,
 } from '../utils/tauriCommands';
 import type { Period, Photo } from '../types';
+import PhotoContextMenu from '../components/PhotoContextMenu';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -47,11 +49,22 @@ export default function PeriodSelectPage() {
   const [showAddPeriod, setShowAddPeriod] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newPeriodDate, setNewPeriodDate] = useState('');
-  const [selectedTab, setSelectedTab] = useState<'photos' | 'videos'>('photos');
+  const [selectedTab, setSelectedTab] = useState<'photos' | 'pending' | 'videos'>('photos');
   const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
   const loadedImageIds = useRef<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
+  
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    position: { x: number; y: number };
+    photo: Photo | null;
+  }>({
+    visible: false,
+    position: { x: 0, y: 0 },
+    photo: null,
+  });
 
   useEffect(() => {
     if (projectId) {
@@ -65,6 +78,8 @@ export default function PeriodSelectPage() {
       // 切换周期时关闭预览
       setShowPreview(false);
       setPreviewIndex(0);
+      // 切换周期时关闭右键菜单
+      handleCloseContextMenu();
     }
   }, [currentPeriod]);
 
@@ -296,6 +311,81 @@ export default function PeriodSelectPage() {
     }
   };
 
+  // 右键菜单处理
+  const handlePhotoContextMenu = (e: React.MouseEvent, photo: Photo) => {
+    e.preventDefault();
+    setContextMenu({
+      visible: true,
+      position: { x: e.clientX, y: e.clientY },
+      photo,
+    });
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu({
+      visible: false,
+      position: { x: 0, y: 0 },
+      photo: null,
+    });
+  };
+
+  const handleAddToPending = (photo: Photo) => {
+    handleTogglePhotoSelect(photo);
+  };
+
+  const handleRemoveFromPending = (photo: Photo) => {
+    handleTogglePhotoSelect(photo);
+  };
+
+  const handleContextMenuSetFinal = (photo: Photo) => {
+    handleSetFinalPhoto(photo);
+  };
+
+  const handleCancelFinalPhoto = async (_photo: Photo) => {
+    if (!currentPeriod) return;
+
+    try {
+      await cancelFinalPhoto(currentPeriod.id);
+      // 更新所有照片的is_final状态
+      const updated = currentPhotos.map(p => ({
+        ...p,
+        is_final: false,
+      }));
+      setCurrentPhotos(updated);
+
+      // 更新周期列表中的selected_photo_id，取消完成状态
+      const updatedPeriods = periods.map(p =>
+        p.id === currentPeriod.id
+          ? { ...p, selected_photo_id: undefined }
+          : p
+      );
+      setPeriods(updatedPeriods);
+      
+      // 同时更新currentPeriod
+      setCurrentPeriod({
+        ...currentPeriod,
+        selected_photo_id: undefined,
+      });
+    } catch (error) {
+      console.error('取消最终照片失败:', error);
+    }
+  };
+
+  const handleContextMenuPreview = (photo: Photo) => {
+    // 根据当前 tab 确定照片列表
+    const photoList = selectedTab === 'pending' 
+      ? currentPhotos.filter(p => p.is_selected)
+      : currentPhotos;
+    const index = photoList.findIndex(p => p.id === photo.id);
+    if (index !== -1) {
+      // 预览始终使用完整的 currentPhotos 列表，保持一致性
+      const fullIndex = currentPhotos.findIndex(p => p.id === photo.id);
+      if (fullIndex !== -1) {
+        handleOpenPreview(fullIndex);
+      }
+    }
+  };
+
   const getPeriodStatus = (period: Period) => {
     if (period.selected_photo_id) return 'completed';
     return 'pending';
@@ -456,7 +546,24 @@ export default function PeriodSelectPage() {
         <div className="px-4 border-b border-gray-200 bg-white">
           <div className="flex gap-1">
             <button
-              onClick={() => setSelectedTab('photos')}
+              onClick={() => {
+                setSelectedTab('pending');
+                handleCloseContextMenu();
+              }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                selectedTab === 'pending'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Plus className="w-4 h-4 inline mr-1" />
+              待选区 ({currentPhotos.filter(p => p.is_selected).length})
+            </button>
+            <button
+              onClick={() => {
+                setSelectedTab('photos');
+                handleCloseContextMenu();
+              }}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 selectedTab === 'photos'
                   ? 'border-primary-500 text-primary-600'
@@ -467,7 +574,10 @@ export default function PeriodSelectPage() {
               照片 ({currentPhotos.length})
             </button>
             <button
-              onClick={() => setSelectedTab('videos')}
+              onClick={() => {
+                setSelectedTab('videos');
+                handleCloseContextMenu();
+              }}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 selectedTab === 'videos'
                   ? 'border-primary-500 text-primary-600'
@@ -510,7 +620,7 @@ export default function PeriodSelectPage() {
                         className={`photo-item ${
                           photo.is_selected ? 'selected' : ''
                         } ${photo.is_final ? 'final' : ''}`}
-                        onClick={() => handleTogglePhotoSelect(photo)}
+                        onContextMenu={(e) => handlePhotoContextMenu(e, photo)}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
                           const index = currentPhotos.findIndex(p => p.id === photo.id);
@@ -537,18 +647,62 @@ export default function PeriodSelectPage() {
                             {photo.file_name}
                           </p>
                         </div>
-                        {photo.is_selected && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSetFinalPhoto(photo);
-                            }}
-                            className="absolute top-2 left-2 px-2 py-1 bg-green-500 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                            style={{ opacity: photo.is_selected ? 1 : 0 }}
-                          >
-                            设为最终
-                          </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : selectedTab === 'pending' ? (
+            <div>
+              {currentPhotos.filter(p => p.is_selected).length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                  <Plus className="w-16 h-16 mb-4 text-gray-300" />
+                  <p>暂无待选照片</p>
+                  <p className="text-sm mt-1">在"照片"tab 中右键点击照片，选择"加入到待选区"</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center justify-between">
+                    <p className="text-sm text-gray-600">
+                      待选区共有 {currentPhotos.filter(p => p.is_selected).length} 张照片，
+                      {currentPhotos.find(p => p.is_final) ? '已确认最终照片' : '请确认1张最终照片'}
+                    </p>
+                  </div>
+                  <div className="photo-grid">
+                    {currentPhotos.filter(p => p.is_selected).map((photo) => (
+                      <div
+                        key={photo.id}
+                        className={`photo-item ${
+                          photo.is_selected ? 'selected' : ''
+                        } ${photo.is_final ? 'final' : ''}`}
+                        onContextMenu={(e) => handlePhotoContextMenu(e, photo)}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          const index = currentPhotos.findIndex(p => p.id === photo.id);
+                          handleOpenPreview(index);
+                        }}
+                      >
+                        <img
+                          src={loadedImages[photo.id] || ''}
+                          alt={photo.file_name}
+                          loading="lazy"
+                        />
+                        {photo.is_final && (
+                          <div className="photo-badge final">
+                            <Check className="w-3 h-3" />
+                          </div>
                         )}
+                        {photo.is_selected && !photo.is_final && (
+                          <div className="photo-badge selected">
+                            ✓
+                          </div>
+                        )}
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                          <p className="text-white text-xs truncate">
+                            {photo.file_name}
+                          </p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -650,6 +804,19 @@ export default function PeriodSelectPage() {
           </div>
         </div>
       )}
+
+      {/* 右键菜单 */}
+      <PhotoContextMenu
+        visible={contextMenu.visible}
+        position={contextMenu.position}
+        photo={contextMenu.photo}
+        onAddToPending={handleAddToPending}
+        onRemoveFromPending={handleRemoveFromPending}
+        onSetFinal={handleContextMenuSetFinal}
+        onCancelFinal={handleCancelFinalPhoto}
+        onPreview={handleContextMenuPreview}
+        onClose={handleCloseContextMenu}
+      />
     </div>
   );
 }

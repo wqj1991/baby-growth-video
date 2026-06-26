@@ -135,6 +135,12 @@ fn set_final_photo(period_id: i64, photo_id: i64, state: State<AppState>) -> Res
     db.set_final_photo(period_id, photo_id).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn cancel_final_photo(period_id: i64, state: State<AppState>) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.cancel_final_photo(period_id).map_err(|e| e.to_string())
+}
+
 // ==================== 视频相关 ====================
 
 #[tauri::command]
@@ -307,6 +313,7 @@ pub fn run() {
             get_period_photos,
             update_photo,
             set_final_photo,
+            cancel_final_photo,
             get_period_videos,
             get_video_frames,
             generate_video_frames,
