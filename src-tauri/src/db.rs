@@ -482,6 +482,26 @@ impl Database {
         periods.collect()
     }
 
+    pub fn get_period(&self, period_id: i64) -> Result<Period> {
+        let conn = self.get_conn();
+        let mut stmt = conn.prepare("SELECT * FROM periods WHERE id = ?1")?;
+        let period = stmt.query_row(params![period_id], |row| {
+            Ok(Period {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                name: row.get(2)?,
+                start_date: row.get(3)?,
+                end_date: row.get(4)?,
+                period_type: row.get(5)?,
+                sort_order: row.get(6)?,
+                selected_photo_id: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+            })
+        })?;
+        Ok(period)
+    }
+
     pub fn generate_periods(
         &self,
         project_id: i64,
@@ -615,6 +635,12 @@ impl Database {
         photos.collect()
     }
 
+    pub fn delete_period_photos(&self, period_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        conn.execute("DELETE FROM photos WHERE period_id = ?1", params![period_id])?;
+        Ok(())
+    }
+
     // 批量插入照片（事务）
     pub fn add_photos(&self, photos: &[NewPhoto]) -> Result<Vec<Photo>> {
         let conn = self.get_conn();
@@ -732,6 +758,12 @@ impl Database {
             })
         })?;
         videos.collect()
+    }
+
+    pub fn delete_period_videos(&self, period_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        conn.execute("DELETE FROM videos WHERE period_id = ?1", params![period_id])?;
+        Ok(())
     }
 
     // 批量插入视频（事务）

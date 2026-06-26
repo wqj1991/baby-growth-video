@@ -10,6 +10,7 @@ use tauri::State;
 use tauri_plugin_dialog::init as init_dialog;
 use tauri_plugin_fs::init as init_fs;
 use tauri_plugin_shell::init as init_shell;
+use base64::Engine;
 
 struct AppState {
     db: Arc<Mutex<Database>>,
@@ -190,6 +191,23 @@ async fn scan_media_folder(
 }
 
 #[tauri::command]
+async fn scan_period_folder(
+    project_id: i64,
+    period_id: i64,
+    folder_path: String,
+    state: State<'_, AppState>,
+) -> Result<media::ScanResult, String> {
+    let db = state.db.clone();
+    
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let db = db.lock().map_err(|e| e.to_string())?;
+        media::scan_period_folder(&db, project_id, period_id, &folder_path)
+    }).await.map_err(|e| format!("Task failed: {}", e))?;
+    
+    result
+}
+
+#[tauri::command]
 fn get_scan_log(project_id: i64) -> Result<Option<media::ScanLogFile>, String> {
     media::load_scan_log(project_id)
 }
@@ -222,6 +240,39 @@ fn get_export_records(
 ) -> Result<Vec<db::ExportRecord>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.get_export_records(project_id).map_err(|e| e.to_string())
+}
+
+// ==================== 图片加载 ====================
+
+#[tauri::command]
+fn get_image_base64(file_path: String) -> Result<String, String> {
+    // 读取文件内容
+    let content = std::fs::read(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+    
+    // 根据扩展名推断 MIME 类型
+    let ext = std::path::Path::new(&file_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    
+    let mime_type = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        "heic" | "heif" => "image/heic",
+        "tiff" | "tif" => "image/tiff",
+        _ => "application/octet-stream",
+    };
+    
+    // 转换为 base64
+    let base64 = base64::engine::general_purpose::STANDARD.encode(&content);
+    
+    // 返回 data URL 格式
+    Ok(format!("data:{};base64,{}", mime_type, base64))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -261,10 +312,12 @@ pub fn run() {
             generate_video_frames,
             set_final_video_frame,
             scan_media_folder,
+            scan_period_folder,
             get_scan_log,
             generate_growth_video,
             get_generation_progress,
             get_export_records,
+            get_image_base64,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

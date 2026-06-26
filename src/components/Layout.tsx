@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Home, Baby, Video, History, Settings, Plus } from 'lucide-react';
+import { Home, Baby, Video, History, Settings } from 'lucide-react';
 import { useAppStore } from '../store';
 
 export default function Layout() {
@@ -8,11 +8,10 @@ export default function Layout() {
   const { currentBaby, currentProject } = useAppStore();
 
   const navItems = [
-    { path: '/', icon: Home, label: '首页' },
-    { path: '/baby-setup', icon: Baby, label: '宝宝信息' },
-    { path: '/create-project', icon: Plus, label: '新建项目' },
-    { path: currentProject ? `/project/${currentProject.id}/periods` : '/', icon: Video, label: '视频制作' },
-    { path: currentProject ? `/project/${currentProject.id}/history` : '/', icon: History, label: '历史记录' },
+    { id: 'home', path: '/', icon: Home, label: '首页' },
+    { id: 'baby', path: '/baby-setup', icon: Baby, label: '宝宝信息' },
+    { id: 'video', path: currentProject ? `/project/${currentProject.id}/periods` : '/', icon: Video, label: '视频制作' },
+    { id: 'history', path: currentProject ? `/project/${currentProject.id}/history` : '/', icon: History, label: '历史记录' },
   ];
 
   const isActive = (path: string) => {
@@ -54,7 +53,7 @@ export default function Layout() {
         <nav className="flex-1 p-4">
           <ul className="space-y-1">
             {navItems.map((item) => (
-              <li key={item.path}>
+              <li key={item.id}>
                 <button
                   onClick={() => navigate(item.path)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${

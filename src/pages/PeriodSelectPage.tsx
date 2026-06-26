@@ -8,6 +8,9 @@ import {
   Video as VideoIcon,
   Calendar,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import {
@@ -17,16 +20,13 @@ import {
   deletePeriod,
   getPeriodPhotos,
   getPeriodVideos,
-  scanMediaFolder,
+  scanPeriodFolder,
   selectFolder,
   updatePhoto,
   setFinalPhoto,
-  onScanLog,
-  getScanLog,
+  getImageBase64,
 } from '../utils/tauriCommands';
-import { downloadJson } from '../utils/download';
-import type { Period, Photo, ScanLog } from '../types';
-import ScanLogPanel from '../components/ScanLogPanel';
+import type { Period, Photo } from '../types';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -42,24 +42,16 @@ export default function PeriodSelectPage() {
     isScanning,
     setIsScanning,
     currentBaby,
-    scanLogs,
-    isLogExpanded,
-    autoScrollLog,
-    addScanLog,
-    addScanLogs,
-    clearScanLogs,
-    toggleLogExpanded,
-    toggleAutoScrollLog,
   } = useAppStore();
 
   const [showAddPeriod, setShowAddPeriod] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newPeriodDate, setNewPeriodDate] = useState('');
   const [selectedTab, setSelectedTab] = useState<'photos' | 'videos'>('photos');
-
-  const unlistenScanLogRef = useRef<(() => void) | null>(null);
-  const pendingLogsRef = useRef<Array<Parameters<typeof addScanLog>[0]>>([]);
-  const flushTimerRef = useRef<number | null>(null);
+  const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
+  const loadedImageIds = useRef<Set<number>>(new Set());
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   useEffect(() => {
     if (projectId) {
@@ -70,44 +62,93 @@ export default function PeriodSelectPage() {
   useEffect(() => {
     if (currentPeriod) {
       loadPeriodMedia(currentPeriod.id);
+      // 切换周期时关闭预览
+      setShowPreview(false);
+      setPreviewIndex(0);
     }
   }, [currentPeriod]);
 
-  // 加载历史日志
+  // 加载图片 base64
   useEffect(() => {
-    if (!projectId) return;
-    
-    const loadHistoryLog = async () => {
-      try {
-        const logFile = await getScanLog(parseInt(projectId));
-        if (logFile && logFile.logs && logFile.logs.length > 0) {
-          // 转换为带 id 的格式
-          const logsWithId: ScanLog[] = logFile.logs.map((log, index) => ({
-            ...log,
-            id: `${log.timestamp}-${index}`,
-          }));
-          // 批量添加到 store
-          addScanLogs(logsWithId);
-        }
-      } catch (error) {
-        console.error('加载历史日志失败:', error);
+    const loadImages = async () => {
+      // 只加载还没加载过的图片
+      const photosToLoad = currentPhotos.filter(photo => !loadedImageIds.current.has(photo.id));
+      
+      if (photosToLoad.length === 0) return;
+      
+      // 标记为加载中（避免重复加载）
+      photosToLoad.forEach(photo => loadedImageIds.current.add(photo.id));
+      
+      // 并发加载图片（限制并发数）
+      const batchSize = 5;
+      for (let i = 0; i < photosToLoad.length; i += batchSize) {
+        const batch = photosToLoad.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map(async (photo) => {
+            try {
+              const base64 = await getImageBase64(photo.file_path);
+              return { id: photo.id, url: base64 };
+            } catch (error) {
+              console.error('加载图片失败:', photo.file_name, error);
+              loadedImageIds.current.delete(photo.id); // 失败的移除标记，下次可以重试
+              return { id: photo.id, url: '' };
+            }
+          })
+        );
+        
+        // 分批更新 state，提升体验
+        const newLoadedImages: Record<number, string> = {};
+        results.forEach(({ id, url }) => {
+          if (url) newLoadedImages[id] = url;
+        });
+        
+        setLoadedImages(prev => ({ ...prev, ...newLoadedImages }));
       }
     };
     
-    loadHistoryLog();
-  }, [projectId]);
+    loadImages();
+  }, [currentPhotos]);
 
-  // 组件卸载时清理事件监听和定时器
+  // 图片预览 - 键盘事件
   useEffect(() => {
-    return () => {
-      if (unlistenScanLogRef.current) {
-        unlistenScanLogRef.current();
-      }
-      if (flushTimerRef.current) {
-        clearTimeout(flushTimerRef.current);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!showPreview) return;
+      
+      if (e.key === 'ArrowLeft') {
+        handlePrevPhoto();
+      } else if (e.key === 'ArrowRight') {
+        handleNextPhoto();
+      } else if (e.key === 'Escape') {
+        handleClosePreview();
       }
     };
-  }, []);
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showPreview, previewIndex]);
+
+  // 打开图片预览
+  const handleOpenPreview = (index: number) => {
+    setPreviewIndex(index);
+    setShowPreview(true);
+  };
+
+  // 关闭图片预览
+  const handleClosePreview = () => {
+    setShowPreview(false);
+  };
+
+  // 上一张
+  const handlePrevPhoto = () => {
+    if (currentPhotos.length === 0) return;
+    setPreviewIndex(prev => (prev - 1 + currentPhotos.length) % currentPhotos.length);
+  };
+
+  // 下一张
+  const handleNextPhoto = () => {
+    if (currentPhotos.length === 0) return;
+    setPreviewIndex(prev => (prev + 1) % currentPhotos.length);
+  };
 
   const loadPeriods = async (pid: number) => {
     try {
@@ -123,6 +164,10 @@ export default function PeriodSelectPage() {
 
   const loadPeriodMedia = async (periodId: number) => {
     try {
+      // 切换周期时重置图片缓存
+      setLoadedImages({});
+      loadedImageIds.current.clear();
+      
       const [photos, videos] = await Promise.all([
         getPeriodPhotos(periodId),
         getPeriodVideos(periodId),
@@ -135,23 +180,6 @@ export default function PeriodSelectPage() {
   };
 
   // 批量刷新日志
-  const flushLogs = () => {
-    if (pendingLogsRef.current.length > 0) {
-      const logs = pendingLogsRef.current;
-      pendingLogsRef.current = [];
-      addScanLogs(logs);
-    }
-    flushTimerRef.current = null;
-  };
-
-  // 添加日志到缓冲，定时批量刷新
-  const enqueueLog = (log: Parameters<typeof addScanLog>[0]) => {
-    pendingLogsRef.current.push(log);
-    if (flushTimerRef.current === null) {
-      flushTimerRef.current = window.setTimeout(flushLogs, 100);
-    }
-  };
-
   const handleGeneratePeriods = async () => {
     if (!projectId || !currentBaby) return;
 
@@ -171,58 +199,23 @@ export default function PeriodSelectPage() {
   };
 
   const handleScanFolder = async () => {
-    if (!projectId) return;
+    if (!projectId || !currentPeriod) return;
 
     const folderPath = await selectFolder();
     if (!folderPath) return;
 
     setIsScanning(true);
-    clearScanLogs();
 
     try {
-      // 注册日志事件监听
-      const unlisten = await onScanLog((log) => {
-        enqueueLog(log);
-      });
-      unlistenScanLogRef.current = unlisten;
-
-      await scanMediaFolder(parseInt(projectId), folderPath);
+      await scanPeriodFolder(parseInt(projectId), currentPeriod.id, folderPath);
       // 重新加载当前周期的媒体
-      if (currentPeriod) {
-        await loadPeriodMedia(currentPeriod.id);
-      }
+      await loadPeriodMedia(currentPeriod.id);
     } catch (error) {
       console.error('扫描文件夹失败:', error);
       alert('扫描文件夹失败');
     } finally {
       setIsScanning(false);
-      // 强制刷新剩余日志
-      if (flushTimerRef.current) {
-        clearTimeout(flushTimerRef.current);
-        flushLogs();
-      }
-      // 移除事件监听
-      if (unlistenScanLogRef.current) {
-        unlistenScanLogRef.current();
-        unlistenScanLogRef.current = null;
-      }
     }
-  };
-
-  // 下载日志
-  const handleDownloadLog = () => {
-    if (scanLogs.length === 0 || !projectId) return;
-    
-    const logData = {
-      project_id: parseInt(projectId),
-      scanned_at: new Date().toISOString(),
-      folder_path: '',
-      total_files: currentPhotos.length + currentVideos.length,
-      logs: scanLogs.map(({ id, ...rest }) => rest),
-    };
-    
-    const fileName = `scan-log-${projectId}-${Date.now()}.json`;
-    downloadJson(logData, fileName);
   };
 
   const handleAddPeriod = async () => {
@@ -284,6 +277,20 @@ export default function PeriodSelectPage() {
         is_final: p.id === photo.id,
       }));
       setCurrentPhotos(updated);
+      
+      // 更新周期列表中的selected_photo_id，实时标记完成状态
+      const updatedPeriods = periods.map(p => 
+        p.id === currentPeriod.id 
+          ? { ...p, selected_photo_id: photo.id }
+          : p
+      );
+      setPeriods(updatedPeriods);
+      
+      // 同时更新currentPeriod
+      setCurrentPeriod({
+        ...currentPeriod,
+        selected_photo_id: photo.id,
+      });
     } catch (error) {
       console.error('设置最终照片失败:', error);
     }
@@ -445,20 +452,6 @@ export default function PeriodSelectPage() {
           </div>
         </div>
 
-        {/* 日志面板 */}
-        {(isScanning || scanLogs.length > 0) && (
-          <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
-            <ScanLogPanel
-              logs={scanLogs}
-              isExpanded={isLogExpanded}
-              onToggleExpand={toggleLogExpanded}
-              autoScroll={autoScrollLog}
-              onToggleAutoScroll={toggleAutoScrollLog}
-              onDownload={handleDownloadLog}
-            />
-          </div>
-        )}
-
         {/* Tab切换 */}
         <div className="px-4 border-b border-gray-200 bg-white">
           <div className="flex gap-1">
@@ -518,10 +511,16 @@ export default function PeriodSelectPage() {
                           photo.is_selected ? 'selected' : ''
                         } ${photo.is_final ? 'final' : ''}`}
                         onClick={() => handleTogglePhotoSelect(photo)}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          const index = currentPhotos.findIndex(p => p.id === photo.id);
+                          handleOpenPreview(index);
+                        }}
                       >
                         <img
-                          src={`file://${photo.file_path}`}
+                          src={loadedImages[photo.id] || ''}
                           alt={photo.file_name}
+                          loading="lazy"
                         />
                         {photo.is_final && (
                           <div className="photo-badge final">
@@ -594,6 +593,63 @@ export default function PeriodSelectPage() {
           )}
         </div>
       </div>
+
+      {/* 图片预览弹窗 */}
+      {showPreview && currentPhotos[previewIndex] && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+          onClick={handleClosePreview}
+        >
+          {/* 关闭按钮 */}
+          <button
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors"
+            onClick={handleClosePreview}
+          >
+            <X className="w-8 h-8" />
+          </button>
+
+          {/* 上一张按钮 */}
+          <button
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevPhoto();
+            }}
+          >
+            <ChevronLeft className="w-10 h-10" />
+          </button>
+
+          {/* 下一张按钮 */}
+          <button
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNextPhoto();
+            }}
+          >
+            <ChevronRight className="w-10 h-10" />
+          </button>
+
+          {/* 图片 */}
+          <div 
+            className="max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={loadedImages[currentPhotos[previewIndex].id] || ''}
+              alt={currentPhotos[previewIndex].file_name}
+              className="max-w-full max-h-[85vh] object-contain"
+            />
+          </div>
+
+          {/* 底部信息 */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 text-sm">
+            <span className="font-medium">{currentPhotos[previewIndex].file_name}</span>
+            <span className="mx-2">·</span>
+            <span>{previewIndex + 1} / {currentPhotos.length}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

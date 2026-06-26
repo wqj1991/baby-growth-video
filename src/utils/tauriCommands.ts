@@ -15,6 +15,24 @@ import type {
   VideoConfig,
 } from '../types';
 
+/**
+ * 将本地文件路径转换为可在 WebView 中加载的 media 协议 URL
+ * 解决 Tauri 2.0 中 file:// 协议被安全策略阻止的问题
+ */
+export function fileToMediaUrl(filePath: string): string {
+  // 对文件路径进行 URL 编码，保留路径分隔符
+  const encoded = encodeURIComponent(filePath).replace(/%2F/g, '/').replace(/%5C/g, '/');
+  return `media://localhost/${encoded}`;
+}
+
+/**
+ * 读取本地图片文件并返回 base64 data URL
+ * 用于在 WebView 中显示本地图片（替代 file:// 协议）
+ */
+export async function getImageBase64(filePath: string): Promise<string> {
+  return invoke('get_image_base64', { filePath });
+}
+
 // ==================== 数据库操作 ====================
 
 // 初始化数据库
@@ -144,6 +162,15 @@ export async function scanMediaFolder(
   folderPath: string
 ): Promise<ScanResult> {
   return invoke('scan_media_folder', { projectId, folderPath });
+}
+
+// 按周期扫描文件夹
+export async function scanPeriodFolder(
+  projectId: number,
+  periodId: number,
+  folderPath: string
+): Promise<ScanResult> {
+  return invoke('scan_period_folder', { projectId, periodId, folderPath });
 }
 
 // 监听扫描日志事件
