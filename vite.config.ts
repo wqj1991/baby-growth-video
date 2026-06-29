@@ -8,12 +8,12 @@ export default defineConfig({
   clearScreen: false,
   // Tauri expects a fixed port, fail if that port is not available
   server: {
-    host: "localhost",
+    host: "127.0.0.1",
     strictPort: true,
-    port: 8092,
+    port: 5173,
     hmr: {
-      host: "localhost",
-      port: 8092,
+      host: "127.0.0.1",
+      port: 5173,
       protocol: "ws",
     },
     watch: {

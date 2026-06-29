@@ -3,7 +3,7 @@
   "build": {
     "beforeDevCommand": "pnpm run dev",
     "beforeBuildCommand": "pnpm run build",
-    "devUrl": "http://localhost:8092",
+    "devUrl": "http://127.0.0.1:5173",
     "frontendDist": "../dist"
   },
   "productName": "宝宝成长视频",
