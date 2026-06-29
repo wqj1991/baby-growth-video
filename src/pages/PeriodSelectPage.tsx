@@ -525,7 +525,7 @@ export default function PeriodSelectPage() {
   const completedCount = periods.filter(p => p.selected_photo_id).length;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* ---- Top Toolbar ---- */}
       <div className="h-[52px] flex items-center justify-between px-5 border-b border-[#e8e6de] bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -563,72 +563,75 @@ export default function PeriodSelectPage() {
         </div>
       </div>
 
-      {/* ---- Period Timeline (Horizontal Steps) ---- */}
-      <PeriodTimeline
-        periods={periods}
-        currentPeriod={currentPeriod}
-        onSelectPeriod={setCurrentPeriod}
-      />
+      {/* ---- Fixed Header Section ---- */}
+      <div className="flex-shrink-0">
+        {/* ---- Period Timeline (Horizontal Steps) ---- */}
+        <PeriodTimeline
+          periods={periods}
+          currentPeriod={currentPeriod}
+          onSelectPeriod={setCurrentPeriod}
+        />
 
-      {/* ---- Add Period Form ---- */}
-      {showAddPeriod && (
-        <div className="p-4 border-b border-[#e8e6de] bg-[#fafaf8]">
-          <div className="flex items-end gap-3 max-w-xl">
-            <div className="form-group flex-1 !mb-0">
-              <label className="form-label">周期名称</label>
-              <input
-                type="text"
-                className="form-input"
-                value={newPeriodName}
-                onChange={(e) => setNewPeriodName(e.target.value)}
-                placeholder="如：满月、百天"
-              />
+        {/* ---- Add Period Form ---- */}
+        {showAddPeriod && (
+          <div className="p-4 border-b border-[#e8e6de] bg-[#fafaf8]">
+            <div className="flex items-end gap-3 max-w-xl">
+              <div className="form-group flex-1 !mb-0">
+                <label className="form-label">周期名称</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newPeriodName}
+                  onChange={(e) => setNewPeriodName(e.target.value)}
+                  placeholder="如：满月、百天"
+                />
+              </div>
+              <div className="form-group flex-1 !mb-0">
+                <label className="form-label">日期</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={newPeriodDate}
+                  onChange={(e) => setNewPeriodDate(e.target.value)}
+                />
+              </div>
+              <button onClick={handleAddPeriod} className="btn btn-primary btn-sm h-[38px]">
+                确认添加
+              </button>
+              <button onClick={() => setShowAddPeriod(false)} className="btn btn-ghost btn-sm h-[38px]">
+                取消
+              </button>
             </div>
-            <div className="form-group flex-1 !mb-0">
-              <label className="form-label">日期</label>
-              <input
-                type="date"
-                className="form-input"
-                value={newPeriodDate}
-                onChange={(e) => setNewPeriodDate(e.target.value)}
-              />
-            </div>
-            <button onClick={handleAddPeriod} className="btn btn-primary btn-sm h-[38px]">
-              确认添加
-            </button>
-            <button onClick={() => setShowAddPeriod(false)} className="btn btn-ghost btn-sm h-[38px]">
-              取消
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ---- Tab Bar ---- */}
-      <div className="tab-bar-v2">
-        <button
-          onClick={() => { setSelectedTab('photos'); handleCloseContextMenu(); }}
-          className={`tab-item-v2 ${selectedTab === 'photos' ? 'active' : ''}`}
-        >
-          <Image className="w-4 h-4" />
-          全部照片
-          <span className="tab-count-v2">{currentPhotos.length}</span>
-        </button>
-        <button
-          onClick={() => { setSelectedTab('videos'); handleCloseContextMenu(); }}
-          className={`tab-item-v2 ${selectedTab === 'videos' ? 'active' : ''}`}
-        >
-          <VideoIcon className="w-4 h-4" />
-          视频
-          <span className="tab-count-v2 video">{currentVideos.length}</span>
-        </button>
-        <button
-          onClick={() => { setSelectedTab('pending'); handleCloseContextMenu(); }}
-          className={`tab-item-v2 ${selectedTab === 'pending' ? 'active' : ''}`}
-        >
-          <Plus className="w-4 h-4" />
-          待选区
-          <span className="tab-count-v2 stash">{selectedItems.length}</span>
-        </button>
+        {/* ---- Tab Bar ---- */}
+        <div className="tab-bar-v2">
+          <button
+            onClick={() => { setSelectedTab('photos'); handleCloseContextMenu(); }}
+            className={`tab-item-v2 ${selectedTab === 'photos' ? 'active' : ''}`}
+          >
+            <Image className="w-4 h-4" />
+            全部照片
+            <span className="tab-count-v2">{currentPhotos.length}</span>
+          </button>
+          <button
+            onClick={() => { setSelectedTab('videos'); handleCloseContextMenu(); }}
+            className={`tab-item-v2 ${selectedTab === 'videos' ? 'active' : ''}`}
+          >
+            <VideoIcon className="w-4 h-4" />
+            视频
+            <span className="tab-count-v2 video">{currentVideos.length}</span>
+          </button>
+          <button
+            onClick={() => { setSelectedTab('pending'); handleCloseContextMenu(); }}
+            className={`tab-item-v2 ${selectedTab === 'pending' ? 'active' : ''}`}
+          >
+            <Plus className="w-4 h-4" />
+            待选区
+            <span className="tab-count-v2 stash">{selectedItems.length}</span>
+          </button>
+        </div>
       </div>
 
       {/* ---- Content Area ---- */}
