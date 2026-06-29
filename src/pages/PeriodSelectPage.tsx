@@ -3,11 +3,9 @@ import { useParams } from 'react-router-dom';
 import {
   FolderOpen,
   Plus,
-  Check,
   Image,
   Video as VideoIcon,
   Calendar,
-  Trash2,
   ChevronLeft,
   ChevronRight,
   X,
@@ -17,7 +15,6 @@ import {
   getPeriods,
   generatePeriods,
   createPeriod,
-  deletePeriod,
   getPeriodPhotos,
   getPeriodVideos,
   scanPeriodFolder,
@@ -33,11 +30,15 @@ import {
   cancelFinalVideoFrame,
   getVideoThumbnail,
 } from '../utils/tauriCommands';
-import type { Period, Photo, Video, VideoFrame, SelectableItem } from '../types';
+import type { Photo, Video, VideoFrame, SelectableItem } from '../types';
 import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
 import PhotoContextMenu from '../components/PhotoContextMenu';
 import VideoFrameSettingsModal from '../components/VideoFrameSettingsModal';
 import VideoFrameViewerModal from '../components/VideoFrameViewerModal';
+import PeriodTimeline from '../components/PeriodTimeline';
+import PendingSelectionPanel from '../components/PendingSelectionPanel';
+import CollageWorkspace from '../components/CollageWorkspace';
+import VideoFramePlayer from '../components/VideoFramePlayer';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -59,8 +60,18 @@ export default function PeriodSelectPage() {
     setSelectedItems,
     addToSelectedItems,
     removeFromSelectedItems,
+    // Collage state
+    collageMode,
+    setCollageMode,
+    setCollageLayout,
+    setCollagePhotoOrder,
+    // Video player state
+    setShowVideoPlayer,
+    currentPlayingVideo,
+    setCurrentPlayingVideo,
   } = useAppStore();
 
+  // ---- Local State ----
   const [showAddPeriod, setShowAddPeriod] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newPeriodDate, setNewPeriodDate] = useState('');
@@ -69,73 +80,53 @@ export default function PeriodSelectPage() {
   const loadedImageIds = useRef<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
-  
-  // 右键菜单状态
+
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
     position: { x: number; y: number };
     photo: Photo | null;
-  }>({
-    visible: false,
-    position: { x: 0, y: 0 },
-    photo: null,
-  });
+  }>({ visible: false, position: { x: 0, y: 0 }, photo: null });
 
-  // 视频帧相关状态
   const [currentVideoForFrames, setCurrentVideoForFrames] = useState<Video | null>(null);
   const [showFrameSettings, setShowFrameSettings] = useState(false);
   const [showFrameViewer, setShowFrameViewer] = useState(false);
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
   const [videoFrameCounts, setVideoFrameCounts] = useState<Record<number, number>>({});
   const [videoThumbnails, setVideoThumbnails] = useState<Record<number, string>>({});
-  const contentAreaRef = useRef<HTMLDivElement>(null);
-  const [contentAreaHeight, setContentAreaHeight] = useState(400);
 
-  // 测量内容区高度（传递给 VirtualPhotoGrid）
-  useEffect(() => {
-    const el = contentAreaRef.current;
-    if (!el) return;
-    const measure = () => {
-      const rect = el.getBoundingClientRect();
-      setContentAreaHeight(Math.max(100, rect.height - 48)); // subtract header padding
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  // Inline video player state
+  const [showInlinePlayer, setShowInlinePlayer] = useState(false);
 
+  const gridWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Load periods
   useEffect(() => {
-    if (projectId) {
-      loadPeriods(parseInt(projectId));
-    }
+    if (projectId) loadPeriods(parseInt(projectId));
   }, [projectId]);
 
+  // Load media on period change
   useEffect(() => {
     if (currentPeriod) {
       loadPeriodMedia(currentPeriod.id);
-      // 切换周期时关闭预览
       setShowPreview(false);
       setPreviewIndex(0);
-      // 切换周期时关闭右键菜单
       handleCloseContextMenu();
-      // 切换周期时关闭视频帧弹窗
       setShowFrameSettings(false);
       setShowFrameViewer(false);
+      setShowInlinePlayer(false);
+      setCollageMode(false);
       setCurrentVideoForFrames(null);
       setVideoFrameCounts({});
     }
   }, [currentPeriod]);
 
-  // 加载图片 base64
+  // Load photo base64 images
   useEffect(() => {
     const loadImages = async () => {
       const photosToLoad = currentPhotos.filter(photo => !loadedImageIds.current.has(photo.id));
-      
       if (photosToLoad.length === 0) return;
-      
       photosToLoad.forEach(photo => loadedImageIds.current.add(photo.id));
-      
+
       const batchSize = 5;
       for (let i = 0; i < photosToLoad.length; i += batchSize) {
         const batch = photosToLoad.slice(i, i + batchSize);
@@ -145,34 +136,26 @@ export default function PeriodSelectPage() {
               const base64 = await getImageBase64(photo.file_path);
               return { id: photo.id, url: base64 };
             } catch (error) {
-              console.error('加载图片失败:', photo.file_name, error);
               loadedImageIds.current.delete(photo.id);
               return { id: photo.id, url: '' };
             }
           })
         );
-        
         const newLoadedImages: Record<number, string> = {};
-        results.forEach(({ id, url }) => {
-          if (url) newLoadedImages[id] = url;
-        });
-        
+        results.forEach(({ id, url }) => { if (url) newLoadedImages[id] = url; });
         setLoadedImages(prev => ({ ...prev, ...newLoadedImages }));
       }
     };
-    
     loadImages();
   }, [currentPhotos]);
 
-  // 加载视频帧图片 base64
+  // Load video frame images
   useEffect(() => {
     const loadFrameImages = async () => {
       const framesToLoad = currentVideoFrames.filter(frame => !loadedImageIds.current.has(frame.id));
-      
       if (framesToLoad.length === 0) return;
-      
       framesToLoad.forEach(frame => loadedImageIds.current.add(frame.id));
-      
+
       const batchSize = 5;
       for (let i = 0; i < framesToLoad.length; i += batchSize) {
         const batch = framesToLoad.slice(i, i + batchSize);
@@ -182,32 +165,24 @@ export default function PeriodSelectPage() {
               const base64 = await getImageBase64(frame.file_path);
               return { id: frame.id, url: base64 };
             } catch (error) {
-              console.error('加载视频帧失败:', frame.id, error);
               loadedImageIds.current.delete(frame.id);
               return { id: frame.id, url: '' };
             }
           })
         );
-        
         const newLoadedImages: Record<number, string> = {};
-        results.forEach(({ id, url }) => {
-          if (url) newLoadedImages[id] = url;
-        });
-        
+        results.forEach(({ id, url }) => { if (url) newLoadedImages[id] = url; });
         setLoadedImages(prev => ({ ...prev, ...newLoadedImages }));
       }
     };
-    
     loadFrameImages();
   }, [currentVideoFrames]);
 
-  // 加载视频缩略图
+  // Load video thumbnails
   useEffect(() => {
-    const loadVideoThumbnails = async () => {
+    const loadVideoThumbs = async () => {
       const videosToLoad = currentVideos.filter(v => !videoThumbnails[v.id]);
-      
       if (videosToLoad.length === 0) return;
-      
       const batchSize = 3;
       for (let i = 0; i < videosToLoad.length; i += batchSize) {
         const batch = videosToLoad.slice(i, i + batchSize);
@@ -217,194 +192,145 @@ export default function PeriodSelectPage() {
               const thumbnail = await getVideoThumbnail(video.file_path);
               return { id: video.id, thumbnail };
             } catch (error) {
-              console.error('加载视频缩略图失败:', video.file_name, error);
               return { id: video.id, thumbnail: '' };
             }
           })
         );
-        
         const newThumbnails: Record<number, string> = {};
-        results.forEach(({ id, thumbnail }) => {
-          if (thumbnail) newThumbnails[id] = thumbnail;
-        });
-        
+        results.forEach(({ id, thumbnail }) => { if (thumbnail) newThumbnails[id] = thumbnail; });
         setVideoThumbnails(prev => ({ ...prev, ...newThumbnails }));
       }
     };
-    
-    loadVideoThumbnails();
+    loadVideoThumbs();
   }, [currentVideos]);
 
-  // 图片预览 - 键盘事件
+  // Keyboard events for preview
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!showPreview) return;
-      
-      if (e.key === 'ArrowLeft') {
-        handlePrevPhoto();
-      } else if (e.key === 'ArrowRight') {
-        handleNextPhoto();
-      } else if (e.key === 'Escape') {
-        handleClosePreview();
-      }
+      if (e.key === 'ArrowLeft') handlePrevPhoto();
+      else if (e.key === 'ArrowRight') handleNextPhoto();
+      else if (e.key === 'Escape') handleClosePreview();
     };
-    
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showPreview, previewIndex]);
 
-  // 打开图片预览
-  const handleOpenPreview = (index: number) => {
-    setPreviewIndex(index);
-    setShowPreview(true);
-  };
-
-  // 关闭图片预览
-  const handleClosePreview = () => {
-    setShowPreview(false);
-  };
-
-  // 上一张
-  const handlePrevPhoto = () => {
-    if (currentPhotos.length === 0) return;
-    setPreviewIndex(prev => (prev - 1 + currentPhotos.length) % currentPhotos.length);
-  };
-
-  // 下一张
-  const handleNextPhoto = () => {
-    if (currentPhotos.length === 0) return;
-    setPreviewIndex(prev => (prev + 1) % currentPhotos.length);
-  };
+  // ============================
+  // DATA LOADING
+  // ============================
 
   const loadPeriods = async (pid: number) => {
     try {
       const data = await getPeriods(pid);
       setPeriods(data);
-      if (data.length > 0) {
-        setCurrentPeriod(data[0]);
-      }
-    } catch (error) {
-      console.error('加载周期失败:', error);
-    }
+      if (data.length > 0 && !currentPeriod) setCurrentPeriod(data[0]);
+    } catch (error) { console.error('加载周期失败:', error); }
   };
 
   const loadPeriodMedia = async (periodId: number) => {
     try {
       setLoadedImages({});
       loadedImageIds.current.clear();
-      
       setSelectedItems([]);
-      
       const [photos, videos] = await Promise.all([
         getPeriodPhotos(periodId),
         getPeriodVideos(periodId),
       ]);
       setCurrentPhotos(photos);
       setCurrentVideos(videos);
-      
-      const selectedPhotos: SelectableItem[] = photos
+
+      const pendingPhotos: SelectableItem[] = photos
         .filter(p => p.is_selected)
         .map(p => ({ type: 'photo' as const, item: p }));
-      if (selectedPhotos.length > 0) {
-        setSelectedItems(selectedPhotos);
-      }
-    } catch (error) {
-      console.error('加载周期媒体失败:', error);
-    }
+      if (pendingPhotos.length > 0) setSelectedItems(pendingPhotos);
+    } catch (error) { console.error('加载周期媒体失败:', error); }
   };
 
-  // 批量刷新日志
+  // ============================
+  // PERIOD ACTIONS
+  // ============================
+
   const handleGeneratePeriods = async () => {
     if (!projectId || !currentBaby) return;
-
     try {
-      const data = await generatePeriods(
-        parseInt(projectId),
-        currentBaby.birth_date,
-        7
-      );
+      const data = await generatePeriods(parseInt(projectId), currentBaby.birth_date, 7);
       setPeriods(data);
-      if (data.length > 0) {
-        setCurrentPeriod(data[0]);
-      }
-    } catch (error) {
-      console.error('生成周期失败:', error);
-    }
+      if (data.length > 0) setCurrentPeriod(data[0]);
+    } catch (error) { console.error('生成周期失败:', error); }
   };
 
   const handleScanFolder = async () => {
     if (!projectId || !currentPeriod) return;
-
     const folderPath = await selectFolder();
     if (!folderPath) return;
-
     setIsScanning(true);
-
     try {
       await scanPeriodFolder(parseInt(projectId), currentPeriod.id, folderPath);
-      // 重新加载当前周期的媒体
       await loadPeriodMedia(currentPeriod.id);
-    } catch (error) {
-      console.error('扫描文件夹失败:', error);
-      alert('扫描文件夹失败');
-    } finally {
-      setIsScanning(false);
-    }
+    } catch (error) { alert('扫描文件夹失败'); }
+    finally { setIsScanning(false); }
   };
 
   const handleAddPeriod = async () => {
     if (!projectId || !newPeriodName || !newPeriodDate) return;
-
     try {
       const period = await createPeriod({
-        project_id: parseInt(projectId),
-        name: newPeriodName,
-        start_date: newPeriodDate,
-        end_date: newPeriodDate,
-        period_type: 'custom',
-        sort_order: periods.length,
+        project_id: parseInt(projectId), name: newPeriodName,
+        start_date: newPeriodDate, end_date: newPeriodDate,
+        period_type: 'custom', sort_order: periods.length,
       });
       setPeriods([...periods, period]);
       setShowAddPeriod(false);
       setNewPeriodName('');
       setNewPeriodDate('');
-    } catch (error) {
-      console.error('添加周期失败:', error);
-    }
+    } catch (error) { console.error('添加周期失败:', error); }
   };
 
-  const handleDeletePeriod = async (periodId: number) => {
-    if (!confirm('确定要删除这个周期吗？')) return;
-
-    try {
-      await deletePeriod(periodId);
-      const newPeriods = periods.filter(p => p.id !== periodId);
-      setPeriods(newPeriods);
-      if (currentPeriod?.id === periodId) {
-        setCurrentPeriod(newPeriods[0] || null);
-      }
-    } catch (error) {
-      console.error('删除周期失败:', error);
-    }
-  };
+  // ============================
+  // PHOTO ACTIONS
+  // ============================
 
   const handleTogglePhotoSelect = async (photo: Photo) => {
     try {
-      const updated = await updatePhoto({
-        ...photo,
-        is_selected: !photo.is_selected,
-      });
+      const updated = await updatePhoto({ ...photo, is_selected: !photo.is_selected });
       setCurrentPhotos(currentPhotos.map(p => p.id === updated.id ? updated : p));
-      
       if (updated.is_selected) {
         addToSelectedItems({ type: 'photo', item: updated });
       } else {
         removeFromSelectedItems({ type: 'photo', item: updated });
       }
-    } catch (error) {
-      console.error('更新照片失败:', error);
-    }
+    } catch (error) { console.error('更新照片失败:', error); }
   };
+
+  const handleSetFinalPhoto = async (photo: Photo) => {
+    if (!currentPeriod) return;
+    try {
+      await setFinalPhoto(currentPeriod.id, photo.id);
+      setCurrentPhotos(currentPhotos.map(p => ({ ...p, is_final: p.id === photo.id })));
+      const updatedPeriods = periods.map(p =>
+        p.id === currentPeriod.id ? { ...p, selected_photo_id: photo.id } : p
+      );
+      setPeriods(updatedPeriods);
+      setCurrentPeriod({ ...currentPeriod, selected_photo_id: photo.id });
+    } catch (error) { console.error('设置最终照片失败:', error); }
+  };
+
+  const handleCancelFinalPhoto = async () => {
+    if (!currentPeriod) return;
+    try {
+      await cancelFinalPhoto(currentPeriod.id);
+      setCurrentPhotos(currentPhotos.map(p => ({ ...p, is_final: false })));
+      setPeriods(periods.map(p =>
+        p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
+      ));
+      setCurrentPeriod({ ...currentPeriod, selected_photo_id: undefined });
+    } catch (error) { console.error('取消最终照片失败:', error); }
+  };
+
+  // ============================
+  // VIDEO / FRAME ACTIONS
+  // ============================
 
   const handleExtractFrames = (video: Video) => {
     setCurrentVideoForFrames(video);
@@ -414,605 +340,430 @@ export default function PeriodSelectPage() {
   const handleGenerateFrames = async (mode: 'count' | 'interval', value: number) => {
     setShowFrameSettings(false);
     setIsExtractingFrames(true);
-    
     try {
       let frames: VideoFrame[];
-      if (mode === 'count') {
-        frames = await generateVideoFrames(currentVideoForFrames!.id, value);
-      } else {
-        frames = await generateVideoFramesByInterval(currentVideoForFrames!.id, value);
-      }
+      if (mode === 'count') frames = await generateVideoFrames(currentVideoForFrames!.id, value);
+      else frames = await generateVideoFramesByInterval(currentVideoForFrames!.id, value);
       setCurrentVideoFrames(frames);
-      setVideoFrameCounts(prev => ({
-        ...prev,
-        [currentVideoForFrames!.id]: frames.length
-      }));
+      setVideoFrameCounts(prev => ({ ...prev, [currentVideoForFrames!.id]: frames.length }));
       setShowFrameViewer(true);
-    } catch (error) {
-      console.error('抽帧失败:', error);
-      alert('抽帧失败，请重试');
-    } finally {
-      setIsExtractingFrames(false);
-    }
+    } catch (error) { alert('抽帧失败，请重试'); }
+    finally { setIsExtractingFrames(false); }
   };
 
   const handleToggleFrameSelect = async (frame: VideoFrame) => {
     try {
-      const updated = await updateVideoFrame({
-        ...frame,
-        is_selected: !frame.is_selected,
-      });
-      
-      setCurrentVideoFrames(currentVideoFrames.map(f => 
-        f.id === updated.id ? updated : f
-      ));
-      
+      const updated = await updateVideoFrame({ ...frame, is_selected: !frame.is_selected });
+      setCurrentVideoFrames(currentVideoFrames.map(f => f.id === updated.id ? updated : f));
       if (updated.is_selected) {
         addToSelectedItems({ type: 'frame', item: updated });
       } else {
         removeFromSelectedItems({ type: 'frame', item: updated });
       }
-    } catch (error) {
-      console.error('更新视频帧失败:', error);
-    }
+    } catch (error) { console.error('更新视频帧失败:', error); }
   };
 
   const handleSetFinalVideoFrame = async (frame: VideoFrame) => {
     if (!currentPeriod) return;
-    
     try {
       await setFinalVideoFrame(currentPeriod.id, frame.id);
-      
-      setCurrentVideoFrames(currentVideoFrames.map(f => ({
-        ...f,
-        is_final: f.id === frame.id,
-      })));
-      
-      const updatedPeriods = periods.map(p => 
-        p.id === currentPeriod.id 
-          ? { ...p, selected_photo_id: frame.id }
-          : p
-      );
-      setPeriods(updatedPeriods);
-      
-      setCurrentPeriod({
-        ...currentPeriod,
-        selected_photo_id: frame.id,
-      });
-    } catch (error) {
-      console.error('设置最终视频帧失败:', error);
-    }
+      setCurrentVideoFrames(currentVideoFrames.map(f => ({ ...f, is_final: f.id === frame.id })));
+      setPeriods(periods.map(p =>
+        p.id === currentPeriod.id ? { ...p, selected_photo_id: frame.id } : p
+      ));
+      setCurrentPeriod({ ...currentPeriod, selected_photo_id: frame.id });
+    } catch (error) { console.error('设置最终视频帧失败:', error); }
   };
 
   const handleCancelFinalVideoFrame = async () => {
     if (!currentPeriod) return;
-    
     try {
       await cancelFinalVideoFrame(currentPeriod.id);
-      
-      setCurrentVideoFrames(currentVideoFrames.map(f => ({
-        ...f,
-        is_final: false,
-      })));
-      
-      const updatedPeriods = periods.map(p =>
-        p.id === currentPeriod.id
-          ? { ...p, selected_photo_id: undefined }
-          : p
-      );
-      setPeriods(updatedPeriods);
-      
-      setCurrentPeriod({
-        ...currentPeriod,
-        selected_photo_id: undefined,
-      });
-    } catch (error) {
-      console.error('取消最终视频帧失败:', error);
-    }
+      setCurrentVideoFrames(currentVideoFrames.map(f => ({ ...f, is_final: false })));
+      setPeriods(periods.map(p =>
+        p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
+      ));
+      setCurrentPeriod({ ...currentPeriod, selected_photo_id: undefined });
+    } catch (error) { console.error('取消最终视频帧失败:', error); }
   };
 
-  const handleSetFinalPhoto = async (photo: Photo) => {
-    if (!currentPeriod) return;
+  // ============================
+  // CONTEXT MENU
+  // ============================
 
-    try {
-      await setFinalPhoto(currentPeriod.id, photo.id);
-      // 更新所有照片的is_final状态
-      const updated = currentPhotos.map(p => ({
-        ...p,
-        is_final: p.id === photo.id,
-      }));
-      setCurrentPhotos(updated);
-      
-      // 更新周期列表中的selected_photo_id，实时标记完成状态
-      const updatedPeriods = periods.map(p => 
-        p.id === currentPeriod.id 
-          ? { ...p, selected_photo_id: photo.id }
-          : p
-      );
-      setPeriods(updatedPeriods);
-      
-      // 同时更新currentPeriod
-      setCurrentPeriod({
-        ...currentPeriod,
-        selected_photo_id: photo.id,
-      });
-    } catch (error) {
-      console.error('设置最终照片失败:', error);
-    }
-  };
-
-  // 右键菜单处理
   const handlePhotoContextMenu = (e: React.MouseEvent, photo: Photo) => {
     e.preventDefault();
-    setContextMenu({
-      visible: true,
-      position: { x: e.clientX, y: e.clientY },
-      photo,
-    });
+    setContextMenu({ visible: true, position: { x: e.clientX, y: e.clientY }, photo });
   };
 
   const handleCloseContextMenu = () => {
-    setContextMenu({
-      visible: false,
-      position: { x: 0, y: 0 },
-      photo: null,
-    });
+    setContextMenu({ visible: false, position: { x: 0, y: 0 }, photo: null });
   };
 
-  const handleAddToPending = (photo: Photo) => {
-    handleTogglePhotoSelect(photo);
+  // ============================
+  // PREVIEW
+  // ============================
+
+  const handleOpenPreview = (index: number) => { setPreviewIndex(index); setShowPreview(true); };
+  const handleClosePreview = () => setShowPreview(false);
+  const handlePrevPhoto = () => {
+    if (currentPhotos.length === 0) return;
+    setPreviewIndex(prev => (prev - 1 + currentPhotos.length) % currentPhotos.length);
+  };
+  const handleNextPhoto = () => {
+    if (currentPhotos.length === 0) return;
+    setPreviewIndex(prev => (prev + 1) % currentPhotos.length);
   };
 
-  const handleRemoveFromPending = (photo: Photo) => {
-    handleTogglePhotoSelect(photo);
-  };
+  // ============================
+  // PENDING / COLLAGE ACTIONS
+  // ============================
 
-  const handleContextMenuSetFinal = (photo: Photo) => {
-    handleSetFinalPhoto(photo);
-  };
-
-  const handleCancelFinalPhoto = async (_photo: Photo) => {
-    if (!currentPeriod) return;
-
-    try {
-      await cancelFinalPhoto(currentPeriod.id);
-      // 更新所有照片的is_final状态
-      const updated = currentPhotos.map(p => ({
-        ...p,
-        is_final: false,
-      }));
-      setCurrentPhotos(updated);
-
-      // 更新周期列表中的selected_photo_id，取消完成状态
-      const updatedPeriods = periods.map(p =>
-        p.id === currentPeriod.id
-          ? { ...p, selected_photo_id: undefined }
-          : p
-      );
-      setPeriods(updatedPeriods);
-      
-      // 同时更新currentPeriod
-      setCurrentPeriod({
-        ...currentPeriod,
-        selected_photo_id: undefined,
-      });
-    } catch (error) {
-      console.error('取消最终照片失败:', error);
+  const handleToggleMultiSelect = (item: SelectableItem) => {
+    if (item.type === 'photo') {
+      handleTogglePhotoSelect(item.item as Photo);
+    } else {
+      handleToggleFrameSelect(item.item as VideoFrame);
     }
   };
 
-  const handleContextMenuPreview = (photo: Photo) => {
-    // 根据当前 tab 确定照片列表
-    const photoList = selectedTab === 'pending' 
-      ? currentPhotos.filter(p => p.is_selected)
-      : currentPhotos;
-    const index = photoList.findIndex(p => p.id === photo.id);
-    if (index !== -1) {
-      // 预览始终使用完整的 currentPhotos 列表，保持一致性
-      const fullIndex = currentPhotos.findIndex(p => p.id === photo.id);
-      if (fullIndex !== -1) {
-        handleOpenPreview(fullIndex);
-      }
+  const handleRemoveFromStash = (item: SelectableItem) => {
+    if (item.type === 'photo') {
+      handleTogglePhotoSelect({ ...(item.item as Photo), is_selected: true } as Photo);
+    } else {
+      handleToggleFrameSelect({ ...(item.item as VideoFrame), is_selected: true } as VideoFrame);
     }
   };
 
-  const getPeriodStatus = (period: Period) => {
-    if (period.selected_photo_id) return 'completed';
-    return 'pending';
+  const handleSelectSingle = (item: SelectableItem) => {
+    if (item.type === 'photo') {
+      handleSetFinalPhoto(item.item as Photo);
+    } else {
+      handleSetFinalVideoFrame(item.item as VideoFrame);
+    }
   };
+
+  const handleEnterCollage = () => {
+    // Auto-recommend layout based on count
+    const count = selectedItems.filter(i => i.item.is_selected).length;
+    const layoutMap: Record<number, string> = { 2: '2up', 3: '3up-main', 4: '4grid' };
+    setCollageLayout(layoutMap[count] || '4grid');
+    setCollagePhotoOrder(selectedItems.filter(i => i.item.is_selected).map((_, i) => i));
+    setCollageMode(true);
+  };
+
+  const handleGenerateCollage = (_layout: string, _gap: number, _order: number[]) => {
+    // TODO: Call Rust backend to generate collage image via FFmpeg
+    alert('拼图生成功能将在后端集成后可用');
+    setCollageMode(false);
+  };
+
+  const handleExitCollage = () => {
+    setCollageMode(false);
+  };
+
+  // ============================
+  // VIDEO INLINE PLAYER
+  // ============================
+
+  const handleOpenInlinePlayer = (video: Video) => {
+    setCurrentPlayingVideo(video);
+    setShowVideoPlayer(true);
+    setShowInlinePlayer(true);
+  };
+
+  const handleCloseInlinePlayer = () => {
+    setShowInlinePlayer(false);
+    setShowVideoPlayer(false);
+    setCurrentPlayingVideo(null);
+  };
+
+  // ============================
+  // RENDER: COLLAGE MODE
+  // ============================
+
+  if (collageMode) {
+    return (
+      <div className="flex h-full flex-col">
+        <CollageWorkspace
+          selectedItems={selectedItems.filter(i => i.item.is_selected)}
+          loadedImages={loadedImages}
+          onBack={handleExitCollage}
+          onGenerate={handleGenerateCollage}
+        />
+      </div>
+    );
+  }
+
+  // ============================
+  // RENDER: VIDEO INLINE PLAYER
+  // ============================
+
+  if (showInlinePlayer && currentPlayingVideo) {
+    return (
+      <div className="flex h-full flex-col">
+        <VideoFramePlayer
+          video={currentPlayingVideo}
+          onBack={handleCloseInlinePlayer}
+          onCapture={(frame) => {
+            addToSelectedItems({ type: 'frame', item: { ...frame, is_selected: true } });
+          }}
+          onAddToStash={(frame) => {
+            addToSelectedItems({ type: 'frame', item: { ...frame, is_selected: true } });
+          }}
+          capturedFrames={currentVideoFrames}
+          loadedImages={loadedImages}
+        />
+      </div>
+    );
+  }
+
+  // ============================
+  // RENDER: MAIN PAGE
+  // ============================
 
   const completedCount = periods.filter(p => p.selected_photo_id).length;
 
   return (
-    <div className="flex h-full">
-      {/* 左侧 - 周期列表 */}
-      <div className="w-72 border-r border-gray-200 bg-white flex flex-col">
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">周期列表</h3>
-            <span className="text-sm text-gray-500">
-              {completedCount}/{periods.length}
-            </span>
-          </div>
+    <div className="flex h-full flex-col">
+      {/* ---- Top Toolbar ---- */}
+      <div className="h-[52px] flex items-center justify-between px-5 border-b border-[#e8e6de] bg-white flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleScanFolder}
+            disabled={isScanning || !currentPeriod}
+            className="btn btn-primary btn-sm"
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            {isScanning ? '扫描中...' : '扫描文件夹'}
+          </button>
 
-          <div className="flex gap-2">
-            {periods.length === 0 && (
-              <button
-                onClick={handleGeneratePeriods}
-                className="btn btn-primary btn-sm flex-1"
-              >
-                <Calendar className="w-4 h-4" />
-                自动生成
-              </button>
-            )}
-            <button
-              onClick={() => setShowAddPeriod(true)}
-              className="btn btn-outline btn-sm flex-1"
-            >
-              <Plus className="w-4 h-4" />
-              添加
+          {periods.length === 0 && (
+            <button onClick={handleGeneratePeriods} className="btn btn-outline btn-sm">
+              <Calendar className="w-3.5 h-3.5" />
+              自动生成周期
             </button>
-          </div>
+          )}
+
+          <button
+            onClick={() => setShowAddPeriod(true)}
+            className="btn btn-ghost btn-sm text-[#706c63]"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            添加周期
+          </button>
         </div>
 
-        {/* 添加周期表单 */}
-        {showAddPeriod && (
-          <div className="p-4 border-b border-gray-100 bg-gray-50">
-            <div className="form-group">
+        <div className="flex items-center gap-3">
+          {currentPeriod && (
+            <span className="text-xs text-[#b0aca0]">
+              {completedCount}/{periods.length} 已完成
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ---- Period Timeline (Horizontal Steps) ---- */}
+      <PeriodTimeline
+        periods={periods}
+        currentPeriod={currentPeriod}
+        onSelectPeriod={setCurrentPeriod}
+      />
+
+      {/* ---- Add Period Form ---- */}
+      {showAddPeriod && (
+        <div className="p-4 border-b border-[#e8e6de] bg-[#fafaf8]">
+          <div className="flex items-end gap-3 max-w-xl">
+            <div className="form-group flex-1 !mb-0">
               <label className="form-label">周期名称</label>
               <input
                 type="text"
-                className="form-input text-sm"
+                className="form-input"
                 value={newPeriodName}
                 onChange={(e) => setNewPeriodName(e.target.value)}
                 placeholder="如：满月、百天"
               />
             </div>
-            <div className="form-group">
+            <div className="form-group flex-1 !mb-0">
               <label className="form-label">日期</label>
               <input
                 type="date"
-                className="form-input text-sm"
+                className="form-input"
                 value={newPeriodDate}
                 onChange={(e) => setNewPeriodDate(e.target.value)}
               />
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleAddPeriod}
-                className="btn btn-primary btn-sm flex-1"
-              >
-                确认添加
-              </button>
-              <button
-                onClick={() => setShowAddPeriod(false)}
-                className="btn btn-secondary btn-sm"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 周期列表 */}
-        <div className="flex-1 overflow-auto p-2">
-          <div className="period-timeline">
-            {periods.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Calendar className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">暂无周期</p>
-                <p className="text-xs mt-1">点击上方按钮生成或添加</p>
-              </div>
-            ) : (
-              periods.map((period) => (
-                <div
-                  key={period.id}
-                  onClick={() => setCurrentPeriod(period)}
-                  className={`period-item ${
-                    currentPeriod?.id === period.id ? 'active' : ''
-                  } ${getPeriodStatus(period) === 'completed' ? 'completed' : ''}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">{period.name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {period.start_date} ~ {period.end_date}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {getPeriodStatus(period) === 'completed' && (
-                        <span className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" />
-                        </span>
-                      )}
-                      {period.period_type === 'custom' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePeriod(period.id);
-                          }}
-                          className="p-1 text-gray-400 hover:text-red-500"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+            <button onClick={handleAddPeriod} className="btn btn-primary btn-sm h-[38px]">
+              确认添加
+            </button>
+            <button onClick={() => setShowAddPeriod(false)} className="btn btn-ghost btn-sm h-[38px]">
+              取消
+            </button>
           </div>
         </div>
+      )}
+
+      {/* ---- Tab Bar ---- */}
+      <div className="tab-bar-v2">
+        <button
+          onClick={() => { setSelectedTab('photos'); handleCloseContextMenu(); }}
+          className={`tab-item-v2 ${selectedTab === 'photos' ? 'active' : ''}`}
+        >
+          <Image className="w-4 h-4" />
+          全部照片
+          <span className="tab-count-v2">{currentPhotos.length}</span>
+        </button>
+        <button
+          onClick={() => { setSelectedTab('videos'); handleCloseContextMenu(); }}
+          className={`tab-item-v2 ${selectedTab === 'videos' ? 'active' : ''}`}
+        >
+          <VideoIcon className="w-4 h-4" />
+          视频
+          <span className="tab-count-v2 video">{currentVideos.length}</span>
+        </button>
+        <button
+          onClick={() => { setSelectedTab('pending'); handleCloseContextMenu(); }}
+          className={`tab-item-v2 ${selectedTab === 'pending' ? 'active' : ''}`}
+        >
+          <Plus className="w-4 h-4" />
+          待选区
+          <span className="tab-count-v2 stash">{selectedItems.length}</span>
+        </button>
       </div>
 
-      {/* 右侧 - 照片/视频选择区 */}
-      <div className="flex-1 flex flex-col">
-        {/* 工具栏 */}
-        <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold">
-              {currentPeriod?.name || '请选择周期'}
-            </h2>
-            {currentPeriod && (
-              <span className="text-sm text-gray-500">
-                {currentPeriod.start_date} ~ {currentPeriod.end_date}
-              </span>
-            )}
+      {/* ---- Content Area ---- */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {!currentPeriod ? (
+          <div className="empty-state-v2 flex-1">
+            <Calendar className="w-16 h-16 text-[#d4d1c7] mb-4" />
+            <h4>选择一个周期开始</h4>
+            <p>在上方周期进度条中选择一个周期，或通过「扫描文件夹」导入照片</p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleScanFolder}
-              disabled={isScanning || !currentPeriod}
-              className="btn btn-primary btn-sm"
-            >
-              <FolderOpen className="w-4 h-4" />
-              {isScanning ? '扫描中...' : '扫描文件夹'}
-            </button>
-          </div>
-        </div>
-
-        {/* Tab切换 */}
-        <div className="px-4 border-b border-gray-200 bg-white">
-          <div className="flex gap-1">
-            <button
-              onClick={() => {
-                setSelectedTab('pending');
-                handleCloseContextMenu();
-              }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                selectedTab === 'pending'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Plus className="w-4 h-4 inline mr-1" />
-              待选区 ({selectedItems.length})
-            </button>
-            <button
-              onClick={() => {
-                setSelectedTab('photos');
-                handleCloseContextMenu();
-              }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                selectedTab === 'photos'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Image className="w-4 h-4 inline mr-1" />
-              照片 ({currentPhotos.length})
-            </button>
-            <button
-              onClick={() => {
-                setSelectedTab('videos');
-                handleCloseContextMenu();
-              }}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                selectedTab === 'videos'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <VideoIcon className="w-4 h-4 inline mr-1" />
-              视频 ({currentVideos.length})
-            </button>
-          </div>
-        </div>
-
-        {/* 内容区 */}
-        <div ref={contentAreaRef} className="flex-1 overflow-auto p-6 bg-gray-50">
-          {!currentPeriod ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <Calendar className="w-16 h-16 mb-4 text-gray-300" />
-              <p>请先选择一个周期</p>
-            </div>
-          ) : selectedTab === 'photos' ? (
-            <div>
-              {currentPhotos.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                  <Image className="w-16 h-16 mb-4 text-gray-300" />
-                  <p>暂无照片</p>
-                  <p className="text-sm mt-1">点击"扫描文件夹"添加照片</p>
+        ) : selectedTab === 'photos' ? (
+          /* ===== PHOTOS TAB ===== */
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {currentPhotos.length === 0 ? (
+              <div className="empty-state-v2 flex-1">
+                <Image className="w-16 h-16 text-[#d4d1c7] mb-4" />
+                <h4>暂无照片</h4>
+                <p>点击「扫描文件夹」导入照片，或从视频中截取画面</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between px-5 py-3">
+                  <span className="text-xs text-[#706c63]">
+                    显示 <strong className="text-[#33312d]">{currentPhotos.length}</strong> 张照片
+                    {currentPeriod && (
+                      <span className="ml-2 text-[#b0aca0]">
+                        · {currentPeriod.start_date} ~ {currentPeriod.end_date}
+                      </span>
+                    )}
+                  </span>
                 </div>
-              ) : (
-                <>
-                  <div className="mb-4 flex items-center justify-between">
-                    <p className="text-sm text-gray-600">
-                      已选择 {currentPhotos.filter(p => p.is_selected).length} 张候选照片，
-                      {currentPhotos.find(p => p.is_final) ? '已确认最终照片' : '请确认1张最终照片'}
-                    </p>
-                  </div>
+                <div ref={gridWrapperRef} className="flex-1 overflow-hidden px-5 pb-5">
                   <VirtualPhotoGrid
                     photos={currentPhotos}
                     loadedImages={loadedImages}
+                    parentRef={gridWrapperRef}
                     onContextMenu={handlePhotoContextMenu}
                     onDoubleClick={(photo) => {
                       const index = currentPhotos.findIndex(p => p.id === photo.id);
                       if (index !== -1) handleOpenPreview(index);
                     }}
                     onOpenPreview={handleOpenPreview}
-                    gridHeight={contentAreaHeight}
                     className="w-full"
                   />
-                </>
-              )}
-            </div>
-          ) : selectedTab === 'pending' ? (
-            <div>
-              {selectedItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                  <Plus className="w-16 h-16 mb-4 text-gray-300" />
-                  <p>暂无待选项目</p>
-                  <p className="text-sm mt-1">在"照片"或"视频"中选择项目加入待选区</p>
                 </div>
-              ) : (
-                <>
-                  <div className="mb-4 flex items-center justify-between">
-                    <p className="text-sm text-gray-600">
-                      待选区共有 {selectedItems.length} 个项目，
-                      {currentPhotos.find(p => p.is_final) || currentVideoFrames.find(f => f.is_final) 
-                        ? '已确认最终项目' 
-                        : '请确认1个最终项目'}
-                    </p>
-                  </div>
-                  <div className="photo-grid">
-                    {selectedItems.map((selectable) => {
-                      if (selectable.type === 'photo') {
-                        const photo = selectable.item;
-                        return (
-                          <div
-                            key={`photo-${photo.id}`}
-                            className={`photo-item ${
-                              photo.is_selected ? 'selected' : ''
-                            } ${photo.is_final ? 'final' : ''}`}
-                            onContextMenu={(e) => handlePhotoContextMenu(e, photo)}
-                            onDoubleClick={(e) => {
-                              e.stopPropagation();
-                              const index = currentPhotos.findIndex(p => p.id === photo.id);
-                              handleOpenPreview(index);
-                            }}
-                          >
-                            <img
-                              src={loadedImages[photo.id] || ''}
-                              alt={photo.file_name}
-                              loading="lazy"
-                            />
-                            {photo.is_final && (
-                              <div className="photo-badge final">
-                                <Check className="w-3 h-3" />
-                              </div>
-                            )}
-                            {photo.is_selected && !photo.is_final && (
-                              <div className="photo-badge selected">
-                                ✓
-                              </div>
-                            )}
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                              <p className="text-white text-xs truncate">
-                                {photo.file_name}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      } else {
-                        const frame = selectable.item;
-                        return (
-                          <div
-                            key={`frame-${frame.id}`}
-                            className={`photo-item ${
-                              frame.is_selected ? 'selected' : ''
-                            } ${frame.is_final ? 'final' : ''}`}
-                          >
-                            <img
-                              src={loadedImages[frame.id] || ''}
-                              alt={`frame-${frame.id}`}
-                              loading="lazy"
-                            />
-                            {frame.is_final && (
-                              <div className="photo-badge final">
-                                <Check className="w-3 h-3" />
-                              </div>
-                            )}
-                            {frame.is_selected && !frame.is_final && (
-                              <div className="photo-badge selected">
-                                ✓
-                              </div>
-                            )}
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                              <p className="text-white text-xs font-mono text-center">
-                                {Math.floor(frame.time_seconds / 60)}:{(frame.time_seconds % 60).toString().padStart(2, '0')}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div>
-              {currentVideos.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                  <VideoIcon className="w-16 h-16 mb-4 text-gray-300" />
-                  <p>暂无视频</p>
-                  <p className="text-sm mt-1">点击"扫描文件夹"添加视频</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {currentVideos.map((video) => (
+              </>
+            )}
+          </div>
+        ) : selectedTab === 'pending' ? (
+          /* ===== PENDING TAB ===== */
+          <div className="flex-1 overflow-hidden">
+            <PendingSelectionPanel
+              selectedItems={selectedItems}
+              loadedImages={loadedImages}
+              onToggleMultiSelect={handleToggleMultiSelect}
+              onRemoveItem={handleRemoveFromStash}
+              onSelectSingle={handleSelectSingle}
+              onGenerateCollage={handleEnterCollage}
+            />
+          </div>
+        ) : (
+          /* ===== VIDEOS TAB ===== */
+          <div className="flex-1 overflow-y-auto p-5">
+            {currentVideos.length === 0 ? (
+              <div className="empty-state-v2">
+                <VideoIcon className="w-16 h-16 text-[#d4d1c7] mb-4" />
+                <h4>暂无视频</h4>
+                <p>点击「扫描文件夹」导入视频，然后从中截取画面</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {currentVideos.map((video) => (
+                  <div
+                    key={video.id}
+                    className="cursor-pointer rounded-xl overflow-hidden bg-white border border-[#e8e6de] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                  >
+                    {/* Thumbnail */}
                     <div
-                      key={video.id}
-                      className="card overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                      className="aspect-video bg-[#3a2010] relative overflow-hidden"
+                      onClick={() => handleOpenInlinePlayer(video)}
                     >
-                      <div className="aspect-video bg-gray-900 relative overflow-hidden">
-                        {videoThumbnails[video.id] ? (
-                          <img
-                            src={videoThumbnails[video.id]}
-                            alt={video.file_name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <VideoIcon className="w-12 h-12 text-gray-600" />
+                      {videoThumbnails[video.id] ? (
+                        <img
+                          src={videoThumbnails[video.id]}
+                          alt={video.file_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
+                            <VideoIcon className="w-5 h-5 text-white/60" />
                           </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors" />
-                        <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 text-white text-xs rounded">
-                          {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
                         </div>
+                      )}
+                      <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/65 text-white text-[10px] font-medium rounded">
+                        {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
                       </div>
-                      <div className="p-3">
-                        <p className="text-sm font-medium truncate">{video.file_name}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {video.width}x{video.height}
-                        </p>
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3">
+                      <p className="text-xs font-medium text-[#33312d] truncate">{video.file_name}</p>
+                      <p className="text-[10px] text-[#b0aca0] mt-0.5">
+                        {video.width}×{video.height}
+                      </p>
+                      <div className="flex gap-1.5 mt-2">
                         <button
                           onClick={() => handleExtractFrames(video)}
-                          className="mt-2 w-full btn btn-outline btn-sm"
+                          className="btn btn-outline btn-sm flex-1 text-[11px]"
                           disabled={isExtractingFrames}
                         >
-                          {isExtractingFrames ? '抽帧中...' : (videoFrameCounts[video.id] > 0 ? `查看帧(${videoFrameCounts[video.id]}张)` : '截取画面')}
+                          {isExtractingFrames ? '抽帧中...' : videoFrameCounts[video.id] > 0 ? `查看(${videoFrameCounts[video.id]})` : '截取画面'}
+                        </button>
+                        <button
+                          onClick={() => handleOpenInlinePlayer(video)}
+                          className="btn btn-ghost btn-sm flex-1 text-[11px]"
+                        >
+                          播放
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* 图片预览弹窗 */}
+      {/* ===== IMAGE PREVIEW MODAL ===== */}
       {showPreview && currentPhotos[previewIndex] && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 animate-fade-in"
           onClick={handleClosePreview}
         >
-          {/* 关闭按钮 */}
           <button
             className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors"
             onClick={handleClosePreview}
@@ -1020,33 +771,21 @@ export default function PeriodSelectPage() {
             <X className="w-8 h-8" />
           </button>
 
-          {/* 上一张按钮 */}
           <button
             className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePrevPhoto();
-            }}
+            onClick={(e) => { e.stopPropagation(); handlePrevPhoto(); }}
           >
             <ChevronLeft className="w-10 h-10" />
           </button>
 
-          {/* 下一张按钮 */}
           <button
             className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleNextPhoto();
-            }}
+            onClick={(e) => { e.stopPropagation(); handleNextPhoto(); }}
           >
             <ChevronRight className="w-10 h-10" />
           </button>
 
-          {/* 图片 */}
-          <div 
-            className="max-w-[90vw] max-h-[85vh] flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             <img
               src={loadedImages[currentPhotos[previewIndex].id] || ''}
               alt={currentPhotos[previewIndex].file_name}
@@ -1054,7 +793,6 @@ export default function PeriodSelectPage() {
             />
           </div>
 
-          {/* 底部信息 */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 text-sm">
             <span className="font-medium">{currentPhotos[previewIndex].file_name}</span>
             <span className="mx-2">·</span>
@@ -1063,20 +801,24 @@ export default function PeriodSelectPage() {
         </div>
       )}
 
-      {/* 右键菜单 */}
+      {/* ===== CONTEXT MENU ===== */}
       <PhotoContextMenu
         visible={contextMenu.visible}
         position={contextMenu.position}
         photo={contextMenu.photo}
-        onAddToPending={handleAddToPending}
-        onRemoveFromPending={handleRemoveFromPending}
-        onSetFinal={handleContextMenuSetFinal}
-        onCancelFinal={handleCancelFinalPhoto}
-        onPreview={handleContextMenuPreview}
+        onAddToPending={(p) => { handleTogglePhotoSelect(p); handleCloseContextMenu(); }}
+        onRemoveFromPending={(p) => { handleTogglePhotoSelect(p); handleCloseContextMenu(); }}
+        onSetFinal={(p) => { handleSetFinalPhoto(p); handleCloseContextMenu(); }}
+        onCancelFinal={() => { handleCancelFinalPhoto(); handleCloseContextMenu(); }}
+        onPreview={(p) => {
+          handleCloseContextMenu();
+          const idx = currentPhotos.findIndex(ph => ph.id === p.id);
+          if (idx !== -1) handleOpenPreview(idx);
+        }}
         onClose={handleCloseContextMenu}
       />
 
-      {/* 视频抽帧设置弹窗 */}
+      {/* ===== VIDEO FRAME SETTINGS MODAL ===== */}
       <VideoFrameSettingsModal
         visible={showFrameSettings}
         video={currentVideoForFrames}
@@ -1084,22 +826,17 @@ export default function PeriodSelectPage() {
         onGenerate={handleGenerateFrames}
       />
 
-      {/* 视频帧查看弹窗 */}
+      {/* ===== VIDEO FRAME VIEWER MODAL ===== */}
       <VideoFrameViewerModal
         visible={showFrameViewer}
         video={currentVideoForFrames}
         frames={currentVideoFrames}
         onClose={() => setShowFrameViewer(false)}
-        onReExtract={() => {
-          setShowFrameViewer(false);
-          setShowFrameSettings(true);
-        }}
+        onReExtract={() => { setShowFrameViewer(false); setShowFrameSettings(true); }}
         onToggleSelect={handleToggleFrameSelect}
         onSetFinal={handleSetFinalVideoFrame}
         onCancelFinal={handleCancelFinalVideoFrame}
-        onPreview={(frame) => {
-          console.log('预览视频帧:', frame);
-        }}
+        onPreview={() => {}}
       />
     </div>
   );

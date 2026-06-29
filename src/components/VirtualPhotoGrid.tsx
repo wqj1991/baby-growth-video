@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type CSSProperties } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import { FixedSizeGrid as Grid } from 'react-window';
 import type { Photo } from '../types';
 import PhotoCard from './PhotoCard';
@@ -6,13 +6,14 @@ import PhotoCard from './PhotoCard';
 interface VirtualPhotoGridProps {
   photos: Photo[];
   loadedImages: Record<number, string>;
+  /** A ref pointing to the wrapper <div> that defines the grid's available space */
+  parentRef: React.RefObject<HTMLDivElement | null>;
   onContextMenu?: (e: React.MouseEvent, photo: Photo) => void;
   onDoubleClick?: (photo: Photo) => void;
   onOpenPreview?: (index: number) => void;
   onSelect?: (photo: Photo) => void;
   onAddToStash?: (photo: Photo) => void;
   className?: string;
-  gridHeight: number;
 }
 
 const ITEM_SIZE = 166; // 150px image + 16px gap
@@ -21,60 +22,60 @@ const MAX_COLUMNS = 8;
 
 /**
  * Virtualized photo grid using react-window.
- * Renders only visible photo cards for performance.
- * Internally measures its container to compute columns and pass pixel dimensions to FixedSizeGrid.
+ * Measures its parent wrapper div for exact pixel dimensions,
+ * then passes those to FixedSizeGrid for accurate rendering.
  */
 export default function VirtualPhotoGrid({
   photos,
   loadedImages,
+  parentRef,
   onContextMenu,
   onDoubleClick,
   onOpenPreview,
   onSelect,
   onAddToStash,
   className = '',
-  gridHeight,
 }: VirtualPhotoGridProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(800);
-  const [columns, setColumns] = useState(4);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 400, columns: 4 });
 
-  // Measure container width, compute columns
+  // Measure parent wrapper — exact available space for the grid
   useEffect(() => {
-    const el = containerRef.current;
+    const el = parentRef.current;
     if (!el) return;
 
     const measure = () => {
-      const rect = el.getBoundingClientRect();
-      const w = rect.width;
-      if (w > 0) {
-        setContainerWidth(Math.max(200, w));
-        setColumns(Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, Math.floor(w / ITEM_SIZE))));
-      }
+      // clientWidth/clientHeight already account for padding (px-5, pb-5)
+      const cw = el.clientWidth;
+      const ch = el.clientHeight;
+      if (cw <= 0 || ch <= 0) return;
+
+      const cols = Math.max(MIN_COLUMNS, Math.min(MAX_COLUMNS, Math.floor(cw / ITEM_SIZE)));
+      setDimensions({ width: cw, height: ch, columns: cols });
     };
 
-    measure();
+    // Small delay to let flexbox finish layout before first measure
+    const timer = setTimeout(measure, 0);
 
     const observer = new ResizeObserver(measure);
     observer.observe(el);
 
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [parentRef]);
 
+  const { width, height, columns } = dimensions;
   const totalCount = photos.length;
   const rowCount = totalCount > 0 ? Math.ceil(totalCount / columns) : 0;
 
-  // Ensure grid has valid dimensions before rendering
-  const safeWidth = containerWidth > 0 ? containerWidth : 800;
-  const safeHeight = gridHeight > 0 ? gridHeight : 400;
-
   return (
-    <div ref={containerRef} className={`${className} min-h-[200px]`}>
+    <div className={`${className} h-full`}>
       <Grid
         columnCount={columns}
         rowCount={rowCount}
-        width={safeWidth}
-        height={safeHeight}
+        width={width}
+        height={height}
         columnWidth={ITEM_SIZE}
         rowHeight={ITEM_SIZE}
         overscanCount={2}
