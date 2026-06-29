@@ -150,7 +150,7 @@ export default function PendingSelectionPanel({
             {bottomRow.length > 0 && (
               <div
                 className="grid gap-2 mb-3"
-                style={{ gridTemplateColumns: `repeat(${Math.min(bottomRow.length, 3)}, 1fr)` }}
+                style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
               >
                 {bottomRow.map((item) => {
                   const uniqueKey = `sm-${item.type}-${item.item.id}`;
