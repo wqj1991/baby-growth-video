@@ -20,7 +20,7 @@ interface ScanLogPanelProps {
   onToggleAutoScroll: () => void;
   onDownload?: () => void;
   /** 可选: 扫描进度计数器 (已处理/总数) */
-  progress?: { processed: number; total: number };
+  progress?: { processed: number; total: number } | null;
 }
 
 const levelConfig = {

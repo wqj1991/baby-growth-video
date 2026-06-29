@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 use std::collections::HashMap;
+use base64::Engine;
 
 fn get_ffmpeg_path() -> PathBuf {
     let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
@@ -242,9 +243,11 @@ pub fn generate_growth_video(
     // 设置进度：准备完成
     set_progress(&task_id, 10);
 
-    // 执行ffmpeg命令
+    // 执行ffmpeg命令（静默模式）
     let status = Command::new(get_ffmpeg_path())
         .args(&ffmpeg_args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status()
         .map_err(|e| format!("执行FFmpeg失败: {}", e))?;
 
@@ -279,6 +282,7 @@ pub fn get_video_info(path: &str) -> Result<(f64, i64, i64), String> {
             "-of", "default=noprint_wrappers=1",
             path,
         ])
+        .stderr(std::process::Stdio::null())
         .output()
         .map_err(|e| format!("执行ffprobe失败: {}", e))?;
 
@@ -321,14 +325,17 @@ pub fn get_video_thumbnail(video_path: &str) -> Result<String, String> {
             "-vframes", "1",
             "-q:v", "2",
             "-y",
+            "-v", "error",
             output_path.to_str().unwrap_or("thumbnail.jpg"),
         ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .status();
     
     match status {
         Ok(s) if s.success() => {
             let image_data = std::fs::read(&output_path).map_err(|e| e.to_string())?;
-            let base64 = base64::encode(&image_data);
+            let base64 = base64::engine::general_purpose::STANDARD.encode(&image_data);
             let _ = std::fs::remove_file(output_path);
             Ok(format!("data:image/jpeg;base64,{}", base64))
         }
@@ -391,7 +398,7 @@ pub fn generate_video_frames(
         let frame_file_name = format!("{}_frame_{:03}.jpg", video_stem, i);
         let frame_path = frames_dir.join(&frame_file_name);
 
-        // 使用ffmpeg截图
+        // 使用ffmpeg截图（静默模式）
         let status = Command::new(get_ffmpeg_path())
             .args([
                 "-ss", &time_seconds.to_string(),
@@ -399,8 +406,11 @@ pub fn generate_video_frames(
                 "-vframes", "1",
                 "-q:v", "2",
                 "-y",
+                "-v", "error",
                 frame_path.to_str().unwrap_or("frame.jpg"),
             ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .status()
             .map_err(|e| format!("截图失败: {}", e))?;
 

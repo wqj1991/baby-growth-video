@@ -62,6 +62,28 @@ interface AppState {
   setSelectedItems: (items: SelectableItem[]) => void;
   addToSelectedItems: (item: SelectableItem) => void;
   removeFromSelectedItems: (item: SelectableItem) => void;
+
+  // 拼图工作区状态
+  collageMode: boolean;
+  setCollageMode: (mode: boolean) => void;
+  collageLayout: string; // '2up' | '3up-main' | '4grid' | '3row'
+  setCollageLayout: (layout: string) => void;
+  collageGap: number; // px
+  setCollageGap: (gap: number) => void;
+  collagePhotoOrder: number[]; // photo IDs in order
+  setCollagePhotoOrder: (order: number[]) => void;
+
+  // 视频播放器状态
+  showVideoPlayer: boolean;
+  setShowVideoPlayer: (show: boolean) => void;
+  currentPlayingVideo: Video | null;
+  setCurrentPlayingVideo: (video: Video | null) => void;
+
+  // 截帧相关
+  capturedFrame: VideoFrame | null;
+  setCapturedFrame: (frame: VideoFrame | null) => void;
+  showCaptureResult: boolean;
+  setShowCaptureResult: (show: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -167,4 +189,26 @@ export const useAppStore = create<AppState>((set) => ({
       i => !(i.type === item.type && i.item.id === item.item.id)
     )
   })),
+
+  // 拼图工作区状态
+  collageMode: false,
+  setCollageMode: (mode) => set({ collageMode: mode }),
+  collageLayout: '3up-main',
+  setCollageLayout: (layout) => set({ collageLayout: layout }),
+  collageGap: 3,
+  setCollageGap: (gap) => set({ collageGap: gap }),
+  collagePhotoOrder: [],
+  setCollagePhotoOrder: (order) => set({ collagePhotoOrder: order }),
+
+  // 视频播放器状态
+  showVideoPlayer: false,
+  setShowVideoPlayer: (show) => set({ showVideoPlayer: show }),
+  currentPlayingVideo: null,
+  setCurrentPlayingVideo: (video) => set({ currentPlayingVideo: video }),
+
+  // 截帧相关
+  capturedFrame: null,
+  setCapturedFrame: (frame) => set({ capturedFrame: frame }),
+  showCaptureResult: false,
+  setShowCaptureResult: (show) => set({ showCaptureResult: show }),
 }));

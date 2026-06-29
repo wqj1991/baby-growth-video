@@ -1,4 +1,4 @@
-use crate::db::{Database, NewPhoto, NewVideo, Photo, Video};
+use crate::db::{NewPhoto, NewVideo, Photo, Video};
 use crate::video;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,23 @@ pub struct ScanResult {
     pub total_videos: i64,
     pub recognized_photos: i64,
     pub recognized_videos: i64,
+    pub skipped_duplicate_photos: i64,
+    pub skipped_duplicate_videos: i64,
+    pub skipped_no_date_photos: i64,
+    pub skipped_no_date_videos: i64,
+    pub skipped_no_period_photos: i64,
+    pub skipped_no_period_videos: i64,
+    pub skipped_copy_failed_photos: i64,
+    pub skipped_copy_failed_videos: i64,
+}
+
+/// 文件处理阶段的输出 — 尚未写入数据库
+pub struct ProcessResult {
+    pub new_photos: Vec<NewPhoto>,
+    pub new_videos: Vec<NewVideo>,
+    pub scan_logs: Vec<ScanLogEntry>,
+    pub total_photos: i64,
+    pub total_videos: i64,
     pub skipped_duplicate_photos: i64,
     pub skipped_duplicate_videos: i64,
     pub skipped_no_date_photos: i64,
@@ -644,12 +661,16 @@ fn process_single_entry(
     }
 }
 
-pub fn scan_media_folder(
-    db: &Database,
+/// 纯文件处理阶段 — 无数据库依赖，不持锁
+/// 遍历文件夹、提取日期、匹配周期、复制文件、解析尺寸、emit 进度事件
+/// 返回尚未写入数据库的 NewPhoto/NewVideo 列表和统计信息
+pub fn process_media_folder(
     project_id: i64,
     folder_path: &str,
-    window: tauri::Window,
-) -> Result<ScanResult, String> {
+    periods: &[crate::db::Period],
+    existing_paths: &HashSet<String>,
+    window: &tauri::Window,
+) -> Result<ProcessResult, String> {
     let folder = Path::new(folder_path);
     if !folder.exists() {
         return Err("文件夹不存在".to_string());
@@ -657,27 +678,10 @@ pub fn scan_media_folder(
 
     let mut scan_logs: Vec<ScanLogEntry> = Vec::new();
 
-    emit_scan_log(&window, "info", format!("开始扫描文件夹: {}", folder_path), None, &mut scan_logs);
-
-    let periods = db.get_periods(project_id).map_err(|e| e.to_string())?;
+    emit_scan_log(window, "info", format!("开始扫描文件夹: {}", folder_path), None, &mut scan_logs);
 
     let photos_dir = get_project_photos_dir(project_id);
     let videos_dir = get_project_videos_dir(project_id);
-
-    // 构建已存在文件集合（用于去重）
-    let mut existing_paths: HashSet<String> = HashSet::new();
-    for period in &periods {
-        if let Ok(photos) = db.get_period_photos(period.id) {
-            for photo in photos {
-                existing_paths.insert(photo.file_path.clone());
-            }
-        }
-        if let Ok(videos) = db.get_period_videos(period.id) {
-            for video in videos {
-                existing_paths.insert(video.file_path.clone());
-            }
-        }
-    }
 
     // ==================== Phase 1: 收集所有条目路径 ====================
     let entries: Vec<PathBuf> = WalkDir::new(folder)
@@ -691,14 +695,13 @@ pub fn scan_media_folder(
     let total_count = entries.len() as i64;
 
     if total_count == 0 {
-        emit_scan_log(&window, "info", "文件夹中没有找到照片或视频文件".to_string(), None, &mut scan_logs);
-        return Ok(ScanResult {
-            photos: vec![],
-            videos: vec![],
+        emit_scan_log(window, "info", "文件夹中没有找到照片或视频文件".to_string(), None, &mut scan_logs);
+        return Ok(ProcessResult {
+            new_photos: vec![],
+            new_videos: vec![],
+            scan_logs,
             total_photos: 0,
             total_videos: 0,
-            recognized_photos: 0,
-            recognized_videos: 0,
             skipped_duplicate_photos: 0,
             skipped_duplicate_videos: 0,
             skipped_no_date_photos: 0,
@@ -711,11 +714,9 @@ pub fn scan_media_folder(
     }
 
     // ==================== Phase 2: 并行处理每个文件 ====================
-    // 用 channel 让每个线程独立 emit 日志，避免 Mutex 竞争
-    // 但由于 tauri::Window::emit 不是 Send + Sync，所以我们在线程结束后统一 emit
-    
-    let entries_arc = entries; // Move into closure scope
-    let periods_arc = periods.clone();
+
+    let entries_arc = entries;
+    let periods_arc = periods.to_vec();
     let existing_arc = existing_paths.clone();
     let photos_dir_arc = photos_dir.clone();
     let videos_dir_arc = videos_dir.clone();
@@ -723,7 +724,7 @@ pub fn scan_media_folder(
     // 计算每个类型的数量
     let mut total_photos = 0i64;
     let mut total_videos = 0i64;
-    
+
     for path in &entries_arc {
         if is_photo_file(path) {
             total_photos += 1;
@@ -732,9 +733,6 @@ pub fn scan_media_folder(
         }
     }
 
-    // 在线程外先统计 skip 原因,避免在 par_iter 中 emit Window 事件
-    // 然后在 par_iter 中只做纯 IO 操作（复制、解析尺寸），最后一次性 merge
-    
     let processed_results: Vec<ProcessedFile> = entries_arc
         .par_iter()
         .map(|path| {
@@ -752,7 +750,7 @@ pub fn scan_media_folder(
     let mut new_photos: Vec<NewPhoto> = Vec::new();
     let mut new_videos: Vec<NewVideo> = Vec::new();
     let mut processed_count = 0usize;
-    
+
     let mut skipped_duplicate_photos = 0i64;
     let mut skipped_duplicate_videos = 0i64;
     let mut skipped_no_date_photos = 0i64;
@@ -768,7 +766,7 @@ pub fn scan_media_folder(
         // 每 BATCH 个文件 emit 一条进度
         if processed_count % PROGRESS_BATCH_SIZE == 0 {
             emit_scan_log(
-                &window,
+                window,
                 "info",
                 format!("已处理 {}/{}", processed_count, total_count),
                 None,
@@ -791,9 +789,9 @@ pub fn scan_media_folder(
                         taken_at: Some(result.date_str.clone()),
                     };
                     new_photos.push(new_photo);
-                    
+
                     emit_scan_log(
-                        &window,
+                        window,
                         "success",
                         format!(
                             "✓ 已识别照片: {} ({})",
@@ -814,9 +812,9 @@ pub fn scan_media_folder(
                         taken_at: Some(result.date_str.clone()),
                     };
                     new_videos.push(new_video);
-                    
+
                     emit_scan_log(
-                        &window,
+                        window,
                         "success",
                         format!(
                             "✓ 已识别视频: {} ({})",
@@ -835,70 +833,51 @@ pub fn scan_media_folder(
             SkipReason::NoDate => {
                 if result.is_photo {
                     skipped_no_date_photos += 1;
-                    emit_scan_log(&window, "warn", format!("⚠ 无法识别日期: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                    emit_scan_log(window, "warn", format!("⚠ 无法识别日期: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 } else {
                     skipped_no_date_videos += 1;
-                    emit_scan_log(&window, "warn", format!("⚠ 无法识别日期: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                    emit_scan_log(window, "warn", format!("⚠ 无法识别日期: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 }
             }
             SkipReason::NoPeriod => {
                 if result.is_photo {
                     skipped_no_period_photos += 1;
-                    emit_scan_log(&window, "warn", format!("⚠ 日期不在周期内: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                    emit_scan_log(window, "warn", format!("⚠ 日期不在周期内: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 } else {
                     skipped_no_period_videos += 1;
-                    emit_scan_log(&window, "warn", format!("⚠ 日期不在周期内: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                    emit_scan_log(window, "warn", format!("⚠ 日期不在周期内: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 }
             }
             SkipReason::Duplicate => {
                 if result.is_photo {
                     skipped_duplicate_photos += 1;
-                    emit_scan_log(&window, "warn", format!("⚠ 跳过重复: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                    emit_scan_log(window, "warn", format!("⚠ 跳过重复: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 } else {
                     skipped_duplicate_videos += 1;
-                    emit_scan_log(&window, "warn", format!("⚠ 跳过重复: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                    emit_scan_log(window, "warn", format!("⚠ 跳过重复: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 }
             }
             SkipReason::CopyFailed => {
                 if result.is_photo {
                     skipped_copy_failed_photos += 1;
-                    emit_scan_log(&window, "error", format!("✗ 复制失败: {} - 磁盘空间不足或权限不足", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                    emit_scan_log(window, "error", format!("✗ 复制失败: {} - 磁盘空间不足或权限不足", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 } else {
                     skipped_copy_failed_videos += 1;
-                    emit_scan_log(&window, "error", format!("✗ 复制失败: {} - 磁盘空间不足或权限不足", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                    emit_scan_log(window, "error", format!("✗ 复制失败: {} - 磁盘空间不足或权限不足", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 }
             }
         }
     }
 
-    // ==================== Phase 4: 批量插入数据库（事务，不变）====================
-    let photos = db.add_photos(&new_photos).unwrap_or_else(|e| {
-        eprintln!("批量插入照片失败: {}", e);
-        Vec::new()
-    });
-    let videos = db.add_videos(&new_videos).unwrap_or_else(|e| {
-        eprintln!("批量插入视频失败: {}", e);
-        Vec::new()
-    });
-
-    let recognized_photos_count = photos.len() as i64;
-    let recognized_videos_count = videos.len() as i64;
-
     let total_files = total_photos + total_videos;
-    emit_scan_log(&window, "info", format!("扫描完成，共处理 {} 个文件", total_files), None, &mut scan_logs);
+    emit_scan_log(window, "info", format!("扫描完成，共处理 {} 个文件", total_files), None, &mut scan_logs);
 
-    // 保存日志到文件
-    if let Err(e) = save_scan_log(project_id, folder_path, total_files, scan_logs) {
-        eprintln!("保存扫描日志失败: {}", e);
-    }
-
-    Ok(ScanResult {
-        photos,
-        videos,
+    Ok(ProcessResult {
+        new_photos,
+        new_videos,
+        scan_logs,
         total_photos,
         total_videos,
-        recognized_photos: recognized_photos_count,
-        recognized_videos: recognized_videos_count,
         skipped_duplicate_photos,
         skipped_duplicate_videos,
         skipped_no_date_photos,
@@ -912,47 +891,28 @@ pub fn scan_media_folder(
 
 // ==================== 按周期扫描（并行版）====================
 
-pub fn scan_period_folder(
-    db: &Database,
+/// 按周期处理文件夹 — 无数据库依赖，不持锁
+/// 调用前由 main.rs 预取 Period 数据并删除旧 DB 记录 + 旧文件
+/// 本函数只做遍历、日期过滤、复制、尺寸解析
+pub fn process_period_folder(
     project_id: i64,
     period_id: i64,
     folder_path: &str,
-) -> Result<ScanResult, String> {
+    period: &crate::db::Period,
+) -> Result<ProcessResult, String> {
     let folder = Path::new(folder_path);
     if !folder.exists() {
         return Err("文件夹不存在".to_string());
     }
 
-    let period = db.get_period(period_id).map_err(|e| e.to_string())?;
     let period_start = period.start_date.clone();
     let period_end = period.end_date.clone();
-
-    // 清空该周期的旧文件
-    let old_photos = db.get_period_photos(period_id).unwrap_or_default();
-    let old_videos = db.get_period_videos(period_id).unwrap_or_default();
-    
-    for photo in &old_photos {
-        if let Err(e) = fs::remove_file(&photo.file_path) {
-            eprintln!("删除旧照片失败: {} -> {}", photo.file_path, e);
-        }
-    }
-    for video in &old_videos {
-        if let Err(e) = fs::remove_file(&video.file_path) {
-            eprintln!("删除旧视频失败: {} -> {}", video.file_path, e);
-        }
-    }
-    
-    if let Err(e) = db.delete_period_photos(period_id) {
-        eprintln!("删除周期照片记录失败: {}", e);
-    }
-    if let Err(e) = db.delete_period_videos(period_id) {
-        eprintln!("删除周期视频记录失败: {}", e);
-    }
 
     let photos_dir = get_project_photos_dir(project_id);
     let videos_dir = get_project_videos_dir(project_id);
 
-    let mut existing_paths = HashSet::new();
+    // 周期扫描使用空 existing_paths（旧记录已由调用方清理）
+    let existing_paths = HashSet::new();
 
     let mut total_photos = 0i64;
     let mut total_videos = 0i64;
@@ -975,11 +935,10 @@ pub fn scan_period_folder(
         }
     }
 
-    // 并行处理
+    // 并行处理（带周期日期过滤）
     let results: Vec<ProcessedFile> = entries
         .par_iter()
         .map(|path| {
-            // 周期扫描的特殊逻辑: 直接过滤日期范围
             let file_name = path
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -1024,11 +983,11 @@ pub fn scan_period_folder(
                 };
             }
 
-            // 正常处理
+            // 正常处理 — 只用当前周期
             let cloned_period = period.clone();
             process_single_entry(
                 path,
-                &vec![cloned_period],  // 只用当前周期
+                &vec![cloned_period],
                 &existing_paths,
                 &photos_dir,
                 &videos_dir,
@@ -1053,7 +1012,7 @@ pub fn scan_period_folder(
         match &result.skip_reason {
             None => {
                 if result.is_photo {
-                    let new_photo = NewPhoto {
+                    new_photos.push(NewPhoto {
                         period_id: result.period_id,
                         file_path: result.dest_path.to_string_lossy().to_string(),
                         file_name: result.file_name.clone(),
@@ -1061,11 +1020,9 @@ pub fn scan_period_folder(
                         width: result.width,
                         height: result.height,
                         taken_at: Some(result.date_str.clone()),
-                    };
-                    new_photos.push(new_photo);
-                    existing_paths.insert(result.dest_path.to_string_lossy().to_string());
+                    });
                 } else if result.is_video {
-                    let new_video = NewVideo {
+                    new_videos.push(NewVideo {
                         period_id: result.period_id,
                         file_path: result.dest_path.to_string_lossy().to_string(),
                         file_name: result.file_name.clone(),
@@ -1074,9 +1031,7 @@ pub fn scan_period_folder(
                         width: result.width,
                         height: result.height,
                         taken_at: Some(result.date_str.clone()),
-                    };
-                    new_videos.push(new_video);
-                    existing_paths.insert(result.dest_path.to_string_lossy().to_string());
+                    });
                 }
             }
             Some(skip) => {
@@ -1102,25 +1057,12 @@ pub fn scan_period_folder(
         }
     }
 
-    let photos = db.add_photos(&new_photos).unwrap_or_else(|e| {
-        eprintln!("批量插入照片失败: {}", e);
-        Vec::new()
-    });
-    let videos = db.add_videos(&new_videos).unwrap_or_else(|e| {
-        eprintln!("批量插入视频失败: {}", e);
-        Vec::new()
-    });
-
-    let recognized_photos_count = photos.len() as i64;
-    let recognized_videos_count = videos.len() as i64;
-
-    Ok(ScanResult {
-        photos,
-        videos,
+    Ok(ProcessResult {
+        new_photos,
+        new_videos,
+        scan_logs: Vec::new(),
         total_photos,
         total_videos,
-        recognized_photos: recognized_photos_count,
-        recognized_videos: recognized_videos_count,
         skipped_duplicate_photos,
         skipped_duplicate_videos,
         skipped_no_date_photos,

@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>宝宝成长视频 - UI设计原型</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    * {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #f58b3d;
+      --primary-dark: #e06a1e;
+      --primary-light: #ffcca3;
+      --secondary: #d44d68;
+      --accent: #5b66c0;
+      --success: #2d9d5f;
+      --warning: #f5c000;
+      --bg: #fafaf8;
+      --bg-raised: #ffffff;
+      --border: #e8e6de;
+      --text-primary: #33312d;
+      --text-secondary: #706c63;
+      --text-tertiary: #b0aca0;
+    }
+
+    body {
+      background: linear-gradient(135deg, #fafaf8 0%, #f5f4f0 50%, #fffaf5 100%);
+      min-height: 100vh;
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Glass Morphism */
+    .glass {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .glass-strong {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    /* Gradients */
+    .gradient-warm {
+      background: linear-gradient(135deg, #f58b3d 0%, #e06a1e 50%, #d44d68 100%);
+    }
+
+    .gradient-indigo {
+      background: linear-gradient(135deg, #5b66c0 0%, #484fa5 50%, #3b3f85 100%);
+    }
+
+    .gradient-sunset {
+      background: linear-gradient(135deg, #ffaf70 0%, #f58b3d 30%, #d44d68 70%, #9b2441 100%);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d4d1c7; border-radius: 20px; }
+    ::-webkit-scrollbar-thumb:hover { background: #b0aca0; }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes floatUp {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 139, 61, 0.4); }
+      50% { box-shadow: 0 0 0 12px rgba(245, 139, 61, 0); }
+    }
+
+    .animate-fade-in-up { animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-fade-in-scale { animation: fadeInScale 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .animate-float { animation: floatUp 3s ease-in-out infinite; }
+    .animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+
+    /* Card Styles */
+    .card {
+      background: var(--bg-raised);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 15px -3px rgba(0,0,0,0.06);
+      transition: all 250ms cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .card:hover {
+      box-shadow: 0 4px 25px -5px rgba(0,0,0,0.08);
+      border-color: #d4d1c7;
+      transform: translateY(-1px);
+    }
+
+    /* Button Styles */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      transition: all 200ms cubic-bezier(0.4,0,0.2,1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #f58b3d 0%, #e06a1e 100%);
+      color: white;
+      box-shadow: 0 2px 8px -2px rgba(245, 139, 61, 0.3);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #ff9f55 0%, #f07a2e 100%);
+      box-shadow: 0 4px 15px -3px rgba(245, 139, 61, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: var(--bg-raised);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: #fafaf8;
+      border-color: #d4d1c7;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .btn-ghost:hover {
+      background: rgba(0,0,0,0.04);
+      color: var(--text-primary);
+    }
+
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+    .btn-lg { padding: 14px 24px; font-size: 16px; border-radius: 16px; }
+
+    /* Input Styles */
+    .form-input {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-raised);
+      font-size: 14px;
+      transition: all 200ms;
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: #f58b3d;
+      box-shadow: 0 0 0 3px rgba(245, 139, 61, 0.1);
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-primary { background: #fff2e6; color: #b85218; }
+    .badge-success { background: #d9f2e4; color: #1b643c; }
+    .badge-warning { background: #fff9e0; color: #8f6600; }
+    .badge-danger { background: #fae7ea; color: #9b2441; }
+
+    /* Tab Bar */
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-raised);
+    }
+
+    .tab-item {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--text-tertiary);
+      border-bottom: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 150ms;
+    }
+
+    .tab-item:hover { color: var(--text-secondary); }
+    .tab-item.active { color: #f58b3d; border-bottom-color: #f58b3d; }
+
+    /* Period Timeline */
+    .period-timeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+      padding: 12px 20px;
+      scrollbar-width: none;
+    }
+
+    .period-timeline::-webkit-scrollbar { display: none; }
+
+    .period-step {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .period-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+      flex-shrink: 0;
+    }
+
+    .period-dot.done {
+      background: linear-gradient(135deg, #2d9d5f, #1f7e4a);
+      color: white;
+      box-shadow: 0 2px 8px rgba(45,157,95,0.2);
+    }
+
+    .period-dot.current {
+      background: linear-gradient(135deg, #f58b3d 0%, #d44d68 100%);
+      color: white;
+      box-shadow: 0 0 0 3px rgba(245,139,61,0.18), 0 4px 12px rgba(245,139,61,0.25);
+    }
+
+    .period-dot.pending {
+      background: #f5f4f0;
+      color: #b0aca0;
+      border: 1.5px solid var(--border);
+    }
+
+    .period-dot:hover { transform: scale(1.12); }
+
+    .period-info {
+      padding: 0 8px;
+      min-width: 56px;
+    }
+
+    .period-info .ps-name {
+      font-size: 11px;
+      font-weight: 500;
+      color: #706c63;
+      white-space: nowrap;
+    }
+
+    .period-info .ps-status {
+      font-size: 10px;
+      color: #b0aca0;
+      margin-top: 1px;
+    }
+
+    .period-info .ps-status.done { color: #2d9d5f; }
+    .period-info .ps-status.current { color: #f58b3d; font-weight: 500; }
+
+    .period-connector {
+      width: 24px;
+      height: 1.5px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .period-connector.done { background: #2d9d5f; }
+
+    /* Photo Grid */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    @media (max-width: 1280px) { .photo-grid { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 960px) { .photo-grid { grid-template-columns: repeat(3, 1fr); } }
+
+    .photo-item {
+      position: relative;
+      aspect-ratio: 4/3;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 200ms;
+      border: 2px solid transparent;
+      background: #f5f4f0;
+    }
+
+    .photo-item:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 20px -4px rgba(0,0,0,0.1);
+    }
+
+    .photo-item.selected {
+      border-color: #f58b3d;
+      box-shadow: 0 0 0 3px rgba(245, 139, 61, 0.12);
+    }
+
+    .photo-item.final {
+      border-color: #2d9d5f;
+      box-shadow: 0 0 0 3px rgba(45, 157, 95, 0.12);
+    }
+
+    .photo-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-hover-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(0deg, rgba(28,20,13,0.55) 0%, transparent 50%);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px;
+    }
+
+    .photo-item:hover .photo-hover-overlay { opacity: 1; }
+
+    .photo-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: white;
+      z-index: 2;
+    }
+
+    .photo-badge.selected { background: linear-gradient(135deg, #f58b3d, #e06a1e); }
+    .photo-badge.final { background: linear-gradient(135deg, #2d9d5f, #1f7e4a); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      animation: fadeInScale 0.2s ease;
+    }
+
+    .modal-content {
+      background: var(--bg-raised);
+      border-radius: 20px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      height: 6px;
+      background: #f5f4f0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f58b3d, #e06a1e);
+      border-radius: 3px;
+      transition: width 500ms ease;
+    }
+
+    /* Empty State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--text-tertiary);
+    }
+
+    .empty-state h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .empty-state p {
+      font-size: 13px;
+      line-height: 1.6;
+      max-width: 280px;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(24px);
+      border-right: 1px solid rgba(255,255,255,0.4);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Page Container */
+    .page-container {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Stagger Animation */
+    .stagger-item { opacity: 0; }
+    .stagger-0 { animation-delay: 0ms; }
+    .stagger-50 { animation-delay: 50ms; }
+    .stagger-100 { animation-delay: 100ms; }
+    .stagger-150 { animation-delay: 150ms; }
+    .stagger-200 { animation-delay: 200ms; }
+    .stagger-250 { animation-delay: 250ms; }
+    .stagger-300 { animation-delay: 300ms; }
+
+    /* Wizard Steps */
+    .wizard-step-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .wizard-step-dot.active {
+      background: linear-gradient(135deg, #f58b3d 0%, #d44d68 100%);
+      color: white;
+      box-shadow: 0 0 0 4px rgba(245,139,61,0.15);
+    }
+
+    .wizard-step-dot.completed {
+      background: linear-gradient(135deg, #2d9d5f, #1f7e4a);
+      color: white;
+    }
+
+    .wizard-step-dot.pending {
+      background: #f5f4f0;
+      color: #b0aca0;
+      border: 2px solid var(--border);
+    }
+
+    .wizard-connector {
+      width: 4px;
+      flex: 1;
+      background: var(--border);
+      transition: background 0.5s;
+    }
+
+    .wizard-connector.completed { background: #2d9d5f; }
+    .wizard-connector.active { background: linear-gradient(180deg, #f58b3d, var(--border)); }
+
+    /* Video Timeline */
+    .video-timeline-bar {
+      display: flex;
+      gap: 4px;
+      padding: 8px;
+      overflow-x: auto;
+      background: #fafaf8;
+      border-radius: 12px;
+    }
+
+    .timeline-thumb {
+      width: 60px;
+      height: 40px;
+      border-radius: 6px;
+      background: #e8e6de;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: all 150ms;
+      border: 2px solid transparent;
+    }
+
+    .timeline-thumb:hover { transform: scale(1.05); }
+    .timeline-thumb.active { border-color: #f58b3d; }
+
+    /* Nav Active State */
+    .nav-item.active {
+      background: white;
+      color: #f58b3d;
+      box-shadow: 0 2px 8px -2px rgba(0,0,0,0.05);
+    }
+
+    /* Selection */
+    ::selection {
+      background: #ffe4cc;
+      color: #6b3218;
+    }
+  </style>
+</head>
+<body>
+  <!-- Page Container -->
+  <div class="page-container" id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div className="px-4 py-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl gradient-warm flex items-center justify-center shadow-[0_0_30px_-5px_rgba(245,139,61,0.15)]">
+            <i data-lucide="sparkles" className="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <h1 className="text-lg font-bold" style={{color: '#33312d'}}>成长视频</h1>
+            <p className="text-xs font-medium" style={{color: '#b0aca0'}}>记录宝宝每一刻</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Baby Card -->
+      <div className="px-4 mb-4">
+        <div className="relative overflow-hidden rounded-2xl p-4 cursor-pointer group transition-all duration-300"
+          style={{background: 'linear-gradient(135deg, #fffaf5 0%, #fff2e6 50%, #ffffff 100%)', border: '1px solid #ffe4cc'}}
+          onclick="showBabySetup()"
+        >
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-300 to-rose-400 flex items-center justify-center text-xl shadow-sm">
+                👧
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white"></div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm truncate" style={{color: '#33312d'}}>小糯米</p>
+              <p className="text-xs" style={{color: '#b0aca0'}}>小公主 · 2024-06-01</p>
+            </div>
+            <i data-lucide="chevron-right" className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all" style={{color: '#b0aca0'}}></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav className="flex-1 px-3">
+        <p className="px-2 mb-2 text-xs font-semibold uppercase tracking-wider" style={{color: '#b0aca0'}}>导航</p>
+        <ul className="space-y-1">
+          {[
+            { id: 'home', path: 'home', icon: 'home', label: '首页' },
+            { id: 'baby', path: 'baby-setup', icon: 'baby', label: '宝宝信息' },
+            { id: 'video', path: 'periods', icon: 'video', label: '视频制作' },
+            { id: 'history', path: 'history', icon: 'history', label: '历史记录' },
+          ].map(item => (
+            <li key={item.id}>
+              <button
+                onclick="navigateTo('${item.path}')"
+                className={`nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${currentPage === item.path ? 'active' : 'text-stone-600 hover:bg-white/60'}`}
+              >
+                <i data-lucide="${item.icon}" className={`w-[18px] h-[18px] ${currentPage === item.path ? 'scale-110' : ''}`}></i>
+                <span>${item.label}</span>
+                {currentPage === item.path && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-warmth-500" style={{background: '#f58b3d'}}></span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <!-- Settings -->
+      <div className="px-3 pt-3 border-t" style={{borderColor: '#e8e6de'}}>
+        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-stone-600 hover:bg-white/60 transition-all">
+          <i data-lucide="settings" className="w-[18px] h-[18px]"></i>
+          <span>设置</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main className="main-content">
+      <!-- Home Page -->
+      <div id="page-home" className="p-8 max-w-7xl mx-auto">
+        {/* Welcome Banner */}
+        <div className="relative overflow-hidden rounded-3xl p-8 mb-8 animate-fade-in-up"
+          style={{background: 'linear-gradient(135deg, #fffaf5 0%, #fff2e6 30%, #fae7ea 70%, #e4e7f6 100%)'}}
+        >
+          <div className="relative z-10 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/70 text-[#f58b3d] shadow-sm">
+                  <i data-lucide="sparkles" className="w-3.5 h-3.5"></i>
+                  成长记录
+                </span>
+              </div>
+              <h1 className="text-3xl font-bold mb-2" style={{color: '#33312d'}}>
+                欢迎回来
+                <span className="ml-2" style={{color: '#f58b3d'}}>小糯米的家长</span>
+              </h1>
+              <p className="text-base" style={{color: '#706c63'}}>
+                记录宝宝每一个珍贵瞬间，制作专属成长视频
+              </p>
+            </div>
+            <div className="hidden lg:block">
+              <div className="w-20 h-20 rounded-2xl gradient-warm flex items-center justify-center shadow-[0_0_30px_-5px_rgba(245,139,61,0.15)] animate-float">
+                <i data-lucide="play" className="w-8 h-8 text-white" fill="white"></i>
+              </div>
+            </div>
+          </div>
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10"
+            style={{background: 'radial-gradient(circle, #f58b3d 0%, transparent 70%)'}}
+          ></div>
+          <div className="absolute bottom-0 left-1/3 w-48 h-48 rounded-full opacity-8"
+            style={{background: 'radial-gradient(circle, #d44d68 0%, transparent 70%)'}}
+          ></div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <button onclick="navigateTo('create-project')" className="relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-lg group stagger-item animate-fade-in-up"
+            style={{background: 'linear-gradient(135deg, #ffffff 0%, #fffaf5 100%)', border: '1px solid #ffe4cc'}}
+          >
+            <div className="w-11 h-11 rounded-xl gradient-warm flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
+              <i data-lucide="plus" className="w-5 h-5 text-white"></i>
+            </div>
+            <h3 className="font-semibold text-base mb-1" style={{color: '#33312d'}}>新建项目</h3>
+            <p className="text-xs" style={{color: '#8f8b80'}}>创建新的成长视频项目</p>
+          </button>
+
+          <button onclick="navigateTo('periods')" className="relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-lg group stagger-item animate-fade-in-up"
+            style={{background: 'linear-gradient(135deg, #ffffff 0%, #f4f5fb 100%)', border: '1px solid #e4e7f6'}}
+          >
+            <div className="w-11 h-11 rounded-xl gradient-indigo flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
+              <i data-lucide="play" className="w-5 h-5 text-white"></i>
+            </div>
+            <h3 className="font-semibold text-base mb-1" style={{color: '#33312d'}}>继续制作</h3>
+            <p className="text-xs" style={{color: '#8f8b80'}}>继续上次的视频项目</p>
+          </button>
+
+          <button onclick="navigateTo('history')" className="relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-lg group stagger-item animate-fade-in-up"
+            style={{background: 'linear-gradient(135deg, #ffffff 0%, #f2fbf6 100%)', border: '1px solid #d9f2e4'}}
+          >
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
+              <i data-lucide="calendar" className="w-5 h-5 text-white"></i>
+            </div>
+            <h3 className="font-semibold text-base mb-1" style={{color: '#33312d'}}>历史记录</h3>
+            <p className="text-xs" style={{color: '#8f8b80'}}>查看已生成的成长视频</p>
+          </button>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-12 gap-6">
+          {/* Baby List */}
+          <div className="col-span-4">
+            <div className="card p-5 stagger-item animate-fade-in-up">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold" style={{color: '#33312d'}}>我的宝宝</h2>
+                <button onclick="showBabySetup()" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white gradient-warm shadow-sm hover:shadow-md transition-all hover:scale-105">
+                  <i data-lucide="plus" className="w-3.5 h-3.5"></i>
+                  添加
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {[
+                  { id: 1, name: '小糯米', gender: 'girl', birth: '2024-06-01', selected: true },
+                  { id: 2, name: '小汤圆', gender: 'boy', birth: '2025-03-15', selected: false },
+                ].map(baby => (
+                  <div key={baby.id}
+                    onclick="selectBaby(${baby.id})"
+                    className={`group p-4 rounded-xl cursor-pointer transition-all duration-300 ${baby.selected ? 'bg-gradient-to-r from-[#fffaf5] to-[#fff2e6] border-2 border-[#ffe4cc] shadow-sm' : 'hover:bg-stone-50 border-2 border-transparent'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${baby.gender === 'boy' ? 'from-blue-400 to-indigo-400' : 'from-rose-300 to-rose-400'} flex items-center justify-center text-xl shadow-sm group-hover:scale-105 transition-transform`}>
+                        ${baby.gender === 'boy' ? '👦' : '👧'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate" style={{color: '#33312d'}}>${baby.name}</p>
+                        <p className="text-xs" style={{color: '#8f8b80'}}>${baby.birth} 出生</p>
+                      </div>
+                      <i data-lucide="chevron-right" className={`w-4 h-4 transition-all ${baby.selected ? 'text-[#ffaf70] opacity-100' : 'text-stone-300 opacity-0 group-hover:opacity-100'}`}></i>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Project List */}
+          <div className="col-span-8">
+            <div className="card p-6 stagger-item animate-fade-in-up">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-lg font-semibold" style={{color: '#33312d'}}>视频项目</h2>
+                  <p className="text-xs mt-0.5" style={{color: '#b0aca0'}}>小糯米 的成长视频项目 · 3 个项目</p>
+                </div>
+                <button onclick="navigateTo('create-project')" className="btn btn-primary btn-sm">
+                  <i data-lucide="plus" className="w-3.5 h-3.5"></i>
+                  新建项目
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { id: 1, name: '百日纪念视频', desc: '记录小糯米出生一百天的成长点滴', status: 'completed', days: 7, updated: '2026-06-28' },
+                  { id: 2, name: '半岁成长记录', desc: '从出生到半岁的精彩瞬间', status: 'draft', days: 7, updated: '2026-06-25' },
+                  { id: 3, name: '周岁生日视频', desc: '准备制作的周岁纪念视频', status: 'draft', days: 30, updated: '2026-06-20' },
+                ].map((project, idx) => (
+                  <div key={project.id}
+                    onclick="openProject(${project.id})"
+                    className="group relative overflow-hidden rounded-2xl p-5 cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
+                    style={{background: 'linear-gradient(135deg, #ffffff 0%, #fafaf8 100%)', border: '1px solid #e8e6de'}}
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-1 gradient-warm opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate mb-1" style={{color: '#33312d'}}>${project.name}</h3>
+                        <p className="text-xs line-clamp-2" style={{color: '#8f8b80'}}>${project.desc}</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${project.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-[#fff2e6] text-[#f58b3d]'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full mr-1 ${project.status === 'completed' ? 'bg-emerald-400' : 'bg-[#f58b3d]'}`}></span>
+                          ${project.status === 'completed' ? '已完成' : '进行中'}
+                        </span>
+                        <button onclick="event.stopPropagation(); deleteProject(${project.id})" className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all text-stone-400 hover:text-[#d44d68] hover:bg-[#fae7ea]">
+                          <i data-lucide="trash-2" className="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 mb-3">
+                      <span className="inline-flex items-center gap-1.5 text-xs" style={{color: '#8f8b80'}}>
+                        <i data-lucide="clock" className="w-3.5 h-3.5"></i>
+                        ${project.days}天/周期
+                      </span>
+                    </div>
+                    <div className="pt-3 flex items-center justify-between" style={{borderTop: '1px solid #f5f4f0'}}>
+                      <span className="text-xs" style={{color: '#b0aca0'}}>更新于 ${project.updated}</span>
+                      <i data-lucide="chevron-right" className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0.5" style={{color: '#ffaf70'}}></i>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Create Project Wizard */}
+      <div id="page-create-project" className="min-h-screen flex items-center justify-center p-8" style={{background: 'linear-gradient(135deg, #fafaf8 0%, #fffaf5 50%, #f4f5fb 100%)'}}>
+        <div className="w-full max-w-4xl">
+          <div className="flex gap-8">
+            {/* Left: Steps */}
+            <div className="w-64 flex-shrink-0">
+              <div className="flex flex-col items-center">
+                {[1, 2, 3, 4, 5].map((step, idx) => (
+                  <div key={step} className="flex flex-col items-center">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-400 ${wizardStep === step ? 'wizard-step-dot active' : wizardStep > step ? 'wizard-step-dot completed' : 'wizard-step-dot pending'}`}>
+                      {wizardStep > step ? <i data-lucide="check" className="w-5 h-5"></i> : step}
+                    </div>
+                    <p className={`text-xs font-medium mt-2 ${wizardStep === step ? 'text-[#f58b3d]' : wizardStep > step ? 'text-[#2d9d5f]' : 'text-[#b0aca0]'}`}>
+                      {step === 1 ? '宝宝信息' : step === 2 ? '项目信息' : step === 3 ? '选择文件夹' : step === 4 ? '生成周期' : '完成'}
+                    </p>
+                    {idx < 4 && (
+                      <div className={`w-1 h-12 mt-4 ${wizardStep > step + 1 ? 'wizard-connector completed' : wizardStep === step + 1 ? 'wizard-connector active' : 'wizard-connector'}`}></div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Content */}
+            <div className="flex-1">
+              {/* Step 1: Baby Info */}
+              {wizardStep === 1 && (
+                <div className="card p-8 animate-fade-in-scale">
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 rounded-2xl gradient-warm flex items-center justify-center mx-auto mb-4 shadow-lg">
+                      <i data-lucide="baby" className="w-8 h-8 text-white"></i>
+                    </div>
+                    <h2 className="text-2xl font-bold" style={{color: '#33312d'}}>选择宝宝</h2>
+                    <p className="text-sm mt-2" style={{color: '#706c63'}}>选择要制作视频的宝宝</p>
+                  </div>
+
+                  <div className="space-y-4 mb-8">
+                    {[
+                      { id: 1, name: '小糯米', gender: 'girl', birth: '2024-06-01', selected: true },
+                      { id: 2, name: '小汤圆', gender: 'boy', birth: '2025-03-15', selected: false },
+                    ].map(baby => (
+                      <div key={baby.id}
+                        onclick="selectWizardBaby(${baby.id})"
+                        className={`p-4 rounded-xl cursor-pointer transition-all ${baby.selected ? 'bg-gradient-to-r from-[#fffaf5] to-[#fff2e6] border-2 border-[#f58b3d]' : 'bg-white border-2 border-transparent hover:border-[#e8e6de]'}`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${baby.gender === 'boy' ? 'from-blue-400 to-indigo-400' : 'from-rose-300 to-rose-400'} flex items-center justify-center text-2xl shadow-md`}>
+                            ${baby.gender === 'boy' ? '👦' : '👧'}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold" style={{color: '#33312d'}}>${baby.name}</h3>
+                            <p className="text-sm" style={{color: '#8f8b80'}}>${baby.gender === 'boy' ? '小王子' : '小公主'} · ${baby.birth}出生</p>
+                          </div>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${baby.selected ? 'border-[#f58b3d] bg-[#f58b3d]' : 'border-[#e8e6de]'}`}>
+                            {baby.selected && <i data-lucide="check" className="w-3 h-3 text-white"></i>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-end gap-3">
+                    <button onclick="wizardPrev()" className="btn btn-ghost">上一步</button>
+                    <button onclick="wizardNext()" className="btn btn-primary">下一步</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Project Info */}
+              {wizardStep === 2 && (
+                <div className="card p-8 animate-fade-in-scale">
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 rounded-2xl gradient-indigo flex items-center justify-center mx-auto mb-4 shadow-lg">
+                      <i data-lucide="file-text" className="w-8 h-8 text-white"></i>
+                    </div>
+                    <h2 className="text-2xl font-bold" style={{color: '#33312d'}}>项目信息</h2>
+                    <p className="text-sm mt-2" style={{color: '#706c63'}}>设置项目名称和周期参数</p>
+                  </div>
+
+                  <div className="space-y-6 mb-8">
+                    <div>
+                      <label className="form-label">项目名称</label>
+                      <input type="text" className="form-input" placeholder="如：百日纪念视频" value="半岁成长记录" />
+                    </div>
+
+                    <div>
+                      <label className="form-label">项目描述</label>
+                      <textarea className="form-input" rows={3} placeholder="描述这个项目的内容..." style={{resize: 'none'}}>记录小糯米从出生到半岁的精彩瞬间</textarea>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="form-label">周期天数</label>
+                        <select className="form-input">
+                          <option value="7">7天（每周）</option>
+                          <option value="14">14天（每两周）</option>
+                          <option value="30" selected>30天（每月）</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="form-label">包含特殊日期</label>
+                        <div className="flex items-center gap-3">
+                          <div className="toggle-switch active" onclick="toggleSpecialDates()">
+                            <div className="toggle-switch-knob"></div>
+                          </div>
+                          <span className="text-sm" style={{color: '#706c63'}}>自动包含满月、百天等</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3">
+                    <button onclick="wizardPrev()" className="btn btn-ghost">上一步</button>
+                    <button onclick="wizardNext()" className="btn btn-primary">下一步</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Select Folder */}
+              {wizardStep === 3 && (
+                <div className="card p-8 animate-fade-in-scale">
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                      <i data-lucide="folder-open" className="w-8 h-8 text-white"></i>
+                    </div>
+                    <h2 className="text-2xl font-bold" style={{color: '#33312d'}}>选择素材文件夹</h2>
+                    <p className="text-sm mt-2" style={{color: '#706c63'}}>选择包含宝宝照片和视频的文件夹</p>
+                  </div>
+
+                  <div className="border-2 border-dashed rounded-xl p-12 text-center mb-8" style={{borderColor: '#e8e6de', background: '#fafaf8'}}>
+                    <i data-lucide="folder" className="w-12 h-12 mx-auto mb-4" style={{color: '#b0aca0'}}></i>
+                    <p className="font-medium mb-2" style={{color: '#706c63'}}>点击选择文件夹</p>
+                    <p className="text-sm" style={{color: '#b0aca0'}}>支持 JPG、PNG、MP4、MOV 等格式</p>
+                    <button className="mt-4 btn btn-primary">
+                      <i data-lucide="folder-plus" className="w-4 h-4"></i>
+                      选择文件夹
+                    </button>
+                  </div>
+
+                  <div className="bg-[#f4f5fb] rounded-xl p-4 mb-8" style={{border: '1px solid #e4e7f6'}}>
+                    <div className="flex items-center gap-3">
+                      <i data-lucide="info" className="w-5 h-5" style={{color: '#5b66c0'}}></i>
+                      <div>
+                        <p className="text-sm font-medium" style={{color: '#5b66c0'}}>温馨提示</p>
+                        <p className="text-xs" style={{color: '#706c63'}}>建议将宝宝照片按日期分类存放，系统会自动识别拍摄日期并归类到对应周期</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3">
+                    <button onclick="wizardPrev()" className="btn btn-ghost">上一步</button>
+                    <button onclick="wizardNext()" className="btn btn-primary">下一步</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Generate Periods */}
+              {wizardStep === 4 && (
+                <div className="card p-8 animate-fade-in-scale">
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                      <i data-lucide="calendar" className="w-8 h-8 text-white"></i>
+                    </div>
+                    <h2 className="text-2xl font-bold" style={{color: '#33312d'}}>生成周期</h2>
+                    <p className="text-sm mt-2" style={{color: '#706c63'}}>系统将根据宝宝生日自动生成成长周期</p>
+                  </div>
+
+                  <div className="bg-gradient-to-r from-[#fffaf5] to-[#fff2e6] rounded-xl p-6 mb-6" style={{border: '1px solid #ffe4cc'}}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm" style={{color: '#8f8b80'}}>宝宝生日</p>
+                        <p className="text-xl font-bold" style={{color: '#33312d'}}>2024年06月01日</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm" style={{color: '#8f8b80'}}>当前年龄</p>
+                        <p className="text-xl font-bold" style={{color: '#f58b3d'}}>1岁</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-8">
+                    <h3 className="font-medium mb-4" style={{color: '#33312d'}}>生成的周期</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {['第1周', '第2周', '第3周', '第4周', '满月', '第2个月', '百天', '第3个月', '第4个月', '第5个月', '半岁'].map((period, idx) => (
+                        <div key={period} className="flex items-center gap-3 p-3 rounded-xl bg-white border" style={{borderColor: '#e8e6de'}}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${idx < 6 ? 'bg-[#2d9d5f] text-white' : 'bg-[#f5f4f0] text-[#b0aca0]'}`}>
+                            {idx + 1}
+                          </div>
+                          <span className="font-medium text-sm" style={{color: '#33312d'}}>${period}</span>
+                          {idx < 6 && <span className="badge badge-success ml-auto">已识别素材</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3">
+                    <button onclick="wizardPrev()" className="btn btn-ghost">上一步</button>
+                    <button onclick="wizardNext()" className="btn btn-primary">下一步</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 5: Complete */}
+              {wizardStep === 5 && (
+                <div className="card p-8 animate-fade-in-scale">
+                  <div className="text-center">
+                    <div className="relative w-24 h-24 mx-auto mb-6">
+                      <div className="absolute inset-0 rounded-full bg-[#2d9d5f] animate-pulse-glow"></div>
+                      <div className="relative w-24 h-24 rounded-full gradient-warm flex items-center justify-center shadow-lg">
+                        <i data-lucide="check" className="w-12 h-12 text-white"></i>
+                      </div>
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2" style={{color: '#33312d'}}>项目创建成功</h2>
+                    <p className="text-sm mb-8" style={{color: '#706c63'}}>已成功创建「半岁成长记录」项目，现在开始选择照片吧</p>
+
+                    <div className="grid grid-cols-3 gap-4 mb-8">
+                      <div className="bg-[#fafaf8] rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold" style={{color: '#f58b3d'}}>12</p>
+                        <p className="text-xs mt-1" style={{color: '#8f8b80'}}>识别到的周期</p>
+                      </div>
+                      <div className="bg-[#fafaf8] rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold" style={{color: '#5b66c0'}}>156</p>
+                        <p className="text-xs mt-1" style={{color: '#8f8b80'}}>照片数量</p>
+                      </div>
+                      <div className="bg-[#fafaf8] rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold" style={{color: '#2d9d5f'}}>8</p>
+                        <p className="text-xs mt-1" style={{color: '#8f8b80'}}>视频数量</p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-center gap-3">
+                      <button onclick="navigateTo('home')" className="btn btn-secondary">返回首页</button>
+                      <button onclick="navigateTo('periods')" className="btn btn-primary">开始制作</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Period Selection Page */}
+      <div id="page-periods" className="h-full flex flex-col">
+        {/* Top Toolbar */}
+        <div className="h-[52px] flex items-center justify-between px-5 border-b" style={{borderColor: '#e8e6de', background: 'white'}}>
+          <div className="flex items-center gap-3">
+            <button className="btn btn-primary btn-sm">
+              <i data-lucide="folder-open" className="w-3.5 h-3.5"></i>
+              扫描文件夹
+            </button>
+            <button className="btn btn-outline btn-sm">
+              <i data-lucide="calendar" className="w-3.5 h-3.5"></i>
+              自动生成周期
+            </button>
+            <button className="btn btn-ghost btn-sm" style={{color: '#706c63'}}>
+              <i data-lucide="plus" className="w-3.5 h-3.5"></i>
+              添加周期
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs" style={{color: '#b0aca0'}}>6/12 已完成</span>
+          </div>
+        </div>
+
+        {/* Period Timeline */}
+        <div className="period-timeline border-b" style={{borderColor: '#e8e6de'}}>
+          {[
+            { id: 1, name: '第1周', status: 'done', days: '06-01~06-07' },
+            { id: 2, name: '第2周', status: 'done', days: '06-08~06-14' },
+            { id: 3, name: '第3周', status: 'done', days: '06-15~06-21' },
+            { id: 4, name: '第4周', status: 'done', days: '06-22~06-28' },
+            { id: 5, name: '满月', status: 'done', days: '07-01' },
+            { id: 6, name: '第2个月', status: 'current', days: '07-02~07-31' },
+            { id: 7, name: '百天', status: 'pending', days: '09-08' },
+            { id: 8, name: '第3个月', status: 'pending', days: '08-01~08-31' },
+          ].map((period, idx) => (
+            <div key={period.id} className="period-step" onclick="selectPeriod(${period.id})">
+              <div className={`period-dot ${period.status}`}>
+                {period.status === 'done' ? <i data-lucide="check" className="w-4 h-4"></i> : period.id}
+              </div>
+              <div className="period-info">
+                <p className="ps-name">${period.name}</p>
+                <p className={`ps-status ${period.status}`}>${period.days}</p>
+              </div>
+              {idx < 7 && <div className={`period-connector ${period.status === 'done' ? 'done' : ''}`}></div>}
+            </div>
+          ))}
+        </div>
+
+        {/* Tab Bar */}
+        <div className="tab-bar">
+          <button className="tab-item active" onclick="switchTab('photos')">
+            <i data-lucide="image" className="w-4 h-4"></i>
+            全部照片
+            <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-[#f5f4f0] text-[#b0aca0]">24</span>
+          </button>
+          <button className="tab-item" onclick="switchTab('videos')">
+            <i data-lucide="video" className="w-4 h-4"></i>
+            视频
+            <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-[#e4e7f6] text-[#5b66c0]">3</span>
+          </button>
+          <button className="tab-item" onclick="switchTab('pending')">
+            <i data-lucide="plus" className="w-4 h-4"></i>
+            待选区
+            <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-[#f3f0fb] text-[#7c5cbf]">3</span>
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {/* Photos Tab */}
+          {currentTab === 'photos' && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs" style={{color: '#706c63'}}>
+                  显示 <strong style={{color: '#33312d'}}>24</strong> 张照片
+                  <span className="ml-2" style={{color: '#b0aca0'}}>· 2024-07-02 ~ 2024-07-31</span>
+                </span>
+              </div>
+              <div className="photo-grid">
+                {[...Array(24)].map((_, idx) => (
+                  <div key={idx} className={`photo-item ${idx === 5 ? 'selected' : idx === 12 ? 'final' : ''}`}
+                    onclick="openPhotoPreview(${idx})"
+                  >
+                    <img src={`https://picsum.photos/300/400?random=${idx}`} alt="Photo" />
+                    {idx === 5 && <div className="photo-badge selected"><i data-lucide="check" className="w-3 h-3"></i></div>}
+                    {idx === 12 && <div className="photo-badge final"><i data-lucide="check" className="w-3 h-3"></i></div>}
+                    <div className="photo-hover-overlay">
+                      <button className="photo-quick-btn qbtn-select" style={{fontSize: '10px', padding: '3px 8px'}}>选中</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Videos Tab */}
+          {currentTab === 'videos' && (
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { name: '小糯米洗澡.mp4', duration: 45, width: 1920, height: 1080 },
+                { name: '第一次翻身.mp4', duration: 120, width: 1920, height: 1080 },
+                { name: '亲子互动.mp4', duration: 90, width: 1920, height: 1080 },
+              ].map((video, idx) => (
+                <div key={idx} className="cursor-pointer rounded-xl overflow-hidden bg-white border shadow-sm hover:shadow-md transition-all" style={{borderColor: '#e8e6de'}}>
+                  <div className="aspect-video bg-[#3a2010] relative overflow-hidden" onclick="playVideo(${idx})">
+                    <img src={`https://picsum.photos/600/338?random=${idx + 100}`} alt="Video" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+                        <i data-lucide="play" className="w-6 h-6 text-white" fill="white"></i>
+                      </div>
+                    </div>
+                    <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/65 text-white text-[10px] font-medium rounded">
+                      ${Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <p className="text-xs font-medium truncate" style={{color: '#33312d'}}>${video.name}</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[10px]" style={{color: '#8f8b80'}}>${video.width}×${video.height}</span>
+                      <button className="ml-auto p-1.5 rounded-lg text-stone-400 hover:text-[#f58b3d] hover:bg-[#fffaf5] transition-all">
+                        <i data-lucide="check-circle" className="w-4 h-4"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pending Tab */}
+          {currentTab === 'pending' && (
+            <div className="grid grid-cols-5 gap-3">
+              {[...Array(3)].map((_, idx) => (
+                <div key={idx} className="photo-item" onclick="openPhotoPreview(${idx})">
+                  <img src={`https://picsum.photos/300/400?random=${idx + 200}`} alt="Pending Photo" />
+                  <div className="photo-hover-overlay">
+                    <button className="photo-quick-btn qbtn-select" style={{fontSize: '10px', padding: '3px 8px'}}>选中</button>
+                    <button className="photo-quick-btn qbtn-reject" style={{fontSize: '10px', padding: '3px 8px'}}>排除</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Action Bar */}
+        <div className="h-[60px] flex items-center justify-between px-5 border-t" style={{borderColor: '#e8e6de', background: 'white'}}>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="select-all" className="w-4 h-4 rounded border-stone-300 text-[#f58b3d] focus:ring-[#f58b3d]" />
+              <label htmlFor="select-all" className="text-xs" style={{color: '#706c63'}}>全选</label>
+            </div>
+            <span className="text-xs" style={{color: '#8f8b80'}}>已选 2 张</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="btn btn-secondary btn-sm">
+              <i data-lucide="rotate-ccw" className="w-3.5 h-3.5"></i>
+              重置选择
+            </button>
+            <button className="btn btn-primary btn-sm">
+              <i data-lucide="arrow-right" className="w-3.5 h-3.5"></i>
+              确认选择
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Video Generate Page */}
+      <div id="page-video-generate" className="h-full flex flex-col">
+        {/* Top Toolbar */}
+        <div className="h-[52px] flex items-center justify-between px-5 border-b" style={{borderColor: '#e8e6de', background: 'white'}}>
+          <div className="flex items-center gap-3">
+            <button className="btn btn-secondary btn-sm" onclick="navigateTo('periods')">
+              <i data-lucide="arrow-left" className="w-3.5 h-3.5"></i>
+              返回
+            </button>
+            <h2 className="font-semibold text-sm" style={{color: '#33312d'}}>生成视频</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="btn btn-secondary btn-sm">
+              <i data-lucide="settings" className="w-3.5 h-3.5"></i>
+              高级设置
+            </button>
+            <button className="btn btn-primary btn-sm" onclick="startVideoGeneration()">
+              <i data-lucide="play" className="w-3.5 h-3.5"></i>
+              生成视频
+            </button>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Video Preview */}
+          <div className="card p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-sm" style={{color: '#33312d'}}>视频预览</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{color: '#b0aca0'}}>1080p</span>
+                <span className="text-xs" style={{color: '#b0aca0'}}>·</span>
+                <span className="text-xs" style={{color: '#b0aca0'}}>12秒</span>
+              </div>
+            </div>
+            <div className="relative rounded-xl overflow-hidden aspect-video bg-gradient-to-br from-[#3a2010] to-[#1a0f08]">
+              <img src="https://picsum.photos/1280/720?random=999" alt="Video Preview" className="w-full h-full object-cover opacity-80" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <button className="w-16 h-16 rounded-full gradient-warm flex items-center justify-center shadow-lg hover:scale-110 transition-transform" onclick="playPreview()">
+                  <i data-lucide="play" className="w-8 h-8 text-white ml-1" fill="white"></i>
+                </button>
+              </div>
+              <div className="video-timeline-bar">
+                {[...Array(12)].map((_, idx) => (
+                  <div key={idx} className={`timeline-thumb ${idx === 5 ? 'active' : ''}`}>
+                    <img src={`https://picsum.photos/120/80?random=${idx + 300}`} alt="" className="w-full h-full object-cover rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Settings Grid */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* Duration Settings */}
+            <div className="card p-5">
+              <h3 className="font-medium text-sm mb-4" style={{color: '#33312d'}}>播放时长</h3>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs" style={{color: '#706c63'}}>每张照片</span>
+                    <span className="text-sm font-semibold" style={{color: '#f58b3d'}}>2秒</span>
+                  </div>
+                  <input type="range" min="1" max="5" value="2" className="w-full h-2 bg-[#f5f4f0] rounded-lg appearance-none cursor-pointer" />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs" style={{color: '#706c63'}}>转场效果</span>
+                    <span className="text-sm font-semibold" style={{color: '#5b66c0'}}>淡入淡出</span>
+                  </div>
+                  <select className="form-input text-sm">
+                    <option>淡入淡出</option>
+                    <option>滑动</option>
+                    <option>缩放</option>
+                    <option>无</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Music Settings */}
+            <div className="card p-5">
+              <h3 className="font-medium text-sm mb-4" style={{color: '#33312d'}}>背景音乐</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-[#f5f4f0]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg gradient-indigo flex items-center justify-center">
+                      <i data-lucide="music" className="w-4 h-4 text-white"></i>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium" style={{color: '#33312d'}}>温馨回忆.mp3</p>
+                      <p className="text-[10px]" style={{color: '#8f8b80'}}>3:45</p>
+                    </div>
+                  </div>
+                  <button className="p-1.5 rounded-lg text-stone-400 hover:text-[#f58b3d] hover:bg-white transition-all">
+                    <i data-lucide="refresh-cw" className="w-4 h-4"></i>
+                  </button>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs" style={{color: '#706c63'}}>音量</span>
+                    <span className="text-sm font-semibold" style={{color: '#f58b3d'}}>60%</span>
+                  </div>
+                  <input type="range" min="0" max="100" value="60" className="w-full h-2 bg-[#f5f4f0] rounded-lg appearance-none cursor-pointer" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Photo Sequence */}
+          <div className="card p-5">
+            <h3 className="font-medium text-sm mb-4" style={{color: '#33312d'}}>照片顺序</h3>
+            <div className="grid grid-cols-6 gap-3">
+              {[...Array(6)].map((_, idx) => (
+                <div key={idx} className="relative group">
+                  <div className="aspect-square rounded-xl overflow-hidden bg-[#f5f4f0] border-2 border-transparent hover:border-[#f58b3d] transition-all">
+                    <img src={`https://picsum.photos/200/200?random=${idx + 400}`} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-white flex items-center justify-center text-[10px] font-bold shadow-sm" style={{color: '#f58b3d'}}>
+                    {idx + 1}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button className="w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm text-stone-400 hover:text-[#f58b3d]">
+                      <i data-lucide="grip-vertical" className="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* History Page */}
+      <div id="page-history" className="p-8 max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold" style={{color: '#33312d'}}>历史记录</h2>
+            <p className="text-sm mt-1" style={{color: '#b0aca0'}}>查看已生成的成长视频</p>
+          </div>
+          <button className="btn btn-primary">
+            <i data-lucide="download" className="w-4 h-4"></i>
+            导出全部
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { name: '百日纪念视频.mp4', date: '2026-06-28', size: '45MB', duration: '03:25', status: 'completed' },
+            { name: '半岁成长记录.mp4', date: '2026-06-25', size: '68MB', duration: '05:12', status: 'completed' },
+            { name: '周岁生日视频.mp4', date: '2026-06-20', size: '85MB', duration: '06:48', status: 'completed' },
+            { name: '2024年度回顾.mp4', date: '2025-01-01', size: '120MB', duration: '12:30', status: 'completed' },
+            { name: '春天成长记.mp4', date: '2024-04-15', size: '52MB', duration: '04:08', status: 'completed' },
+            { name: '夏日时光.mp4', date: '2024-08-20', size: '58MB', duration: '04:45', status: 'completed' },
+          ].map((item, idx) => (
+            <div key={idx} className="card p-4 hover:shadow-md transition-all">
+              <div className="relative rounded-xl overflow-hidden aspect-video mb-4 bg-gradient-to-br from-[#3a2010] to-[#1a0f08]">
+                <img src={`https://picsum.photos/600/338?random=${idx + 500}`} alt="" className="w-full h-full object-cover opacity-70" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <button className="w-10 h-10 rounded-full bg-white/20 backdrop-blur flex items-center justify-center hover:bg-white/30 transition-colors">
+                    <i data-lucide="play" className="w-5 h-5 text-white" fill="white"></i>
+                  </button>
+                </div>
+                <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/60 text-white text-[10px] font-medium rounded">
+                  ${item.duration}
+                </div>
+              </div>
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{color: '#33312d'}}>${item.name}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-xs" style={{color: '#b0aca0'}}>${item.date}</span>
+                    <span className="text-xs" style={{color: '#b0aca0'}}>${item.size}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 ml-2">
+                  <button className="p-2 rounded-lg text-stone-400 hover:text-[#f58b3d] hover:bg-[#fffaf5] transition-all">
+                    <i data-lucide="play-circle" className="w-5 h-5"></i>
+                  </button>
+                  <button className="p-2 rounded-lg text-stone-400 hover:text-[#5b66c0] hover:bg-[#f4f5fb] transition-all">
+                    <i data-lucide="download" className="w-5 h-5"></i>
+                  </button>
+                  <button className="p-2 rounded-lg text-stone-400 hover:text-[#d44d68] hover:bg-[#fae7ea] transition-all">
+                    <i data-lucide="trash-2" className="w-5 h-5"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Baby Setup Page */}
+      <div id="page-baby-setup" className="p-8 max-w-3xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <button className="btn btn-secondary btn-sm" onclick="navigateTo('home')">
+            <i data-lucide="arrow-left" className="w-3.5 h-3.5"></i>
+            返回
+          </button>
+          <h2 className="text-xl font-bold" style={{color: '#33312d'}}>宝宝信息</h2>
+        </div>
+
+        <div className="card p-6 mb-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-300 to-rose-400 flex items-center justify-center text-3xl shadow-md">
+              👧
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold" style={{color: '#33312d'}}>小糯米</h3>
+              <p className="text-sm" style={{color: '#706c63'}}>小公主 · 2024-06-01</p>
+            </div>
+            <button className="ml-auto btn btn-ghost btn-sm">
+              <i data-lucide="edit-3" className="w-3.5 h-3.5"></i>
+              编辑
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-4 rounded-xl bg-[#fafaf8]">
+              <p className="text-2xl font-bold" style={{color: '#f58b3d'}}>1岁</p>
+              <p className="text-xs mt-1" style={{color: '#8f8b80'}}>当前年龄</p>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-[#fafaf8]">
+              <p className="text-2xl font-bold" style={{color: '#5b66c0'}}>156</p>
+              <p className="text-xs mt-1" style={{color: '#8f8b80'}}>照片数量</p>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-[#fafaf8]">
+              <p className="text-2xl font-bold" style={{color: '#2d9d5f'}}>3</p>
+              <p className="text-xs mt-1" style={{color: '#8f8b80'}}>视频数量</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h3 className="font-semibold mb-4" style={{color: '#33312d'}}>添加新宝宝</h3>
+          <form className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="form-label">宝宝姓名</label>
+                <input type="text" className="form-input" placeholder="请输入宝宝姓名" />
+              </div>
+              <div>
+                <label className="form-label">性别</label>
+                <div className="flex gap-2">
+                  <button type="button" className="flex-1 py-2.5 rounded-xl border-2 border-[#e8e6de] text-sm font-medium text-stone-600 hover:border-blue-400 hover:text-blue-500 transition-all">
+                    👦 男宝宝
+                  </button>
+                  <button type="button" className="flex-1 py-2.5 rounded-xl border-2 border-[#e8e6de] text-sm font-medium text-stone-600 hover:border-rose-400 hover:text-rose-500 transition-all">
+                    👧 女宝宝
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="form-label">出生日期</label>
+              <input type="date" className="form-input" />
+            </div>
+            <button type="submit" className="w-full btn btn-primary">
+              <i data-lucide="plus" className="w-4 h-4"></i>
+              添加宝宝
+            </button>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    {/* Modals */}
+    {/* Photo Preview Modal */}
+    <div id="modal-photo-preview" className="modal-overlay" style={{display: 'none'}} onclick="closePhotoPreview()">
+      <div className="modal-content" onclick="event.stopPropagation()">
+        <div className="p-4 border-b flex items-center justify-between" style={{borderColor: '#e8e6de'}}>
+          <h3 className="font-semibold" style={{color: '#33312d'}}>照片预览</h3>
+          <button className="btn btn-ghost btn-sm" onclick="closePhotoPreview()">
+            <i data-lucide="x" className="w-4 h-4"></i>
+          </button>
+        </div>
+        <div className="p-6">
+          <div className="rounded-xl overflow-hidden mb-4">
+            <img id="preview-image" src="" alt="Preview" className="w-full" />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{color: '#706c63'}}>IMG_20240715_103025.jpg</span>
+              <span className="text-xs" style={{color: '#b0aca0'}}>· 1920×1080</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="btn btn-secondary" onclick="addToPending()">
+                <i data-lucide="plus" className="w-4 h-4"></i>
+                添加到待选
+              </button>
+              <button className="btn btn-primary" onclick="selectPhoto()">
+                <i data-lucide="check" className="w-4 h-4"></i>
+                选为周期照片
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Video Player Modal */}
+    <div id="modal-video-player" className="modal-overlay" style={{display: 'none'}} onclick="closeVideoPlayer()">
+      <div className="modal-content" style={{maxWidth: '800px'}} onclick="event.stopPropagation()">
+        <div className="p-4 border-b flex items-center justify-between" style={{borderColor: '#e8e6de'}}>
+          <h3 className="font-semibold" style={{color: '#33312d'}}>视频播放</h3>
+          <button className="btn btn-ghost btn-sm" onclick="closeVideoPlayer()">
+            <i data-lucide="x" className="w-4 h-4"></i>
+          </button>
+        </div>
+        <div className="p-6">
+          <div className="rounded-xl overflow-hidden aspect-video bg-black mb-4">
+            <img src="https://picsum.photos/800/450?random=999" alt="Video" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <button className="w-14 h-14 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+                <i data-lucide="play" className="w-7 h-7 text-white" fill="white"></i>
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{color: '#706c63'}}>小糯米洗澡.mp4</span>
+              <span className="text-xs" style={{color: '#b0aca0'}}>· 00:45</span>
+            </div>
+            <button className="btn btn-primary">
+              <i data-lucide="scissors" className="w-4 h-4"></i>
+              截取帧
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Video Generation Progress Modal */}
+    <div id="modal-generation-progress" className="modal-overlay" style={{display: 'none'}}>
+      <div className="modal-content" style={{maxWidth: '400px'}}>
+        <div className="p-6 text-center">
+          <div className="relative w-20 h-20 mx-auto mb-4">
+            <div className="absolute inset-0 rounded-full border-4 border-[#f5f4f0]"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-[#f58b3d] border-t-transparent animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-lg font-bold" id="progress-percent" style={{color: '#f58b3d'}}>0%</span>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold mb-2" style={{color: '#33312d'}}>正在生成视频</h3>
+          <p className="text-sm mb-4" style={{color: '#706c63'}}>正在处理您的成长视频，请稍候...</p>
+          <div className="progress-bar mb-2">
+            <div className="progress-fill" id="progress-bar" style={{width: '0%'}}></div>
+          </div>
+          <p className="text-xs" style={{color: '#b0aca0'}}>预计剩余时间: <span id="time-remaining">3分钟</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentPage = 'home';
+    let wizardStep = 1;
+    let currentTab = 'photos';
+    let selectedPeriod = 6;
+
+    function navigateTo(page) {
+      document.querySelectorAll('[id^="page-"]').forEach(el => {
+        el.style.display = 'none';
+      });
+      const target = document.getElementById('page-' + page);
+      if (target) {
+        target.style.display = page === 'create-project' ? 'flex' : 'block';
+        currentPage = page;
+      }
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      const navBtn = document.querySelector(`button[onclick="navigateTo('${page}')"]`);
+      if (navBtn) navBtn.classList.add('active');
+      lucide.createIcons();
+    }
+
+    function showBabySetup() {
+      navigateTo('baby-setup');
+    }
+
+    function selectBaby(id) {
+      const babies = document.querySelectorAll('[onclick^="selectBaby"]');
+      babies.forEach(baby => {
+        if (baby.getAttribute('onclick').includes(id)) {
+          baby.classList.add('bg-gradient-to-r', 'from-[#fffaf5]', 'to-[#fff2e6]');
+          baby.classList.add('border-2', 'border-[#ffe4cc]');
+          baby.classList.remove('hover:bg-stone-50', 'border-2', 'border-transparent');
+        } else {
+          baby.classList.remove('bg-gradient-to-r', 'from-[#fffaf5]', 'to-[#fff2e6]');
+          baby.classList.remove('border-2', 'border-[#ffe4cc]');
+          baby.classList.add('hover:bg-stone-50', 'border-2', 'border-transparent');
+        }
+      });
+    }
+
+    function selectWizardBaby(id) {
+      const babies = document.querySelectorAll('[onclick^="selectWizardBaby"]');
+      babies.forEach(baby => {
+        if (baby.getAttribute('onclick').includes(id)) {
+          baby.classList.add('bg-gradient-to-r', 'from-[#fffaf5]', 'to-[#fff2e6]');
+          baby.classList.add('border-2', 'border-[#f58b3d]');
+          baby.querySelector('div:last-child').classList.add('border-[#f58b3d]', 'bg-[#f58b3d]');
+          baby.querySelector('div:last-child').innerHTML = '<i data-lucide="check" class="w-3 h-3 text-white"></i>';
+          lucide.createIcons();
+        } else {
+          baby.classList.remove('bg-gradient-to-r', 'from-[#fffaf5]', 'to-[#fff2e6]');
+          baby.classList.remove('border-2', 'border-[#f58b3d]');
+          baby.querySelector('div:last-child').classList.remove('border-[#f58b3d]', 'bg-[#f58b3d]');
+          baby.querySelector('div:last-child').classList.add('border-[#e8e6de]');
+          baby.querySelector('div:last-child').innerHTML = '';
+        }
+      });
+    }
+
+    function wizardNext() {
+      if (wizardStep < 5) {
+        wizardStep++;
+        updateWizard();
+      }
+    }
+
+    function wizardPrev() {
+      if (wizardStep > 1) {
+        wizardStep--;
+        updateWizard();
+      }
+    }
+
+    function updateWizard() {
+      const steps = document.querySelectorAll('.wizard-step-dot');
+      const connectors = document.querySelectorAll('.wizard-connector');
+      steps.forEach((step, idx) => {
+        step.classList.remove('active', 'completed', 'pending');
+        if (wizardStep > idx + 1) {
+          step.classList.add('completed');
+          step.innerHTML = '<i data-lucide="check" class="w-5 h-5"></i>';
+        } else if (wizardStep === idx + 1) {
+          step.classList.add('active');
+          step.textContent = idx + 1;
+        } else {
+          step.classList.add('pending');
+          step.textContent = idx + 1;
+        }
+      });
+      connectors.forEach((conn, idx) => {
+        conn.classList.remove('completed', 'active');
+        if (wizardStep > idx + 2) {
+          conn.classList.add('completed');
+        } else if (wizardStep === idx + 2) {
+          conn.classList.add('active');
+        }
+      });
+      lucide.createIcons();
+    }
+
+    function toggleSpecialDates() {
+      const toggle = document.querySelector('.toggle-switch');
+      toggle.classList.toggle('active');
+    }
+
+    function openProject(id) {
+      navigateTo('periods');
+    }
+
+    function deleteProject(id) {
+      if (confirm('确定要删除这个项目吗？')) {
+        const project = document.querySelector(`[onclick="openProject(${id})"]`);
+        if (project) project.remove();
+      }
+    }
+
+    function selectPeriod(id) {
+      selectedPeriod = id;
+      document.querySelectorAll('.period-step').forEach(step => {
+        const dot = step.querySelector('.period-dot');
+        dot.classList.remove('current');
+        if (step.getAttribute('onclick').includes(id)) {
+          dot.classList.add('current');
+        }
+      });
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.getAttribute('onclick').includes(tab)) {
+          item.classList.add('active');
+        }
+      });
+    }
+
+    function openPhotoPreview(idx) {
+      const modal = document.getElementById('modal-photo-preview');
+      const img = document.getElementById('preview-image');
+      img.src = `https://picsum.photos/800/600?random=${idx}`;
+      modal.style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function closePhotoPreview() {
+      document.getElementById('modal-photo-preview').style.display = 'none';
+    }
+
+    function addToPending() {
+      alert('已添加到待选区');
+      closePhotoPreview();
+    }
+
+    function selectPhoto() {
+      alert('已选为周期照片');
+      closePhotoPreview();
+    }
+
+    function playVideo(idx) {
+      const modal = document.getElementById('modal-video-player');
+      modal.style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function closeVideoPlayer() {
+      document.getElementById('modal-video-player').style.display = 'none';
+    }
+
+    function playPreview() {
+      alert('预览功能演示');
+    }
+
+    function startVideoGeneration() {
+      const modal = document.getElementById('modal-generation-progress');
+      modal.style.display = 'flex';
+      lucide.createIcons();
+
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 100) progress = 100;
+        
+        document.getElementById('progress-percent').textContent = Math.round(progress) + '%';
+        document.getElementById('progress-bar').style.width = progress + '%';
+
+        const remaining = Math.max(0, Math.round((100 - progress) / 30 * 60));
+        document.getElementById('time-remaining').textContent = remaining < 60 ? remaining + '秒' : Math.floor(remaining / 60) + '分' + (remaining % 60) + '秒';
+
+        if (progress >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            modal.style.display = 'none';
+            alert('视频生成完成！');
+            navigateTo('history');
+          }, 500);
+        }
+      }, 500);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      document.getElementById('page-home').style.display = 'block';
+    });
+  </script>
+</body>
+</html>

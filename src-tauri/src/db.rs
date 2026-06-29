@@ -155,6 +155,13 @@ impl Database {
     pub fn init(&mut self) -> Result<()> {
         let db_path = Self::get_db_path();
         let conn = Connection::open(db_path)?;
+
+        // 并发安全 & 数据完整性 PRAGMA
+        conn.pragma_update(None, "journal_mode", "WAL")?;       // 读写不互斥
+        conn.pragma_update(None, "foreign_keys", "ON")?;        // 强制外键约束
+        conn.pragma_update(None, "busy_timeout", "5000")?;      // 写冲突等待 5s
+        conn.pragma_update(None, "synchronous", "NORMAL")?;     // WAL 模式下安全加速
+
         self.conn = Some(conn);
         self.create_tables()?;
         Ok(())

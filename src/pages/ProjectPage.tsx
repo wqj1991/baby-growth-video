@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Outlet, NavLink } from 'react-router-dom';
-import { Calendar, Video, History, Settings, ArrowLeft, LayoutDashboard } from 'lucide-react';
+import { Calendar, Video, History, ArrowLeft, LayoutDashboard } from 'lucide-react';
 import { useAppStore } from '../store';
 import { getProjects } from '../utils/tauriCommands';
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { currentProject, setCurrentProject } = useAppStore();
+  const { currentProject, setCurrentProject, currentBaby } = useAppStore();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,13 +19,10 @@ export default function ProjectPage() {
   const loadProject = async (id: number) => {
     setLoading(true);
     try {
-      // 这里应该从项目列表中找到对应的项目
-      // 简化处理，先假设项目已存在
-      const projects = await getProjects(1); // 临时用babyId=1
+      const babyId = currentBaby?.id || 1;
+      const projects = await getProjects(babyId);
       const project = projects.find(p => p.id === id);
-      if (project) {
-        setCurrentProject(project);
-      }
+      if (project) setCurrentProject(project);
     } catch (error) {
       console.error('加载项目失败:', error);
     } finally {
@@ -35,8 +32,11 @@ export default function ProjectPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">加载中...</div>
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center gap-2 text-[#b0aca0]">
+          <div className="w-4 h-4 border-2 border-[#f58b3d] border-t-transparent rounded-full animate-spin" />
+          加载中...
+        </div>
       </div>
     );
   }
@@ -50,41 +50,48 @@ export default function ProjectPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* 顶部栏 */}
-      <div className="bg-white border-b border-gray-200 px-8 py-4">
+      {/* ===== Top Header ===== */}
+      <div className="bg-white border-b border-[#e8e6de] px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/')}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-[#8f8b80] hover:text-[#33312d] hover:bg-[#f5f4f0] rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">
+              <h1 className="text-xl font-bold text-[#33312d]">
                 {currentProject?.name || '成长视频项目'}
               </h1>
-              <p className="text-sm text-gray-500">
-                {currentProject?.description || '制作宝宝的成长视频'}
-              </p>
+              {currentProject?.description && (
+                <p className="text-sm text-[#8f8b80]">{currentProject.description}</p>
+              )}
             </div>
           </div>
-          <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-            <Settings className="w-5 h-5" />
-          </button>
+
+          {currentProject && (
+            <span className="text-xs text-[#b0aca0]">
+              {currentProject.status === 'completed' ? (
+                <span className="badge badge-success">已完成</span>
+              ) : (
+                <span className="badge badge-primary">草稿</span>
+              )}
+            </span>
+          )}
         </div>
 
-        {/* 子导航 */}
+        {/* Sub Navigation */}
         <div className="flex gap-1 mt-4">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-primary-50 text-primary-600 font-medium'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-[#fff2e6] text-[#b85218] shadow-sm'
+                    : 'text-[#706c63] hover:bg-[#fafaf8] hover:text-[#33312d]'
                 }`
               }
             >
@@ -95,7 +102,7 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      {/* 内容区 */}
+      {/* Content */}
       <div className="flex-1 overflow-auto">
         <Outlet />
       </div>

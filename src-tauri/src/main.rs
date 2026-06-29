@@ -186,13 +186,68 @@ async fn scan_media_folder(
     state: State<'_, AppState>,
 ) -> Result<media::ScanResult, String> {
     let db = state.db.clone();
-    let window = window.clone();
-    
+    let window2 = window.clone();
+    let folder_path2 = folder_path.clone();
+
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let db = db.lock().map_err(|e| e.to_string())?;
-        media::scan_media_folder(&db, project_id, &folder_path, window)
+        // ========== Lock 1: 读取 periods + 已有文件路径（毫秒级）==========
+        let (periods, existing_paths) = {
+            let db = db.lock().map_err(|e| e.to_string())?;
+            let periods = db.get_periods(project_id).map_err(|e| e.to_string())?;
+            let mut paths = std::collections::HashSet::new();
+            for period in &periods {
+                if let Ok(photos) = db.get_period_photos(period.id) {
+                    for p in photos { paths.insert(p.file_path); }
+                }
+                if let Ok(videos) = db.get_period_videos(period.id) {
+                    for v in videos { paths.insert(v.file_path); }
+                }
+            }
+            Ok::<_, String>((periods, paths))
+        }?; // 锁释放
+
+        // ========== Phase 2: 文件处理（无锁，秒级 — 遍历+复制+尺寸解析）==========
+        let scan_result = media::process_media_folder(
+            project_id, &folder_path2, &periods, &existing_paths, &window2
+        )?;
+
+        // ========== Lock 2: 批量写入数据库（毫秒级）==========
+        let (photos, videos) = {
+            let db = db.lock().map_err(|e| e.to_string())?;
+            let photos = db.add_photos(&scan_result.new_photos)
+                .unwrap_or_else(|e| { eprintln!("批量插入照片失败: {}", e); Vec::new() });
+            let videos = db.add_videos(&scan_result.new_videos)
+                .unwrap_or_else(|e| { eprintln!("批量插入视频失败: {}", e); Vec::new() });
+            (photos, videos)
+        }; // 锁释放
+
+        let recognized_photos = photos.len() as i64;
+        let recognized_videos = videos.len() as i64;
+
+        // ========== Phase 3: 保存日志（无锁 IO）==========
+        let total_files = scan_result.total_photos + scan_result.total_videos;
+        if let Err(e) = media::save_scan_log(project_id, &folder_path2, total_files, scan_result.scan_logs) {
+            eprintln!("保存扫描日志失败: {}", e);
+        }
+
+        Ok(media::ScanResult {
+            photos,
+            videos,
+            total_photos: scan_result.total_photos,
+            total_videos: scan_result.total_videos,
+            recognized_photos,
+            recognized_videos,
+            skipped_duplicate_photos: scan_result.skipped_duplicate_photos,
+            skipped_duplicate_videos: scan_result.skipped_duplicate_videos,
+            skipped_no_date_photos: scan_result.skipped_no_date_photos,
+            skipped_no_date_videos: scan_result.skipped_no_date_videos,
+            skipped_no_period_photos: scan_result.skipped_no_period_photos,
+            skipped_no_period_videos: scan_result.skipped_no_period_videos,
+            skipped_copy_failed_photos: scan_result.skipped_copy_failed_photos,
+            skipped_copy_failed_videos: scan_result.skipped_copy_failed_videos,
+        })
     }).await.map_err(|e| format!("Task failed: {}", e))?;
-    
+
     result
 }
 
@@ -227,12 +282,73 @@ async fn scan_period_folder(
     state: State<'_, AppState>,
 ) -> Result<media::ScanResult, String> {
     let db = state.db.clone();
-    
+    let folder_path2 = folder_path.clone();
+
     let result = tauri::async_runtime::spawn_blocking(move || {
-        let db = db.lock().map_err(|e| e.to_string())?;
-        media::scan_period_folder(&db, project_id, period_id, &folder_path)
+        // ========== Lock 1: 获取周期信息 + 删除旧 DB 记录（毫秒级）==========
+        let (period, old_file_paths) = {
+            let db = db.lock().map_err(|e| e.to_string())?;
+            let period = db.get_period(period_id).map_err(|e| e.to_string())?;
+
+            // 收集旧文件路径（用于后续删除文件）
+            let mut paths = Vec::new();
+            if let Ok(photos) = db.get_period_photos(period_id) {
+                for p in &photos { paths.push(p.file_path.clone()); }
+            }
+            if let Ok(videos) = db.get_period_videos(period_id) {
+                for v in &videos { paths.push(v.file_path.clone()); }
+            }
+
+            // 删除旧 DB 记录
+            db.delete_period_photos(period_id).ok();
+            db.delete_period_videos(period_id).ok();
+
+            Ok::<_, String>((period, paths))
+        }?; // 锁释放
+
+        // ========== 删除旧物理文件（无锁 IO）==========
+        for path in &old_file_paths {
+            if let Err(e) = std::fs::remove_file(path) {
+                eprintln!("删除旧文件失败: {} -> {}", path, e);
+            }
+        }
+
+        // ========== Phase 2: 处理新文件（无锁，秒级）==========
+        let scan_result = media::process_period_folder(
+            project_id, period_id, &folder_path2, &period
+        )?;
+
+        // ========== Lock 2: 批量写入数据库（毫秒级）==========
+        let (photos, videos) = {
+            let db = db.lock().map_err(|e| e.to_string())?;
+            let photos = db.add_photos(&scan_result.new_photos)
+                .unwrap_or_else(|e| { eprintln!("批量插入照片失败: {}", e); Vec::new() });
+            let videos = db.add_videos(&scan_result.new_videos)
+                .unwrap_or_else(|e| { eprintln!("批量插入视频失败: {}", e); Vec::new() });
+            (photos, videos)
+        }; // 锁释放
+
+        let recognized_photos = photos.len() as i64;
+        let recognized_videos = videos.len() as i64;
+
+        Ok(media::ScanResult {
+            photos,
+            videos,
+            total_photos: scan_result.total_photos,
+            total_videos: scan_result.total_videos,
+            recognized_photos,
+            recognized_videos,
+            skipped_duplicate_photos: scan_result.skipped_duplicate_photos,
+            skipped_duplicate_videos: scan_result.skipped_duplicate_videos,
+            skipped_no_date_photos: scan_result.skipped_no_date_photos,
+            skipped_no_date_videos: scan_result.skipped_no_date_videos,
+            skipped_no_period_photos: scan_result.skipped_no_period_photos,
+            skipped_no_period_videos: scan_result.skipped_no_period_videos,
+            skipped_copy_failed_photos: scan_result.skipped_copy_failed_photos,
+            skipped_copy_failed_videos: scan_result.skipped_copy_failed_videos,
+        })
     }).await.map_err(|e| format!("Task failed: {}", e))?;
-    
+
     result
 }
 

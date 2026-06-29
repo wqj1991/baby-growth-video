@@ -47,6 +47,7 @@ interface CreateProjectState {
   setFolderPath: (path: string) => void;
   setScanResult: (result: ScanResult | null) => void;
   setIsScanning: (scanning: boolean) => void;
+  setScanProgress: (progress: { processed: number; total: number } | null) => void;
   addScanLog: (log: Omit<ScanLog, 'id'>) => void;
   addScanLogs: (logs: Array<Omit<ScanLog, 'id'>>) => void;
   clearScanLogs: () => void;
@@ -90,7 +91,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   setProjectId: (id) => set({ projectId: id }),
 
   setFolderPath: (path) => set({ folderPath: path }),
-  setScanProgress: (progress) => set({ scanProgress: progress }),
+  setScanProgress: (progress: { processed: number; total: number } | null) => set({ scanProgress: progress }),
 
   setScanResult: (result) => set({ scanResult: result }),
 
