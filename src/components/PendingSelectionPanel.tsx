@@ -46,7 +46,7 @@ export default function PendingSelectionPanel({
   };
 
   const isItemSelected = (item: SelectableItem): boolean => {
-    return item.item.is_multi_selected;
+    return item.item.is_final;
   };
 
   return (
