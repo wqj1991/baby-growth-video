@@ -36,7 +36,7 @@ export default function VirtualPhotoGrid({
   const rowCount = totalCount > 0 ? Math.ceil(totalCount / columns) : 0;
 
   return (
-    <div ref={containerRef} className={className} style={{ height: gridHeight }}>
+    <div ref={containerRef as React.Ref<HTMLDivElement>} className={className} style={{ height: gridHeight }}>
       <Grid
         columnCount={columns}
         rowCount={rowCount}

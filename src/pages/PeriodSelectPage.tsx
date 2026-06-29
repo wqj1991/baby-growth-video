@@ -34,6 +34,7 @@ import {
   getVideoThumbnail,
 } from '../utils/tauriCommands';
 import type { Period, Photo, Video, VideoFrame, SelectableItem } from '../types';
+import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
 import PhotoContextMenu from '../components/PhotoContextMenu';
 import VideoFrameSettingsModal from '../components/VideoFrameSettingsModal';
 import VideoFrameViewerModal from '../components/VideoFrameViewerModal';
@@ -87,6 +88,22 @@ export default function PeriodSelectPage() {
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
   const [videoFrameCounts, setVideoFrameCounts] = useState<Record<number, number>>({});
   const [videoThumbnails, setVideoThumbnails] = useState<Record<number, string>>({});
+  const contentAreaRef = useRef<HTMLDivElement>(null);
+  const [contentAreaHeight, setContentAreaHeight] = useState(400);
+
+  // 测量内容区高度（传递给 VirtualPhotoGrid）
+  useEffect(() => {
+    const el = contentAreaRef.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      setContentAreaHeight(Math.max(100, rect.height - 48)); // subtract header padding
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (projectId) {
@@ -804,7 +821,7 @@ export default function PeriodSelectPage() {
         </div>
 
         {/* 内容区 */}
-        <div className="flex-1 overflow-auto p-6 bg-gray-50">
+        <div ref={contentAreaRef} className="flex-1 overflow-auto p-6 bg-gray-50">
           {!currentPeriod ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <Calendar className="w-16 h-16 mb-4 text-gray-300" />
@@ -826,43 +843,18 @@ export default function PeriodSelectPage() {
                       {currentPhotos.find(p => p.is_final) ? '已确认最终照片' : '请确认1张最终照片'}
                     </p>
                   </div>
-                  <div className="photo-grid">
-                    {currentPhotos.map((photo) => (
-                      <div
-                        key={photo.id}
-                        className={`photo-item ${
-                          photo.is_selected ? 'selected' : ''
-                        } ${photo.is_final ? 'final' : ''}`}
-                        onContextMenu={(e) => handlePhotoContextMenu(e, photo)}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          const index = currentPhotos.findIndex(p => p.id === photo.id);
-                          handleOpenPreview(index);
-                        }}
-                      >
-                        <img
-                          src={loadedImages[photo.id] || ''}
-                          alt={photo.file_name}
-                          loading="lazy"
-                        />
-                        {photo.is_final && (
-                          <div className="photo-badge final">
-                            <Check className="w-3 h-3" />
-                          </div>
-                        )}
-                        {photo.is_selected && !photo.is_final && (
-                          <div className="photo-badge selected">
-                            ✓
-                          </div>
-                        )}
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                          <p className="text-white text-xs truncate">
-                            {photo.file_name}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <VirtualPhotoGrid
+                    photos={currentPhotos}
+                    loadedImages={loadedImages}
+                    onContextMenu={handlePhotoContextMenu}
+                    onDoubleClick={(photo) => {
+                      const index = currentPhotos.findIndex(p => p.id === photo.id);
+                      if (index !== -1) handleOpenPreview(index);
+                    }}
+                    onOpenPreview={handleOpenPreview}
+                    gridHeight={contentAreaHeight}
+                    className="w-full"
+                  />
                 </>
               )}
             </div>
