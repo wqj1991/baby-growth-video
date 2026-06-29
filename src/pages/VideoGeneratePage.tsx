@@ -1,13 +1,17 @@
-import { useState, useRef } from 'react';
-import { Video, Play, Settings, Download, Music, Image } from 'lucide-react';
-import { useAppStore } from '../store';
-import { saveFile } from '../utils/tauriCommands';
-// import { generateGrowthVideo } from '../utils/tauriCommands';
-import type { VideoConfig } from '../types';
+import { useState, useRef, useEffect } from 'react';
+import { Video, Play, Settings, Download, Music, Image, Sparkles, AlertCircle, ExternalLink, AlertTriangle, CheckCircle2, Loader2, Film, Type, Wand2, Clock } from 'lucide-react';
+import { useAppStore, isAiConfigured } from '../store';
+import { saveFile, generateGrowthVideo } from '../utils/tauriCommands';
+import { listen } from '@tauri-apps/api/event';
+import { useNavigate } from 'react-router-dom';
+import type { VideoConfig, PhotoText } from '../types';
 
 export default function VideoGeneratePage() {
-  const { periods, isGenerating, setIsGenerating, generationProgress, setGenerationProgress } = useAppStore();
-  const progressRef = useRef(0);
+  const navigate = useNavigate();
+  const { periods, currentProject, isGenerating, setIsGenerating, generationProgress, setGenerationProgress,
+    generationStage, setGenerationStage, generationMessage, setGenerationMessage,
+    generationFallback, setGenerationFallback, fallbackReason, setFallbackReason } = useAppStore();
+  const unlistenRef = useRef<(() => void) | null>(null);
 
   const [config, setConfig] = useState<VideoConfig>({
     resolution: '1080p',
@@ -17,7 +21,77 @@ export default function VideoGeneratePage() {
     transition_duration: 0.5,
     background_music: undefined,
     output_format: 'mp4',
+    ai_enabled: false,
+    video_mode: 'standard',
   });
+
+  const [videoMode, setVideoMode] = useState<'standard' | 'agnes'>('standard');
+  const [overallPrompt, setOverallPrompt] = useState('');
+  const [photoTexts, setPhotoTexts] = useState<PhotoText[]>([]);
+  const [editingTextFor, setEditingTextFor] = useState<number | null>(null);
+
+  const [aiEnabled, setAiEnabled] = useState(() => {
+    const s = useAppStore.getState().aiSettings;
+    return s.enabled && !!s.api_key;
+  });
+
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const [completedVideoPath, setCompletedVideoPath] = useState<string | null>(null);
+
+  // 清理事件监听
+  useEffect(() => {
+    return () => {
+      if (unlistenRef.current) {
+        unlistenRef.current();
+        unlistenRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleAiToggle = () => {
+    const next = !aiEnabled;
+    setAiEnabled(next);
+    setConfig(prev => ({ ...prev, ai_enabled: next }));
+  };
+
+  /** 根据 stage 返回默认进度文案 */
+  function getDefaultMessage(stage: string, current: number, total: number): string {
+    switch (stage) {
+      case 'preparing': return '正在准备照片...';
+      case 'preprocessing': return `正在处理照片文字 (${current}/${total})...`;
+      case 'ai_generation': return `正在生成 AI 过渡帧 (${current}/${total})...`;
+      case 'ai_fallback': return 'AI 生成失败，回退到标准转场...';
+      case 'ffmpeg_encoding': return '正在合成视频...';
+      case 'agnes_creating': return '正在创建 Agnes 视频任务...';
+      case 'agnes_encoding': return 'Agnes AI 正在生成视频...';
+      case 'agnes_downloading': return '正在下载生成的视频...';
+      case 'agnes_fallback': return 'Agnes 生成失败，回退到标准模式...';
+      case 'complete': return '视频生成完成!';
+      case 'error': return '生成失败';
+      default: return `${stage}...`;
+    }
+  }
+
+  function getStageLabel(stage: string): string {
+    switch (stage) {
+      case 'preparing': return '准备照片';
+      case 'preprocessing': return '处理文字标注';
+      case 'ai_generation': return 'AI 生成过渡帧';
+      case 'ai_fallback': return '回退到标准转场';
+      case 'ffmpeg_encoding': return 'FFmpeg 编码合成';
+      case 'agnes_creating': return '创建 Agnes 任务';
+      case 'agnes_encoding': return 'Agnes AI 渲染视频';
+      case 'agnes_downloading': return '下载视频文件';
+      case 'agnes_fallback': return '降级到标准模式';
+      case 'complete': return '完成';
+      case 'error': return '出错';
+      default: return stage;
+    }
+  }
+
+  const aiConfigured = isAiConfigured();
+
+  const aiFrameDuration = useAppStore((s) => s.aiSettings.frame_duration);
 
   const completedPeriods = periods.filter(p => p.selected_photo_id);
 
@@ -27,38 +101,84 @@ export default function VideoGeneratePage() {
       return;
     }
 
+    if (!currentProject) {
+      alert('请先选择项目');
+      return;
+    }
+
     const outputPath = await saveFile(`成长视频.${config.output_format}`);
     if (!outputPath) return;
 
+    // 重置状态
     setIsGenerating(true);
     setGenerationProgress(0);
-    progressRef.current = 0;
+    setGenerationStage('preparing');
+    setGenerationMessage('准备中...');
+    setGenerationFallback(false);
+    setFallbackReason('');
+    setGenerationError(null);
+    setCompletedVideoPath(null);
+
+    // 清理旧的事件监听
+    if (unlistenRef.current) {
+      unlistenRef.current();
+      unlistenRef.current = null;
+    }
+
+    // 监听后端进度事件
+    try {
+      const unlisten = await listen<{
+        stage: string;
+        current: number;
+        total: number;
+        percentage: number;
+        message: string;
+      }>('generation-progress', (event) => {
+        const { stage, current, total, percentage, message } = event.payload;
+        setGenerationProgress(percentage);
+        setGenerationStage(stage);
+        // 百分比已经包含在 message 中（后端负责拼接）
+        setGenerationMessage(message || getDefaultMessage(stage, current, total));
+
+        // 检测降级
+        if (stage === 'ai_fallback' || stage === 'agnes_fallback') {
+          setGenerationFallback(true);
+          setFallbackReason(message);
+        }
+      });
+
+      unlistenRef.current = unlisten;
+    } catch (e) {
+      console.error('Failed to listen to generation-progress:', e);
+    }
 
     try {
-      // 模拟进度更新
-      const progressInterval = setInterval(() => {
-        if (progressRef.current >= 90) {
-          clearInterval(progressInterval);
-          return;
-        }
-        progressRef.current += 5;
-        setGenerationProgress(progressRef.current);
-      }, 500);
-
-      // 实际生成视频
-      // const result = await generateGrowthVideo(projectId, config, outputPath);
-      
-      // 模拟完成
-      setTimeout(() => {
-        clearInterval(progressInterval);
-        setGenerationProgress(100);
-        setIsGenerating(false);
-        alert('视频生成完成！');
-      }, 3000);
+      const result = await generateGrowthVideo(
+        currentProject.id,
+        { ...config, video_mode: videoMode },
+        outputPath,
+        videoMode === 'agnes' ? overallPrompt : undefined,
+        videoMode === 'agnes' ? photoTexts : undefined,
+      );
+      setGenerationProgress(100);
+      setGenerationStage('complete');
+      setGenerationMessage('视频生成完成!');
+      setCompletedVideoPath(result.output_path);
     } catch (error) {
-      console.error('生成视频失败:', error);
-      alert('生成视频失败');
+      const errMsg = typeof error === 'string' ? error : '未知错误';
+      setGenerationError(errMsg);
+      setGenerationProgress(100);
+      setGenerationStage('error');
+      setGenerationMessage('生成失败');
+    } finally {
       setIsGenerating(false);
+      // 延迟清理监听，确保最终事件已收到
+      setTimeout(() => {
+        if (unlistenRef.current) {
+          unlistenRef.current();
+          unlistenRef.current = null;
+        }
+      }, 500);
     }
   };
 
@@ -71,7 +191,7 @@ export default function VideoGeneratePage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="h-full overflow-y-auto p-6">
       <div className="grid grid-cols-12 gap-6">
         {/* 左侧 - 配置 */}
         <div className="col-span-5">
@@ -160,6 +280,79 @@ export default function VideoGeneratePage() {
                     step={0.1}
                   />
                 </div>
+              )}
+
+              {/* ===== AI 智能过渡 (仅标准模式) ===== */}
+              {videoMode === 'standard' && (
+              <div className="form-group">
+                <div className="p-4 rounded-xl" style={{ background: 'linear-gradient(135deg, #f4f5fb 0%, #f8f6fc 50%, #fffaf5 100%)', border: '1px solid #e4e7f6' }}>
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5" style={{ color: '#5b66c0' }} />
+                      <div>
+                        <label className="text-sm font-semibold" style={{ color: '#2b2e58' }}>AI 智能过渡</label>
+                        <p className="text-xs mt-0.5" style={{ color: '#7785d1' }}>
+                          在照片之间生成 AI 装饰性过渡帧
+                        </p>
+                      </div>
+                    </div>
+                    {aiConfigured ? (
+                      <button
+                        onClick={handleAiToggle}
+                        className={`toggle-switch ${aiEnabled ? 'active' : ''}`}
+                        role="switch"
+                        aria-checked={aiEnabled}
+                        aria-label="AI 智能过渡"
+                      >
+                        <span className="toggle-switch-knob" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                        style={{ color: '#5b66c0', background: '#e4e7f6' }}
+                      >
+                        去配置
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {!aiConfigured && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: '#fff9e0', border: '1px solid #fff2b8' }}>
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#8f6600' }} />
+                      <p className="text-xs" style={{ color: '#6b4d00' }}>
+                        尚未配置 AI 模型，请在
+                        <button
+                          onClick={() => navigate('/settings')}
+                          className="font-medium underline mx-1"
+                          style={{ color: '#b38000' }}
+                        >
+                          设置
+                        </button>
+                        中配置 Provider 和 API Key
+                      </p>
+                    </div>
+                  )}
+
+                  {aiEnabled && aiConfigured && (
+                    <div className="mt-3 pt-3 border-t" style={{ borderColor: '#d4d1c7' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg gradient-indigo flex items-center justify-center">
+                          <Sparkles className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium" style={{ color: '#33312d' }}>AI 过渡帧已启用</p>
+                          <p className="text-xs" style={{ color: '#8f8b80' }}>
+                            将在 {completedPeriods.length > 1 ? `${completedPeriods.length - 1} 个转场点` : '转场点'} 生成 AI 帧
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
               )}
 
               {/* 背景音乐 */}
@@ -262,6 +455,141 @@ export default function VideoGeneratePage() {
             </div>
           </div>
 
+          {/* 生成模式选择 */}
+          <div className="card mb-6">
+            <div className="card-body">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Wand2 className="w-4 h-4" style={{ color: '#7c3aed' }} />
+                生成模式
+              </h3>
+              <div className="flex rounded-xl p-1" style={{ background: '#f5f4f0' }}>
+                <button
+                  onClick={() => {
+                    setVideoMode('standard');
+                    setConfig(prev => ({ ...prev, video_mode: 'standard' }));
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    videoMode === 'standard'
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Film className="w-4 h-4" />
+                  标准 (FFmpeg)
+                </button>
+                <button
+                  onClick={() => {
+                    if (!aiConfigured) {
+                      navigate('/settings');
+                      return;
+                    }
+                    setVideoMode('agnes');
+                    setConfig(prev => ({ ...prev, video_mode: 'agnes', ai_enabled: false }));
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    videoMode === 'agnes'
+                      ? 'bg-white shadow-sm text-purple-700'
+                      : aiConfigured ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Agnes AI 视频
+                  {!aiConfigured && <ExternalLink className="w-3 h-3" />}
+                </button>
+              </div>
+              {videoMode === 'agnes' && !aiConfigured && (
+                <p className="text-xs mt-2 text-amber-600">
+                  需要先在设置中配置 AI Provider 和 API Key
+                </p>
+              )}
+              {videoMode === 'agnes' && aiConfigured && (
+                <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg" style={{ background: '#f5f0ff', border: '1px solid #e4d6ff' }}>
+                  <Clock className="w-4 h-4 flex-shrink-0" style={{ color: '#7c3aed' }} />
+                  <p className="text-xs" style={{ color: '#6b47b5' }}>
+                    Agnes AI 将照片生成一段完整的动态视频，约需 2-5 分钟
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Agnes 描述输入 */}
+          {videoMode === 'agnes' && (
+            <div className="card mb-6">
+              <div className="card-body space-y-4">
+                <div className="form-group">
+                  <label className="form-label flex items-center gap-2">
+                    <Type className="w-4 h-4 text-purple-500" />
+                    视频整体描述
+                  </label>
+                  <textarea
+                    className="form-input min-h-[80px] resize-y"
+                    value={overallPrompt}
+                    onChange={(e) => setOverallPrompt(e.target.value)}
+                    placeholder="描述你想要的效果，例如：温馨的家庭成长记录，柔和的暖色调，自然过渡..."
+                  />
+                  <p className="text-xs mt-1" style={{ color: '#b0aca0' }}>
+                    留空将使用默认风格描述
+                  </p>
+                </div>
+
+                {/* 每张照片的文字标注 */}
+                <div className="form-group">
+                  <label className="form-label flex items-center gap-2">
+                    <Type className="w-4 h-4 text-purple-500" />
+                    照片标注
+                    <span className="text-xs font-normal text-gray-400">（可选，在照片底部添加文字）</span>
+                  </label>
+                  {completedPeriods.length === 0 ? (
+                    <p className="text-xs text-gray-400">暂无已选照片</p>
+                  ) : (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {completedPeriods.map((period) => {
+                        const existingText = photoTexts.find(pt => pt.period_id === period.id)?.text || '';
+                        const isEditing = editingTextFor === period.id;
+                        return (
+                          <div key={period.id} className="flex items-center gap-2">
+                            <span className="text-xs font-medium w-20 truncate text-gray-600">{period.name}</span>
+                            {isEditing ? (
+                              <input
+                                className="form-input flex-1 text-xs py-1.5"
+                                value={existingText}
+                                onChange={(e) => {
+                                  setPhotoTexts(prev => {
+                                    const filtered = prev.filter(pt => pt.period_id !== period.id);
+                                    if (e.target.value) {
+                                      return [...filtered, { period_id: period.id, text: e.target.value }];
+                                    }
+                                    return filtered;
+                                  });
+                                }}
+                                onBlur={() => setEditingTextFor(null)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') setEditingTextFor(null); }}
+                                placeholder="输入文字..."
+                                autoFocus
+                              />
+                            ) : (
+                              <button
+                                onClick={() => setEditingTextFor(period.id)}
+                                className={`flex-1 text-left text-xs py-1.5 px-2.5 rounded-lg border transition-colors ${
+                                  existingText
+                                    ? 'border-purple-200 bg-purple-50 text-purple-700'
+                                    : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'
+                                }`}
+                              >
+                                {existingText || '点击添加文字...'}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 生成按钮和进度 */}
           <div className="card">
             <div className="card-body">
@@ -269,7 +597,24 @@ export default function VideoGeneratePage() {
                 <div>
                   <h3 className="font-semibold">生成视频</h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    预计时长：约 {Math.max(0, completedPeriods.length * config.photo_duration + (completedPeriods.length - 1) * config.transition_duration).toFixed(1)} 秒
+                    预计时长：约 {(() => {
+                      if (videoMode === 'agnes') return '动态生成';
+                      const baseDuration = completedPeriods.length * config.photo_duration + (completedPeriods.length - 1) * config.transition_duration;
+                      const aiTransitionTime = aiEnabled && aiConfigured
+                        ? (completedPeriods.length - 1) * aiFrameDuration
+                        : 0;
+                      return (baseDuration + aiTransitionTime).toFixed(1);
+                    })()}{videoMode === 'agnes' ? '' : ' 秒'}
+                    {aiEnabled && aiConfigured && videoMode !== 'agnes' && (
+                      <span className="text-xs ml-2" style={{ color: '#5b66c0' }}>
+                        (含 AI 过渡帧)
+                      </span>
+                    )}
+                    {videoMode === 'agnes' && (
+                      <span className="text-xs ml-2" style={{ color: '#7c3aed' }}>
+                        (Agnes AI 生成)
+                      </span>
+                    )}
                   </p>
                 </div>
                 <button
@@ -292,34 +637,78 @@ export default function VideoGeneratePage() {
               </div>
 
               {isGenerating && (
-                <div>
-                  <div className="progress-bar">
-                    <div
-                      className="progress-bar-fill"
-                      style={{ width: `${generationProgress}%` }}
-                    />
+                <div className="space-y-3">
+                  {/* 阶段指示器 */}
+                  <div className="flex items-center gap-2">
+                    <StageIcon stage={generationStage} />
+                    <span className="text-sm font-medium text-gray-700">
+                      {getStageLabel(generationStage)}
+                    </span>
                   </div>
-                  <p className="text-sm text-gray-500 mt-2 text-center">
-                    {generationProgress}% - 正在生成视频...
-                  </p>
+
+                  {/* 降级通知 */}
+                  {generationFallback && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-800">AI 过渡帧生成失败，已回退到标准转场</p>
+                        {fallbackReason && (
+                          <p className="text-xs text-amber-600 mt-0.5">{fallbackReason}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 进度条 */}
+                  <div>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-bar-fill"
+                        style={{ width: `${generationProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2 text-center">
+                      {generationProgress}% - {generationMessage}
+                    </p>
+                  </div>
                 </div>
               )}
 
-              {generationProgress === 100 && !isGenerating && (
-                <div className="mt-4 p-4 bg-green-50 rounded-lg flex items-center justify-between">
+              {/* 成功完成 */}
+              {generationStage === 'complete' && !isGenerating && completedVideoPath && (
+                <div className="mt-4 p-4 bg-green-50 rounded-lg flex items-center justify-between border border-green-200">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <Video className="w-5 h-5 text-green-600" />
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
                       <p className="font-medium text-green-800">视频生成完成！</p>
-                      <p className="text-sm text-green-600">点击右侧按钮下载</p>
+                      <p className="text-xs text-green-600 truncate max-w-[280px]">{completedVideoPath}</p>
                     </div>
                   </div>
-                  <button className="btn btn-success">
+                  <button
+                    className="btn btn-success"
+                    onClick={() => {
+                      // 视频已保存在用户选择的位置
+                      alert(`视频已保存至:\n${completedVideoPath}`);
+                    }}
+                  >
                     <Download className="w-4 h-4" />
-                    下载
+                    查看
                   </button>
+                </div>
+              )}
+
+              {/* 生成失败 */}
+              {generationStage === 'error' && !isGenerating && generationError && (
+                <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-red-800">生成失败</p>
+                      <p className="text-sm text-red-600 mt-1">{generationError}</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -328,4 +717,33 @@ export default function VideoGeneratePage() {
       </div>
     </div>
   );
+}
+
+/** 进度阶段图标组件 */
+function StageIcon({ stage }: { stage: string }) {
+  const baseClass = 'w-5 h-5';
+  switch (stage) {
+    case 'preparing':
+    case 'preprocessing':
+      return <Image className={`${baseClass} text-blue-500`} />;
+    case 'ai_generation':
+      return <Sparkles className={`${baseClass} text-indigo-500 animate-pulse`} />;
+    case 'ai_fallback':
+    case 'agnes_fallback':
+      return <AlertTriangle className={`${baseClass} text-amber-500`} />;
+    case 'ffmpeg_encoding':
+      return <Film className={`${baseClass} text-green-500 animate-pulse`} />;
+    case 'agnes_creating':
+      return <Wand2 className={`${baseClass} text-purple-500 animate-pulse`} />;
+    case 'agnes_encoding':
+      return <Sparkles className={`${baseClass} text-purple-500 animate-pulse`} />;
+    case 'agnes_downloading':
+      return <Download className={`${baseClass} text-purple-500 animate-pulse`} />;
+    case 'complete':
+      return <CheckCircle2 className={`${baseClass} text-green-500`} />;
+    case 'error':
+      return <AlertCircle className={`${baseClass} text-red-500`} />;
+    default:
+      return <Loader2 className={`${baseClass} text-gray-400 animate-spin`} />;
+  }
 }

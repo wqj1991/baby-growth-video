@@ -49,7 +49,7 @@ export default function ProjectPage() {
   ];
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full w-full flex flex-col">
       {/* ===== Top Header ===== */}
       <div className="bg-white border-b border-[#e8e6de] px-6 py-4">
         <div className="flex items-center justify-between">
@@ -103,7 +103,7 @@ export default function ProjectPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         <Outlet />
       </div>
     </div>

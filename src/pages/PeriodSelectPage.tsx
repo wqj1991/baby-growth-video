@@ -29,6 +29,7 @@ import {
   setFinalVideoFrame,
   cancelFinalVideoFrame,
   getVideoThumbnail,
+  getPeriodStats,
 } from '../utils/tauriCommands';
 import type { Photo, Video, VideoFrame, SelectableItem } from '../types';
 import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
@@ -57,10 +58,13 @@ export default function PeriodSelectPage() {
     setIsScanning,
     currentBaby,
     selectedItems,
-    setSelectedItems,
-    addToSelectedItems,
-    removeFromSelectedItems,
-    // Collage state
+  setSelectedItems,
+  addToSelectedItems,
+  removeFromSelectedItems,
+  periodStats,
+  setPeriodStats,
+  updatePeriodStat,
+  // Collage state
     collageMode,
     setCollageMode,
     setCollageLayout,
@@ -222,9 +226,13 @@ export default function PeriodSelectPage() {
 
   const loadPeriods = async (pid: number) => {
     try {
-      const data = await getPeriods(pid);
-      setPeriods(data);
-      if (data.length > 0 && !currentPeriod) setCurrentPeriod(data[0]);
+      const [periodsData, statsData] = await Promise.all([
+        getPeriods(pid),
+        getPeriodStats(pid),
+      ]);
+      setPeriods(periodsData);
+      setPeriodStats(statsData);
+      if (periodsData.length > 0 && !currentPeriod) setCurrentPeriod(periodsData[0]);
     } catch (error) { console.error('加载周期失败:', error); }
   };
 
@@ -270,6 +278,8 @@ export default function PeriodSelectPage() {
     try {
       await scanPeriodFolder(parseInt(projectId), currentPeriod.id, folderPath);
       await loadPeriodMedia(currentPeriod.id);
+      const stats = await getPeriodStats(parseInt(projectId));
+      setPeriodStats(stats);
     } catch (error) { alert('扫描文件夹失败'); }
     finally { setIsScanning(false); }
   };
@@ -304,6 +314,12 @@ export default function PeriodSelectPage() {
       } else {
         removeFromSelectedItems({ type: 'photo', item: localUpdated });
       }
+      if (currentPeriod) {
+        const currentStat = periodStats[currentPeriod.id];
+        updatePeriodStat(currentPeriod.id, {
+          pending_count: (currentStat?.pending_count || 0) + (newSelected ? 1 : -1),
+        });
+      }
     } catch (error) { console.error('更新照片失败:', error); }
   };
 
@@ -317,6 +333,7 @@ export default function PeriodSelectPage() {
       );
       setPeriods(updatedPeriods);
       setCurrentPeriod({ ...currentPeriod, selected_photo_id: photo.id });
+      updatePeriodStat(currentPeriod.id, { has_final: true });
     } catch (error) { console.error('设置最终照片失败:', error); }
   };
 
@@ -329,6 +346,7 @@ export default function PeriodSelectPage() {
         p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
       ));
       setCurrentPeriod({ ...currentPeriod, selected_photo_id: undefined });
+      updatePeriodStat(currentPeriod.id, { has_final: false });
     } catch (error) { console.error('取消最终照片失败:', error); }
   };
 
@@ -362,9 +380,15 @@ export default function PeriodSelectPage() {
       const localUpdated = { ...updated, is_multi_selected: newSelected ? frame.is_multi_selected : false };
       setCurrentVideoFrames(currentVideoFrames.map(f => f.id === updated.id ? localUpdated : f));
       if (newSelected) {
-        addToSelectedItems({ type: 'frame', item: localUpdated });
+        addToSelectedItems({ type: 'video_frame', item: localUpdated });
       } else {
-        removeFromSelectedItems({ type: 'frame', item: localUpdated });
+        removeFromSelectedItems({ type: 'video_frame', item: localUpdated });
+      }
+      if (currentPeriod) {
+        const currentStat = periodStats[currentPeriod.id];
+        updatePeriodStat(currentPeriod.id, {
+          pending_count: (currentStat?.pending_count || 0) + (newSelected ? 1 : -1),
+        });
       }
     } catch (error) { console.error('更新视频帧失败:', error); }
   };
@@ -378,6 +402,7 @@ export default function PeriodSelectPage() {
         p.id === currentPeriod.id ? { ...p, selected_photo_id: frame.id } : p
       ));
       setCurrentPeriod({ ...currentPeriod, selected_photo_id: frame.id });
+      updatePeriodStat(currentPeriod.id, { has_final: true });
     } catch (error) { console.error('设置最终视频帧失败:', error); }
   };
 
@@ -390,6 +415,7 @@ export default function PeriodSelectPage() {
         p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
       ));
       setCurrentPeriod({ ...currentPeriod, selected_photo_id: undefined });
+      updatePeriodStat(currentPeriod.id, { has_final: false });
     } catch (error) { console.error('取消最终视频帧失败:', error); }
   };
 
@@ -440,8 +466,8 @@ export default function PeriodSelectPage() {
       const updated = { ...frame, is_multi_selected: !frame.is_multi_selected };
       setCurrentVideoFrames(currentVideoFrames.map(f => f.id === frame.id ? updated : f));
       setSelectedItems(selectedItems.map(i => 
-        i.type === 'frame' && i.item.id === frame.id 
-          ? { type: 'frame' as const, item: updated } 
+        i.type === 'video_frame' && i.item.id === frame.id 
+          ? { type: 'video_frame' as const, item: updated } 
           : i
       ));
     }
@@ -526,10 +552,10 @@ export default function PeriodSelectPage() {
           video={currentPlayingVideo}
           onBack={handleCloseInlinePlayer}
           onCapture={(frame) => {
-            addToSelectedItems({ type: 'frame', item: { ...frame, is_selected: true } });
+            addToSelectedItems({ type: 'video_frame', item: { ...frame, is_selected: true } });
           }}
           onAddToStash={(frame) => {
-            addToSelectedItems({ type: 'frame', item: { ...frame, is_selected: true } });
+            addToSelectedItems({ type: 'video_frame', item: { ...frame, is_selected: true } });
           }}
           capturedFrames={currentVideoFrames}
           loadedImages={loadedImages}
@@ -545,7 +571,7 @@ export default function PeriodSelectPage() {
   const completedCount = periods.filter(p => p.selected_photo_id).length;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-col">
       {/* ---- Top Toolbar ---- */}
       <div className="h-[52px] flex items-center justify-between px-5 border-b border-[#e8e6de] bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -590,6 +616,7 @@ export default function PeriodSelectPage() {
           periods={periods}
           currentPeriod={currentPeriod}
           onSelectPeriod={setCurrentPeriod}
+          periodStats={periodStats}
         />
 
         {/* ---- Add Period Form ---- */}
@@ -723,7 +750,7 @@ export default function PeriodSelectPage() {
                 <p>点击「扫描文件夹」导入视频，然后从中截取画面</p>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {currentVideos.map((video) => (
                   <div
                     key={video.id}

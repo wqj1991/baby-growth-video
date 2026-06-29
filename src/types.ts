@@ -1,43 +1,41 @@
-// 宝宝信息
+// ==================== 数据库模型 ====================
+
 export interface Baby {
   id: number;
   name: string;
   nickname?: string;
-  birth_date: string; // ISO date string
-  gender: 'boy' | 'girl' | 'unknown';
+  birth_date: string;
+  gender: string;
   avatar_path?: string;
   created_at: string;
   updated_at: string;
 }
 
-// 项目（每个宝宝可以有多个视频项目）
 export interface Project {
   id: number;
   baby_id: number;
   name: string;
   description?: string;
-  period_days: number; // 周期天数，默认7天
-  status: 'draft' | 'completed';
+  period_days: number;
+  status: string;
   output_path?: string;
   created_at: string;
   updated_at: string;
 }
 
-// 周期
 export interface Period {
   id: number;
   project_id: number;
-  name: string; // 周期名称，如"第1周"、"满月"、"百天"
+  name: string;
   start_date: string;
   end_date: string;
-  period_type: 'auto' | 'custom'; // 自动生成或自定义添加
+  period_type: string;
   sort_order: number;
-  selected_photo_id?: number; // 最终选中的照片
+  selected_photo_id?: number;
   created_at: string;
   updated_at: string;
 }
 
-// 照片
 export interface Photo {
   id: number;
   period_id: number;
@@ -46,42 +44,39 @@ export interface Photo {
   file_size: number;
   width: number;
   height: number;
-  taken_at?: string; // 拍摄时间
-  description?: string;
-  is_selected: boolean; // 是否被标记为候选
-  is_multi_selected: boolean; // 是否被选中用于拼图
-  is_final: boolean; // 是否最终选中
-  created_at: string;
-}
-
-// 视频
-export interface Video {
-  id: number;
-  period_id: number;
-  file_path: string;
-  file_name: string;
-  file_size: number;
-  duration: number; // 时长（秒）
-  width: number;
-  height: number;
   taken_at?: string;
-  created_at: string;
-}
-
-// 视频截图
-export interface VideoFrame {
-  id: number;
-  video_id: number;
-  period_id: number;
-  file_path: string; // 截图保存路径
-  time_seconds: number; // 在视频中的时间点
+  description?: string;
   is_selected: boolean;
   is_multi_selected: boolean;
   is_final: boolean;
   created_at: string;
 }
 
-// 导出记录
+export interface Video {
+  id: number;
+  period_id: number;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  duration: number;
+  width: number;
+  height: number;
+  taken_at?: string;
+  created_at: string;
+}
+
+export interface VideoFrame {
+  id: number;
+  video_id: number;
+  period_id: number;
+  file_path: string;
+  time_seconds: number;
+  is_selected: boolean;
+  is_multi_selected: boolean;
+  is_final: boolean;
+  created_at: string;
+}
+
 export interface ExportRecord {
   id: number;
   project_id: number;
@@ -90,12 +85,13 @@ export interface ExportRecord {
   file_size: number;
   duration: number;
   resolution: string;
-  status: 'success' | 'failed' | 'processing';
+  status: string;
   error_message?: string;
   created_at: string;
 }
 
-// 扫描结果
+// ==================== 扫描 ====================
+
 export interface ScanResult {
   photos: Photo[];
   videos: Video[];
@@ -113,54 +109,69 @@ export interface ScanResult {
   skipped_copy_failed_videos: number;
 }
 
-// 扫描日志
 export interface ScanLog {
   id: string;
-  level: 'success' | 'warn' | 'error' | 'info';
+  level: 'info' | 'warn' | 'error';
   message: string;
   timestamp: number;
   fileName?: string;
 }
 
-// 扫描日志文件（持久化格式）
 export interface ScanLogFile {
   project_id: number;
-  scanned_at: string; // ISO date string
+  scanned_at: string;
   folder_path: string;
   total_files: number;
-  logs: Array<Omit<ScanLog, 'id'>>;
+  logs: ScanLog[];
 }
 
-// 视频生成配置
+// ==================== 向导步骤 ====================
+
+export type WizardStep = 1 | 2 | 3 | 4 | 5;
+
+// ==================== 视频配置 ====================
+
 export interface VideoConfig {
   resolution: '720p' | '1080p' | '4k';
   fps: number;
-  photo_duration: number; // 每张照片显示时长（秒）
+  photo_duration: number;
   transition: 'none' | 'fade' | 'slide' | 'zoom';
-  transition_duration: number; // 转场时长（秒）
-  background_music?: string; // 背景音乐路径
+  transition_duration: number;
+  background_music?: string;
   output_format: 'mp4' | 'mov' | 'avi';
+  ai_enabled: boolean;
+  video_mode: 'standard' | 'agnes';
 }
 
-// ==================== 创建项目向导相关类型 ====================
+// ==================== Agnes 照片文字 ====================
 
-// 向导步骤类型
-export type WizardStep = 1 | 2 | 3 | 4 | 5;
-
-// 项目信息（向导步骤2使用）
-export interface ProjectInfo {
-  name: string;
-  description: string;
-  period_days: number;
-  include_special_dates: boolean;
+export interface PhotoText {
+  period_id: number;
+  text: string;
 }
 
-// 待选区项目（照片 + 视频帧）
-export type SelectableItem = 
-  | { type: 'photo'; item: Photo }
-  | { type: 'video_frame'; item: VideoFrame };
+// ==================== AI 设置 ====================
 
-// 周期统计信息
+export interface AiSettings {
+  provider: string;
+  api_endpoint: string;
+  api_key: string;
+  model: string;
+  enabled: boolean;
+  style_preset: string;
+  custom_prompt: string;
+  frame_duration: number;
+}
+
+// ==================== 选择 ====================
+
+export interface SelectableItem {
+  type: 'photo' | 'video_frame';
+  item: Photo | VideoFrame;
+}
+
+// ==================== 周期统计 ====================
+
 export interface PeriodStats {
   period_id: number;
   photo_count: number;

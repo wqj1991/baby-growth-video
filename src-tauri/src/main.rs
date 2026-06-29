@@ -3,6 +3,8 @@
 mod db;
 mod media;
 mod video;
+mod ai;
+mod agnes;
 
 use db::Database;
 use std::sync::{Arc, Mutex};
@@ -113,6 +115,12 @@ fn update_period(period: db::Period, state: State<AppState>) -> Result<db::Perio
 fn delete_period(period_id: i64, state: State<AppState>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.delete_period(period_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_period_stats(project_id: i64, state: State<AppState>) -> Result<Vec<db::PeriodStats>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_period_stats(project_id).map_err(|e| e.to_string())
 }
 
 // ==================== 照片相关 ====================
@@ -360,15 +368,31 @@ fn get_scan_log(project_id: i64) -> Result<Option<media::ScanLogFile>, String> {
 // ==================== 视频生成 ====================
 
 #[tauri::command]
-fn generate_growth_video(
+async fn generate_growth_video(
     project_id: i64,
     config: video::VideoConfig,
     output_path: String,
-    state: State<AppState>,
+    overall_prompt: Option<String>,
+    photo_texts: Option<Vec<video::PhotoText>>,
+    state: State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<db::ExportRecord, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    video::generate_growth_video(&db, project_id, &config, &output_path)
-        .map_err(|e| e.to_string())
+    let db = state.db.clone();
+
+    if config.video_mode == "agnes" {
+        video::generate_growth_video_agnes(
+            db,
+            project_id,
+            config,
+            overall_prompt.unwrap_or_default(),
+            photo_texts.unwrap_or_default(),
+            output_path,
+            app_handle,
+        )
+        .await
+    } else {
+        video::generate_growth_video_async(db, project_id, config, output_path, app_handle).await
+    }
 }
 
 #[tauri::command]
@@ -385,6 +409,42 @@ fn get_export_records(
 ) -> Result<Vec<db::ExportRecord>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.get_export_records(project_id).map_err(|e| e.to_string())
+}
+
+// ==================== 设置相关 ====================
+
+#[tauri::command]
+fn get_settings(state: State<AppState>) -> Result<std::collections::HashMap<String, String>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_all_settings().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_settings(
+    settings: std::collections::HashMap<String, String>,
+    state: State<AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    for (key, value) in settings.iter() {
+        db.set_setting(key, value).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn get_ai_settings(state: State<AppState>) -> Result<db::AiSettings, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_ai_settings().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn test_ai_connection(state: State<'_, AppState>) -> Result<String, String> {
+    let settings = {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        db.get_ai_settings().map_err(|e| e.to_string())?
+    };
+
+    ai::test_connection_async(&settings).await
 }
 
 // ==================== 图片加载 ====================
@@ -449,6 +509,7 @@ pub fn run() {
             create_period,
             update_period,
             delete_period,
+            get_period_stats,
             get_period_photos,
             update_photo,
             set_final_photo,
@@ -467,6 +528,10 @@ pub fn run() {
             get_generation_progress,
             get_export_records,
             get_image_base64,
+            get_settings,
+            save_settings,
+            get_ai_settings,
+            test_ai_connection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

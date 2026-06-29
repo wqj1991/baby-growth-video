@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem } from '../types';
+import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem, PeriodStats, AiSettings } from '../types';
 
 interface AppState {
   // 当前选中的宝宝
@@ -58,10 +58,27 @@ interface AppState {
   generationProgress: number;
   setGenerationProgress: (progress: number) => void;
 
+  generationStage: string;
+  setGenerationStage: (stage: string) => void;
+
+  generationMessage: string;
+  setGenerationMessage: (message: string) => void;
+
+  generationFallback: boolean;
+  setGenerationFallback: (fallback: boolean) => void;
+
+  fallbackReason: string;
+  setFallbackReason: (reason: string) => void;
+
   selectedItems: SelectableItem[];
   setSelectedItems: (items: SelectableItem[]) => void;
   addToSelectedItems: (item: SelectableItem) => void;
   removeFromSelectedItems: (item: SelectableItem) => void;
+
+  periodStats: Record<number, PeriodStats>;
+  setPeriodStats: (stats: PeriodStats[]) => void;
+  updatePeriodStat: (periodId: number, updates: Partial<PeriodStats>) => void;
+  resetPeriodStats: () => void;
 
   // 拼图工作区状态
   collageMode: boolean;
@@ -84,7 +101,22 @@ interface AppState {
   setCapturedFrame: (frame: VideoFrame | null) => void;
   showCaptureResult: boolean;
   setShowCaptureResult: (show: boolean) => void;
+
+  // AI 设置
+  aiSettings: AiSettings;
+  setAiSettings: (settings: Partial<AiSettings>) => void;
 }
+
+const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: 'siliconflow',
+  api_endpoint: 'https://api.siliconflow.cn/v1/images/generations',
+  api_key: '',
+  model: 'black-forest-labs/FLUX.1-schnell',
+  enabled: false,
+  style_preset: 'warm_glow',
+  custom_prompt: '',
+  frame_duration: 1.5,
+};
 
 export const useAppStore = create<AppState>((set) => ({
   currentBaby: null,
@@ -175,6 +207,18 @@ export const useAppStore = create<AppState>((set) => ({
   generationProgress: 0,
   setGenerationProgress: (progress) => set({ generationProgress: progress }),
 
+  generationStage: '',
+  setGenerationStage: (stage) => set({ generationStage: stage }),
+
+  generationMessage: '',
+  setGenerationMessage: (message) => set({ generationMessage: message }),
+
+  generationFallback: false,
+  setGenerationFallback: (fallback) => set({ generationFallback: fallback }),
+
+  fallbackReason: '',
+  setFallbackReason: (reason) => set({ fallbackReason: reason }),
+
   selectedItems: [],
   setSelectedItems: (items) => set({ selectedItems: items }),
   addToSelectedItems: (item) => set((state) => {
@@ -189,6 +233,24 @@ export const useAppStore = create<AppState>((set) => ({
       i => !(i.type === item.type && i.item.id === item.item.id)
     )
   })),
+
+  periodStats: {},
+  setPeriodStats: (stats) => set((state) => {
+    const newStats: Record<number, PeriodStats> = {};
+    stats.forEach(s => { newStats[s.period_id] = s; });
+    return { periodStats: { ...state.periodStats, ...newStats } };
+  }),
+  updatePeriodStat: (periodId, updates) => set((state) => {
+    const existing = state.periodStats[periodId];
+    if (!existing) return state;
+    return {
+      periodStats: {
+        ...state.periodStats,
+        [periodId]: { ...existing, ...updates }
+      }
+    };
+  }),
+  resetPeriodStats: () => set({ periodStats: {} }),
 
   // 拼图工作区状态
   collageMode: false,
@@ -211,4 +273,15 @@ export const useAppStore = create<AppState>((set) => ({
   setCapturedFrame: (frame) => set({ capturedFrame: frame }),
   showCaptureResult: false,
   setShowCaptureResult: (show) => set({ showCaptureResult: show }),
+
+  // AI 设置
+  aiSettings: { ...DEFAULT_AI_SETTINGS },
+  setAiSettings: (partial) =>
+    set((state) => ({ aiSettings: { ...state.aiSettings, ...partial } })),
 }));
+
+/** 检查 AI 是否已配置完整 */
+export function isAiConfigured(): boolean {
+  const s = useAppStore.getState().aiSettings;
+  return s.enabled && !!s.api_key && !!s.api_endpoint && !!s.model;
+}

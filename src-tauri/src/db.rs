@@ -64,6 +64,15 @@ pub struct Period {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PeriodStats {
+    pub period_id: i64,
+    pub photo_count: i64,
+    pub video_count: i64,
+    pub pending_count: i64,
+    pub has_final: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NewPeriod {
     pub project_id: i64,
     pub name: String,
@@ -271,6 +280,16 @@ impl Database {
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
                 FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // 设置表 (key-value)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             )",
             [],
         )?;
@@ -507,6 +526,45 @@ impl Database {
             })
         })?;
         Ok(period)
+    }
+
+    pub fn get_period_stats(&self, project_id: i64) -> Result<Vec<PeriodStats>> {
+        let conn = self.get_conn();
+        let periods = self.get_periods(project_id)?;
+        let mut stats = Vec::with_capacity(periods.len());
+
+        for period in periods {
+            let photo_count: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM photos WHERE period_id = ?1",
+                params![period.id],
+                |row| row.get(0),
+            ).unwrap_or(0);
+
+            let video_count: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM videos WHERE period_id = ?1",
+                params![period.id],
+                |row| row.get(0),
+            ).unwrap_or(0);
+
+            let pending_count: i64 = conn.query_row(
+                "SELECT COALESCE((SELECT COUNT(*) FROM photos WHERE period_id = ?1 AND is_selected = 1), 0) +
+                        COALESCE((SELECT COUNT(*) FROM video_frames WHERE period_id = ?1 AND is_selected = 1), 0)",
+                params![period.id],
+                |row| row.get(0),
+            ).unwrap_or(0);
+
+            let has_final = period.selected_photo_id.is_some();
+
+            stats.push(PeriodStats {
+                period_id: period.id,
+                photo_count,
+                video_count,
+                pending_count,
+                has_final,
+            });
+        }
+
+        Ok(stats)
     }
 
     pub fn generate_periods(
@@ -1005,6 +1063,72 @@ impl Database {
             })
         })
     }
+
+    // ==================== 设置操作 ====================
+
+    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.get_conn();
+        let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+        let result = stmt.query_row(params![key], |row| row.get::<_, String>(0));
+        match result {
+            Ok(value) => Ok(Some(value)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.get_conn();
+        let now = Self::now();
+        conn.execute(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+            params![key, value, &now],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_all_settings(&self) -> Result<std::collections::HashMap<String, String>> {
+        let conn = self.get_conn();
+        let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        let mut map = std::collections::HashMap::new();
+        for row in rows {
+            let (k, v) = row?;
+            map.insert(k, v);
+        }
+        Ok(map)
+    }
+
+    pub fn get_ai_settings(&self) -> Result<AiSettings> {
+        let all = self.get_all_settings()?;
+        Ok(AiSettings {
+            provider: all.get("ai_provider").cloned().unwrap_or_else(|| "siliconflow".into()),
+            api_endpoint: all.get("ai_api_endpoint").cloned().unwrap_or_else(|| "https://api.siliconflow.cn/v1/images/generations".into()),
+            api_key: all.get("ai_api_key").cloned().unwrap_or_default(),
+            model: all.get("ai_model").cloned().unwrap_or_else(|| "black-forest-labs/FLUX.1-schnell".into()),
+            enabled: all.get("ai_enabled").map(|v| v == "true").unwrap_or(false),
+            style_preset: all.get("ai_style_preset").cloned().unwrap_or_else(|| "warm_glow".into()),
+            custom_prompt: all.get("ai_custom_prompt").cloned().unwrap_or_default(),
+            frame_duration: all.get("ai_frame_duration").and_then(|v| v.parse().ok()).unwrap_or(1.5),
+        })
+    }
+}
+
+// ==================== AI 设置结构体 ====================
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AiSettings {
+    pub provider: String,
+    pub api_endpoint: String,
+    pub api_key: String,
+    pub model: String,
+    pub enabled: bool,
+    pub style_preset: String,
+    pub custom_prompt: String,
+    pub frame_duration: f64,
 }
 
 // ==================== 辅助结构体 ====================

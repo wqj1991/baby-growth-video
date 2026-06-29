@@ -44,7 +44,7 @@ export default function ProjectOverviewPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="h-full overflow-y-auto p-8">
       {/* 基础信息卡片 */}
       <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-6 text-white mb-6">
         <div className="flex items-start justify-between">

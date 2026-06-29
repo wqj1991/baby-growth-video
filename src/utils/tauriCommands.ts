@@ -13,6 +13,9 @@ import type {
   ScanLog,
   ScanLogFile,
   VideoConfig,
+  AiSettings,
+  PeriodStats,
+  PhotoText,
 } from '../types';
 
 /**
@@ -113,6 +116,11 @@ export async function updatePeriod(period: Period): Promise<Period> {
 // 删除周期
 export async function deletePeriod(periodId: number): Promise<void> {
   return invoke('delete_period', { periodId });
+}
+
+// 获取周期统计信息
+export async function getPeriodStats(projectId: number): Promise<PeriodStats[]> {
+  return invoke('get_period_stats', { projectId });
 }
 
 // ==================== 照片相关 ====================
@@ -232,9 +240,17 @@ export async function getScanLog(
 export async function generateGrowthVideo(
   projectId: number,
   config: VideoConfig,
-  outputPath: string
+  outputPath: string,
+  overallPrompt?: string,
+  photoTexts?: PhotoText[],
 ): Promise<ExportRecord> {
-  return invoke('generate_growth_video', { projectId, config, outputPath });
+  return invoke('generate_growth_video', {
+    projectId,
+    config,
+    outputPath,
+    overallPrompt: overallPrompt || null,
+    photoTexts: photoTexts || null,
+  });
 }
 
 // 获取生成进度
@@ -281,4 +297,26 @@ export async function saveFile(defaultName: string): Promise<string | null> {
     defaultPath: defaultName,
   });
   return result;
+}
+
+// ==================== 设置相关 ====================
+
+// 获取所有设置
+export async function getSettings(): Promise<Record<string, string>> {
+  return invoke('get_settings');
+}
+
+// 保存设置 (批量)
+export async function saveSettings(settings: Record<string, string>): Promise<void> {
+  return invoke('save_settings', { settings });
+}
+
+// 获取 AI 设置
+export async function getAiSettings(): Promise<AiSettings> {
+  return invoke('get_ai_settings');
+}
+
+// 测试 AI 连接
+export async function testAiConnection(): Promise<string> {
+  return invoke('test_ai_connection');
 }

@@ -51,7 +51,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="h-full overflow-y-auto p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">历史记录</h1>
         <p className="text-gray-500 mt-1">查看所有已生成的视频记录</p>

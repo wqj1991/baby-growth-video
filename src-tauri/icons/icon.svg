@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF8F0"/>
+      <stop offset="100%" stop-color="#FFE8D6"/>
+    </linearGradient>
+    <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFE4D4"/>
+      <stop offset="100%" stop-color="#FFC9A8"/>
+    </linearGradient>
+    <linearGradient id="hairGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E8B86D"/>
+      <stop offset="100%" stop-color="#D49A4C"/>
+    </linearGradient>
+    <linearGradient id="wingGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F5F5F5"/>
+    </linearGradient>
+    <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E8E8E8"/>
+    </linearGradient>
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#FFA500"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="4" dy="8" stdDeviation="8" flood-color="#333" flood-opacity="0.1"/>
+    </filter>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="40" y="40" width="944" height="944" rx="200" fill="url(#bgGrad)"/>
+
+  <ellipse cx="512" cy="780" rx="380" ry="60" fill="#E0E0E0" opacity="0.3"/>
+
+  <g transform="translate(280, 280)">
+    <ellipse cx="232" cy="350" rx="220" ry="45" fill="url(#cloudGrad)" filter="url(#shadow)"/>
+    <ellipse cx="160" cy="340" rx="100" ry="35" fill="url(#cloudGrad)"/>
+    <ellipse cx="304" cy="340" rx="90" ry="32" fill="url(#cloudGrad)"/>
+    <ellipse cx="232" cy="325" rx="130" ry="30" fill="url(#cloudGrad)"/>
+  </g>
+
+  <g transform="translate(300, 200)">
+    <path d="M120 220 Q120 140 200 140 L300 140 Q380 140 380 220 Q380 280 300 320 L200 320 Q120 280 120 220" fill="url(#wingGrad)" opacity="0.9"/>
+    <path d="M140 230 Q140 160 200 160 L280 160 Q360 160 360 230 Q360 270 280 300 L200 300 Q140 270 140 230" fill="url(#wingGrad)"/>
+    <path d="M160 240 L200 180 L240 240" fill="none" stroke="#E0E0E0" stroke-width="1"/>
+    <path d="M180 250 L200 195 L220 250" fill="none" stroke="#E0E0E0" stroke-width="1"/>
+  </g>
+
+  <g transform="translate(520, 200)">
+    <path d="M120 220 Q120 140 200 140 L300 140 Q380 140 380 220 Q380 280 300 320 L200 320 Q120 280 120 220" fill="url(#wingGrad)" opacity="0.9"/>
+    <path d="M140 230 Q140 160 200 160 L280 160 Q360 160 360 230 Q360 270 280 300 L200 300 Q140 270 140 230" fill="url(#wingGrad)"/>
+    <path d="M160 240 L200 180 L240 240" fill="none" stroke="#E0E0E0" stroke-width="1"/>
+    <path d="M180 250 L200 195 L220 250" fill="none" stroke="#E0E0E0" stroke-width="1"/>
+  </g>
+
+  <g transform="translate(360, 280)" filter="url(#shadow)">
+    <circle cx="152" cy="140" r="110" fill="url(#skinGrad)"/>
+
+    <circle cx="120" cy="120" r="60" fill="url(#hairGrad)" opacity="0.9"/>
+    <circle cx="160" cy="100" r="55" fill="url(#hairGrad)" opacity="0.9"/>
+    <circle cx="190" cy="130" r="45" fill="url(#hairGrad)" opacity="0.9"/>
+
+    <ellipse cx="108" cy="75" rx="18" ry="25" fill="url(#hairGrad)"/>
+    <ellipse cx="196" cy="75" rx="18" ry="25" fill="url(#hairGrad)"/>
+
+    <ellipse cx="115" cy="135" rx="20" ry="24" fill="#FFFFFF"/>
+    <ellipse cx="189" cy="135" rx="20" ry="24" fill="#FFFFFF"/>
+    <circle cx="118" cy="138" r="14" fill="#3D2914"/>
+    <circle cx="192" cy="138" r="14" fill="#3D2914"/>
+    <circle cx="122" cy="134" r="5" fill="#FFFFFF"/>
+    <circle cx="196" cy="134" r="5" fill="#FFFFFF"/>
+
+    <ellipse cx="85" cy="160" rx="18" ry="12" fill="#FFB6C1" opacity="0.6"/>
+    <ellipse cx="219" cy="160" rx="18" ry="12" fill="#FFB6C1" opacity="0.6"/>
+
+    <ellipse cx="152" cy="165" rx="22" ry="18" fill="#FFDAB9"/>
+
+    <path d="M130 195 Q152 215 174 195" fill="none" stroke="#E89B8A" stroke-width="4" stroke-linecap="round"/>
+
+    <ellipse cx="75" cy="140" rx="18" ry="22" fill="url(#skinGrad)"/>
+    <ellipse cx="229" cy="140" rx="18" ry="22" fill="url(#skinGrad)"/>
+  </g>
+
+  <g transform="translate(360, 400)" filter="url(#shadow)">
+    <ellipse cx="152" cy="80" rx="90" ry="70" fill="url(#skinGrad)"/>
+
+    <path d="M80 80 L80 200 Q80 220 100 230 L140 230" fill="url(#skinGrad)"/>
+    <path d="M224 80 L224 200 Q224 220 204 230 L164 230" fill="url(#skinGrad)"/>
+
+    <circle cx="105" cy="245" r="32" fill="url(#skinGrad)"/>
+    <circle cx="199" cy="245" r="32" fill="url(#skinGrad)"/>
+    <path d="M95 250 L105 255 L115 248 L125 255 L135 248" fill="none" stroke="#FFB6C1" stroke-width="2" stroke-linecap="round"/>
+    <path d="M189 250 L199 255 L209 248 L219 255 L229 248" fill="none" stroke="#FFB6C1" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(395, 430)">
+    <path d="M60 40 Q60 80 100 100 L180 100 Q220 80 220 40 Q220 0 140 0 L80 0 Q60 0 60 40" fill="#FFFFFF"/>
+    <ellipse cx="140" cy="50" rx="70" ry="35" fill="#FFF5EE"/>
+    <path d="M90 45 L90 70 L190 70 L190 45" fill="none" stroke="#E8E8E8" stroke-width="2"/>
+  </g>
+
+  <g filter="url(#glow)">
+    <polygon points="720,180 728,200 748,200 732,212 740,232 720,220 700,232 708,212 692,200 712,200" fill="url(#starGrad)"/>
+    <polygon points="780,250 785,262 798,262 788,270 792,283 780,275 768,283 772,270 762,262 775,262" fill="url(#starGrad)"/>
+    <polygon points="220,180 228,200 248,200 232,212 240,232 220,220 200,232 208,212 192,200 212,200" fill="url(#starGrad)"/>
+    <polygon points="260,260 264,270 274,270 266,276 268,286 260,280 252,286 254,276 246,270 256,270" fill="url(#starGrad)" opacity="0.8"/>
+  </g>
+
+  <circle cx="740" cy="700" r="40" fill="#FFF8DC" opacity="0.4"/>
+  <circle cx="760" cy="680" r="30" fill="#FFF8DC" opacity="0.3"/>
+</svg>

@@ -19,6 +19,8 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2.3"
 image = "0.24"
+imageproc = "0.23"
+rusttype = "0.9"
 uuid = { version = "1.0", features = ["v4"] }
 regex = "1.10"
 dirs-next = "2.0"
@@ -26,6 +28,7 @@ lazy_static = "1.4"
 rayon = "1.8"
 urlencoding = "2.1"
 base64 = "0.22"
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "blocking"], default-features = false }
 
 [features]
 default = ["custom-protocol"]

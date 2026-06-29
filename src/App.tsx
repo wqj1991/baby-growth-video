@@ -9,6 +9,7 @@ import VideoGeneratePage from './pages/VideoGeneratePage';
 import HistoryPage from './pages/HistoryPage';
 import CreateProjectPage from './pages/CreateProjectPage';
 import ProjectOverviewPage from './pages/ProjectOverviewPage';
+import SettingsPage from './pages/SettingsPage';
 import { initDatabase } from './utils/tauriCommands';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
         <Route path="baby-setup" element={<BabySetupPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         <Route path="project/:projectId" element={<ProjectPage />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<ProjectOverviewPage />} />
