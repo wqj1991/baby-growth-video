@@ -75,7 +75,7 @@ export default function PeriodSelectPage() {
   const [showAddPeriod, setShowAddPeriod] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newPeriodDate, setNewPeriodDate] = useState('');
-  const [selectedTab, setSelectedTab] = useState<'photos' | 'pending' | 'videos'>('photos');
+  const [selectedTab, setSelectedTab] = useState<'photos' | 'pending' | 'videos'>('pending');
   const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
   const loadedImageIds = useRef<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
@@ -242,8 +242,10 @@ export default function PeriodSelectPage() {
 
       const pendingPhotos: SelectableItem[] = photos
         .filter(p => p.is_selected)
-        .map(p => ({ type: 'photo' as const, item: p }));
+        .map(p => ({ type: 'photo' as const, item: { ...p, is_multi_selected: false } }));
       if (pendingPhotos.length > 0) setSelectedItems(pendingPhotos);
+      
+      setSelectedTab('pending');
     } catch (error) { console.error('加载周期媒体失败:', error); }
   };
 
@@ -293,12 +295,14 @@ export default function PeriodSelectPage() {
 
   const handleTogglePhotoSelect = async (photo: Photo) => {
     try {
-      const updated = await updatePhoto({ ...photo, is_selected: !photo.is_selected });
-      setCurrentPhotos(currentPhotos.map(p => p.id === updated.id ? updated : p));
-      if (updated.is_selected) {
-        addToSelectedItems({ type: 'photo', item: updated });
+      const newSelected = !photo.is_selected;
+      const updated = await updatePhoto({ ...photo, is_selected: newSelected });
+      const localUpdated = { ...updated, is_multi_selected: newSelected ? photo.is_multi_selected : false };
+      setCurrentPhotos(currentPhotos.map(p => p.id === updated.id ? localUpdated : p));
+      if (newSelected) {
+        addToSelectedItems({ type: 'photo', item: localUpdated });
       } else {
-        removeFromSelectedItems({ type: 'photo', item: updated });
+        removeFromSelectedItems({ type: 'photo', item: localUpdated });
       }
     } catch (error) { console.error('更新照片失败:', error); }
   };
@@ -353,12 +357,14 @@ export default function PeriodSelectPage() {
 
   const handleToggleFrameSelect = async (frame: VideoFrame) => {
     try {
-      const updated = await updateVideoFrame({ ...frame, is_selected: !frame.is_selected });
-      setCurrentVideoFrames(currentVideoFrames.map(f => f.id === updated.id ? updated : f));
-      if (updated.is_selected) {
-        addToSelectedItems({ type: 'frame', item: updated });
+      const newSelected = !frame.is_selected;
+      const updated = await updateVideoFrame({ ...frame, is_selected: newSelected });
+      const localUpdated = { ...updated, is_multi_selected: newSelected ? frame.is_multi_selected : false };
+      setCurrentVideoFrames(currentVideoFrames.map(f => f.id === updated.id ? localUpdated : f));
+      if (newSelected) {
+        addToSelectedItems({ type: 'frame', item: localUpdated });
       } else {
-        removeFromSelectedItems({ type: 'frame', item: updated });
+        removeFromSelectedItems({ type: 'frame', item: localUpdated });
       }
     } catch (error) { console.error('更新视频帧失败:', error); }
   };
@@ -421,9 +427,23 @@ export default function PeriodSelectPage() {
 
   const handleToggleMultiSelect = (item: SelectableItem) => {
     if (item.type === 'photo') {
-      handleTogglePhotoSelect(item.item as Photo);
+      const photo = item.item as Photo;
+      const updated = { ...photo, is_multi_selected: !photo.is_multi_selected };
+      setCurrentPhotos(currentPhotos.map(p => p.id === photo.id ? updated : p));
+      setSelectedItems(selectedItems.map(i => 
+        i.type === 'photo' && i.item.id === photo.id 
+          ? { type: 'photo' as const, item: updated } 
+          : i
+      ));
     } else {
-      handleToggleFrameSelect(item.item as VideoFrame);
+      const frame = item.item as VideoFrame;
+      const updated = { ...frame, is_multi_selected: !frame.is_multi_selected };
+      setCurrentVideoFrames(currentVideoFrames.map(f => f.id === frame.id ? updated : f));
+      setSelectedItems(selectedItems.map(i => 
+        i.type === 'frame' && i.item.id === frame.id 
+          ? { type: 'frame' as const, item: updated } 
+          : i
+      ));
     }
   };
 
@@ -445,10 +465,10 @@ export default function PeriodSelectPage() {
 
   const handleEnterCollage = () => {
     // Auto-recommend layout based on count
-    const count = selectedItems.filter(i => i.item.is_selected).length;
+    const count = selectedItems.filter(i => i.item.is_multi_selected).length;
     const layoutMap: Record<number, string> = { 2: '2up', 3: '3up-main', 4: '4grid' };
     setCollageLayout(layoutMap[count] || '4grid');
-    setCollagePhotoOrder(selectedItems.filter(i => i.item.is_selected).map((_, i) => i));
+    setCollagePhotoOrder(selectedItems.filter(i => i.item.is_multi_selected).map((_, i) => i));
     setCollageMode(true);
   };
 
@@ -486,7 +506,7 @@ export default function PeriodSelectPage() {
     return (
       <div className="flex h-full flex-col">
         <CollageWorkspace
-          selectedItems={selectedItems.filter(i => i.item.is_selected)}
+          selectedItems={selectedItems.filter(i => i.item.is_multi_selected)}
           loadedImages={loadedImages}
           onBack={handleExitCollage}
           onGenerate={handleGenerateCollage}
@@ -608,6 +628,14 @@ export default function PeriodSelectPage() {
         {/* ---- Tab Bar ---- */}
         <div className="tab-bar-v2">
           <button
+            onClick={() => { setSelectedTab('pending'); handleCloseContextMenu(); }}
+            className={`tab-item-v2 ${selectedTab === 'pending' ? 'active' : ''}`}
+          >
+            <Plus className="w-4 h-4" />
+            待选区
+            <span className="tab-count-v2 stash">{selectedItems.length}</span>
+          </button>
+          <button
             onClick={() => { setSelectedTab('photos'); handleCloseContextMenu(); }}
             className={`tab-item-v2 ${selectedTab === 'photos' ? 'active' : ''}`}
           >
@@ -622,14 +650,6 @@ export default function PeriodSelectPage() {
             <VideoIcon className="w-4 h-4" />
             视频
             <span className="tab-count-v2 video">{currentVideos.length}</span>
-          </button>
-          <button
-            onClick={() => { setSelectedTab('pending'); handleCloseContextMenu(); }}
-            className={`tab-item-v2 ${selectedTab === 'pending' ? 'active' : ''}`}
-          >
-            <Plus className="w-4 h-4" />
-            待选区
-            <span className="tab-count-v2 stash">{selectedItems.length}</span>
           </button>
         </div>
       </div>
@@ -663,18 +683,19 @@ export default function PeriodSelectPage() {
                     )}
                   </span>
                 </div>
-                <div ref={gridWrapperRef} className="flex-1 overflow-y-auto px-5 pb-5">
+                <div 
+                  ref={gridWrapperRef} 
+                  className="flex-1 overflow-y-auto px-5 pb-5"
+                >
                   <VirtualPhotoGrid
                     photos={currentPhotos}
                     loadedImages={loadedImages}
-                    parentRef={gridWrapperRef}
                     onContextMenu={handlePhotoContextMenu}
                     onDoubleClick={(photo) => {
                       const index = currentPhotos.findIndex(p => p.id === photo.id);
                       if (index !== -1) handleOpenPreview(index);
                     }}
                     onOpenPreview={handleOpenPreview}
-                    className="w-full"
                   />
                 </div>
               </>

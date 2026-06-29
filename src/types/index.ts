@@ -49,6 +49,7 @@ export interface Photo {
   taken_at?: string; // 拍摄时间
   description?: string;
   is_selected: boolean; // 是否被标记为候选
+  is_multi_selected: boolean; // 是否被选中用于拼图
   is_final: boolean; // 是否最终选中
   created_at: string;
 }
@@ -75,6 +76,7 @@ export interface VideoFrame {
   file_path: string; // 截图保存路径
   time_seconds: number; // 在视频中的时间点
   is_selected: boolean;
+  is_multi_selected: boolean;
   is_final: boolean;
   created_at: string;
 }

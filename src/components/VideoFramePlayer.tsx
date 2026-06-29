@@ -68,6 +68,7 @@ export default function VideoFramePlayer({
       file_path: '',
       time_seconds: (video.duration * progress) / 100,
       is_selected: false,
+      is_multi_selected: false,
       is_final: false,
       created_at: new Date().toISOString(),
     };

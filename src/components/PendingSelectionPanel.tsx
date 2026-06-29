@@ -23,8 +23,8 @@ export default function PendingSelectionPanel({
   onGenerateCollage,
 }: PendingSelectionPanelProps) {
   const multiSelectedCount = selectedItems.filter((item) => {
-    if (item.type === 'photo') return item.item.is_selected;
-    return item.item.is_selected;
+    if (item.type === 'photo') return item.item.is_multi_selected;
+    return item.item.is_multi_selected;
   }).length;
 
   const canCollage = multiSelectedCount >= 2 && multiSelectedCount <= 4;
@@ -46,7 +46,7 @@ export default function PendingSelectionPanel({
   };
 
   const isItemSelected = (item: SelectableItem): boolean => {
-    return item.item.is_selected;
+    return item.item.is_multi_selected;
   };
 
   return (
