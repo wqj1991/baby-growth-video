@@ -22,6 +22,9 @@ interface CreateProjectState {
   scanResult: ScanResult | null;
   isScanning: boolean;
 
+  // 扫描进度
+  scanProgress: { processed: number; total: number } | null;
+
   // 扫描日志
   scanLogs: ScanLog[];
   isLogExpanded: boolean;
@@ -65,6 +68,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   folderPath: null,
   scanResult: null,
   isScanning: false,
+  scanProgress: null,
   scanLogs: [],
   isLogExpanded: false,
   autoScrollLog: true,
@@ -86,6 +90,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   setProjectId: (id) => set({ projectId: id }),
 
   setFolderPath: (path) => set({ folderPath: path }),
+  setScanProgress: (progress) => set({ scanProgress: progress }),
 
   setScanResult: (result) => set({ scanResult: result }),
 
@@ -149,6 +154,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
       folderPath: null,
       scanResult: null,
       isScanning: false,
+      scanProgress: null,
       scanLogs: [],
       isLogExpanded: false,
       autoScrollLog: true,

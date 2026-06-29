@@ -11,6 +11,7 @@ export default function Step3SelectFolder() {
     folderPath,
     scanResult,
     isScanning,
+    scanProgress,
     projectId,
     scanLogs,
     isLogExpanded,
@@ -18,6 +19,7 @@ export default function Step3SelectFolder() {
     setFolderPath,
     setScanResult,
     setIsScanning,
+    setScanProgress,
     addScanLog,
     addScanLogs,
     clearScanLogs,
@@ -63,11 +65,19 @@ export default function Step3SelectFolder() {
     clearScanLogs();
     try {
       const unlisten = await onScanLog((log) => {
+        // 解析进度日志: "已处理 X/Y"
+        const progressMatch = log.message.match(/已处理\s*(\d+)\/(\d+)/);
+        if (progressMatch) {
+          const processed = parseInt(progressMatch[1], 10);
+          const total = parseInt(progressMatch[2], 10);
+          setScanProgress({ processed, total });
+        }
         enqueueLog(log);
       });
       unlistenScanLogRef.current = unlisten;
       const result: ScanResult = await scanMediaFolder(projectId || 0, folderPath);
       setScanResult(result);
+      setScanProgress(null);  // 扫描完成,清除进度
     } catch (error) {
       console.error('扫描失败:', error);
       alert('扫描文件夹失败，请重试');
@@ -195,6 +205,7 @@ export default function Step3SelectFolder() {
             autoScroll={autoScrollLog}
             onToggleAutoScroll={toggleAutoScrollLog}
             onDownload={handleDownloadLog}
+            progress={scanProgress}
           />
         </div>
       )}

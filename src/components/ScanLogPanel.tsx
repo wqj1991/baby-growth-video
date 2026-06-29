@@ -19,6 +19,8 @@ interface ScanLogPanelProps {
   autoScroll: boolean;
   onToggleAutoScroll: () => void;
   onDownload?: () => void;
+  /** 可选: 扫描进度计数器 (已处理/总数) */
+  progress?: { processed: number; total: number };
 }
 
 const levelConfig = {
@@ -53,6 +55,7 @@ export default function ScanLogPanel({
   autoScroll,
   onToggleAutoScroll,
   onDownload,
+  progress,
 }: ScanLogPanelProps) {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<LogLevel | 'all'>('all');
@@ -182,12 +185,19 @@ export default function ScanLogPanel({
         )}
       </div>
 
-      {/* 底部展开/收起按钮 */}
+      {/* 底部 */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-200">
-        <span className="text-xs text-gray-500">
-          共 {logs.length} 条日志
-          {filter !== 'all' && ` (显示 ${filteredLogs.length} 条)`}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-500">
+            共 {logs.length} 条日志
+            {filter !== 'all' && ` (显示 ${filteredLogs.length} 条)`}
+          </span>
+          {progress && (
+            <span className="text-xs font-mono text-primary-600">
+              处理中: {progress.processed}/{progress.total}
+            </span>
+          )}
+        </div>
         <button
           onClick={onToggleExpand}
           className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"

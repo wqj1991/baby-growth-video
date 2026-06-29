@@ -389,3 +389,668 @@ P2 (高级特性)
 3. **本月**: 重构 db.rs 为分层架构 (repository 模式)，单文件拆分
 4. **下版本**: 引入虚拟滚动 + 缩略图缓存，解决大图内存问题
 5. **长期**: 考虑迁移到 libheif 完整支持 iOS 照片格式
+
+---
+
+## 九、六大难点详细设计方案
+
+### 难点 1: 大规模文件扫描并行化
+
+#### 问题分析
+
+当前 `scan_media_folder` 使用 `WalkDir::new(folder).into_iter().filter_map(|e| e.ok())` 单线程遍历。面对一个含 50,000 张照片的文件夹,每条文件需要:
+1. 路径检查 (`is_file()`)
+2. 扩展名匹配（6 种图片格式 + 9 种视频格式的逐一遍历）
+3. 正则提取日期
+4. 文件 IO 读取尺寸（JPEG/PNG/WebP/GIF/BMP 各一个文件头解析）
+5. `fs::copy`（64KB buffer 顺序写入）
+6. `HashSet::contains` 查重
+
+总计 50,000 次串行 IO 操作,保守估计耗时 5-10 分钟。
+
+#### 选定方案: rayon + par_bridge (v1.0)
+
+基于用户投票结果,采用以下方案:
+- **并行化**: rayon 线程池,在 WalkDir 上使用 `par_bridge()` 并行处理
+- **视频信息**: 保持现有 ffprobe 方式
+- **进度反馈**: 每处理 50 个文件上报一次
+
+#### 详细实现
+
+```
+Rust 后端改动:
+
+1. Cargo.toml 新增 cfg-if 依赖（用于条件编译）
+   cfg-if = "1.0"
+
+2. scan_media_folder 重构:
+   
+   Phase 1 (现有): 单线程扫描,收集所有元数据
+     - 扩展名匹配 → 用 HashSet::from(...) 替代数组遍历
+     - 正则提取日期 (不变)
+     - 文件尺寸解析 (不变)
+     - 复制文件 (不变)
+     - 查重 (不变)
+   
+   Phase 2: 并行化处理
+     将 walkdir 迭代改为:
+       WalkDir::new(folder)
+         .into_iter()
+         .par_bridge()
+         .filter_map(process_entry)  // 每个文件独立处理
+     process_entry 是纯函数,无共享状态
+   
+   Phase 3: 并行进度上报
+     每 batch_size (默认 50) 个文件处理完,emit 一次进度
+     用 channel 收集每个 thread 的结果,最后 merge
+
+前端改动:
+- scan_media_folder Tauri command 加 emit_scan_progress 事件
+- 前端 ScanLogPanel 增加"已处理 X/Y 文件"计数器
+- 日志面板增加"取消"按钮,通过 AtomicBool 传递
+
+性能目标:
+  1000 文件: ~5s (vs 当前 ~30s) → 6x 提升
+  10000 文件: ~30s (vs 当前 ~5min) → 10x 提升
+  50000 文件: ~2min (vs 当前 ~25min) → 12x 提升
+```
+
+#### 预期收益与风险
+
+| 指标 | 当前 | 改造后 | 提升 |
+|------|------|--------|------|
+| 1000 文件扫描 | ~30s | ~5s | 6x |
+| 10000 文件扫描 | ~5min | ~30s | 10x |
+| 50000 文件扫描 | ~25min | ~2min | 12x |
+
+**代价与风险:**
+- **并行 IO 竞争**: NVMe SSD 影响不大,HDD 上可能更慢。增加 `batch_size` 配置降低并行度可缓解
+- **取消语义**: 用 `AtomicBool` + rayon `Interrupt` trait 实现优雅取消
+- **测试复杂度**: 并行代码单元测试用 `rayon::current_num_threads()` 固定线程数
+
+### 难点 2: 图片内存管理虚拟滚动方案
+
+#### 问题分析
+
+当前流程：用户在 `PeriodSelectPage` 选择一个周期 → 加载该周期所有照片 → `tauriCommands.getImageBase64()` 转为 base64 → 存入 Zustand `loadedImages` → 渲染到 `<img>` 标签。
+
+假设一个周期有 500 张照片，平均每张 5MB（iPhone 原图）：
+- 原始文件大小: 500 × 5MB = 2.5GB
+- base64 膨胀后: 2.5GB × 1.33 = 3.3GB
+- 即使分批加载，Zustand 缓存也始终持有 5 张 × 5MB × 1.33 = 33MB 的 base64 数据
+
+但实际问题是：**base64 data URL 本身就有开销** — 浏览器需要将 string 解析为 image binary 再渲染。5MB 原图 → 6.7MB base64 string → 6.7MB decoded → 渲染。这个过程中内存峰值可达 20MB/张。
+
+#### 详细设计方案
+
+```
+方案 A: 虚拟滚动 + 按需加载（推荐）
+
+使用 react-window 的 FixedSizeList 替代普通 div 列表:
+
+import { FixedSizeList } from 'react-window';
+
+<FixedSizeList
+  height={400}
+  itemCount={filteredPhotos.length}
+  itemSize={180}  // 每张图片卡片高度
+  width="100%"
+>
+  {({ index, style }) => (
+    <div style={style}>
+      <PhotoCard
+        photo={photos[index]}
+        imageUrl={getOptimizedUrl(photos[index])}
+      />
+    </div>
+  )}
+</FixedSizeList>
+
+getOptimizedUrl 策略:
+- 如果照片 < 2MB: 走现有 base64 流程
+- 如果照片 2-5MB: 缩略图预处理 → resize 到宽 800px → JPEG quality 85
+- 如果照片 > 5MB: 仅显示占位符 + 点击后再加载
+
+具体实现:
+
+// Rust 新增 Tauri Command
+#[tauri::command]
+async fn get_thumbnail(
+  file_path: String,
+  max_width: i32,
+  quality: i32,
+) -> Result<String, String> {
+  // 使用 image crate resize + jpeg encode
+  // 或直接调用 ffmpeg thumbnail
+  use image::load_with_format(...)
+    .resize(max_width, max_width * ratio, ImageFilters::Nearest)
+    .to_rgba8()
+    .save_with_format(...)
+}
+
+// 前端缩略图缓存
+const thumbnailCache = new Map<string, string>();
+const MAX_CACHE_SIZE = 20;
+
+function getOrGenerateThumbnail(photo) {
+  if (thumbnailCache.has(photo.file_path)) {
+    return thumbnailCache.get(photo.file_path);
+  }
+  // 异步生成
+  return tauriCommands.getThumbnail(photo.file_path, 400, 85)
+    .then(url => {
+      if (thumbnailCache.size >= MAX_CACHE_SIZE) {
+        const firstKey = thumbnailCache.keys().next().value;
+        URL.revokeObjectURL(firstKey);
+        thumbnailCache.delete(firstKey);
+      }
+      thumbnailCache.set(photo.file_path, url);
+      return url;
+    });
+}
+
+
+方案 B: Tauri Asset Protocol（备选）
+
+不使用 base64，而是将项目目录注册为 Tauri 静态资源路径:
+
+// tauri.conf.json
+{
+  "bundle": {
+    "resources": ["./data/projects/*"]
+  },
+  "allowlist": {
+    "fs": {
+      "scope": [
+        "$DATA/projects/*/photos/*"
+      ]
+    }
+  }
+}
+
+// 前端直接使用:
+<img src={`asset:/projects/${projectId}/photos/${uuid}_filename.jpg`} />
+
+优势: 零内存开销，浏览器直接读取文件
+劣势: Tauri 2.0 的 asset protocol 配置复杂，需要额外安全配置
+```
+
+#### 内存占用对比
+
+| 方案 | 500 张照片周期 | 内存峰值 | 加载速度 |
+|------|---------------|---------|---------|
+| 当前 (base64 全量) | 全部加载 | 3.3GB+ | 很慢 |
+| 当前 (分批 5 张) | 只显示 5 张 | ~33MB | 可接受 |
+| 方案 A: 虚拟滚动 + 20 张缓存 | 视口内可见 | ~150MB | 更快 |
+| 方案 B: Asset Protocol | 所有照片 lazy-load | ~50MB | 最快 |
+
+#### 实施计划
+
+1. 优先做方案 A（改动小，效果立竿见影）
+2. 中期评估是否需要方案 B（取决于性能监测数据）
+3. 同时加入图片加载错误边界 — 加载失败的图片显示占位图而非崩溃
+
+### 难点 3: 视频生成异步化详细设计
+
+这是最关键的 P0 难题。当前代码是同步阻塞的，需要完整重构。
+
+#### 当前问题链路
+
+```
+前端: generateGrowthVideo(config) → 模拟 setTimeout → 假进度条
+      ↓
+Rust: #[tauri::command] fn generate_growth_video(...) 
+      → video::generate_growth_video()
+      → Command::new("ffmpeg").args(...).status()  // 同步等待！
+      → 前端完全不知道进度
+```
+
+#### 详细设计方案
+
+```
+架构变更: 从同步调用 → 异步任务队列 + 事件推送
+
+===== Rust 后端改动 =====
+
+1. 添加任务管理器模块 video/task_manager.rs
+
+use std::sync::{Arc, Mutex};
+use tokio::task::JoinHandle;
+use tokio::sync::broadcast;
+
+struct VideoGenerationTask {
+    handle: JoinHandle<Result<ExportRecord, String>>,
+    progress_tx: broadcast::Sender<i32>,
+    task_id: String,
+    status: TaskStatus,  // Pending, Running, Success, Failed
+}
+
+enum TaskStatus {
+    Pending,
+    Running,
+    Success(ExportRecord),
+    Failed(String),
+}
+
+struct TaskManager {
+    tasks: Mutex<HashMap<String, VideoGenerationTask>>,
+}
+
+impl TaskManager {
+    async fn submit_task(
+        &self,
+        project_id: i64,
+        config: VideoConfig,
+        output_path: String,
+        progress_rx: broadcast::Receiver<i32>,
+    ) -> String {
+        let task_id = uuid::Uuid::new_v4().to_string();
+        let (tx, _) = broadcast::channel(32);  // 进度缓冲区
+
+        let handle = tokio::spawn(async move {
+            // 实际调用 video::generate_growth_video_async
+            let record = generate_growth_video_async(
+                &db, project_id, &config, &output_path, tx.clone(),
+            ).await?;
+            ExportRecord { id: task_id.parse()?, ..., status: "success".into() }
+        });
+
+        // 存储任务
+        self.tasks.lock().unwrap().insert(task_id, VideoGenerationTask {
+            handle, progress_tx: tx, task_id: task_id.clone(), status: TaskStatus::Pending,
+        });
+
+        // 订阅进度
+        progress_rx  // 返回给调用者
+        task_id  // 返回给前端
+    }
+}
+
+2. FFmpeg 异步执行: video/generation.rs
+
+pub async fn generate_growth_video_async(
+    db: &Database,
+    project_id: i64,
+    config: &VideoConfig,
+    output_path: &str,
+    progress_tx: broadcast::Sender<i32>,
+) -> Result<ExportRecord, String> {
+    let photos = get_final_photos_for_project(db, project_id)?;
+    
+    let ffmpeg_args = generate_ffmpeg_command(&photos, config, output_path);
+
+    // 关键: 使用 tokio::process::Command 代替 std::process::Command
+    let mut child = tokio::process::Command::new(get_ffmpeg_path())
+        .args(&ffmpeg_args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("FFmpeg启动失败: {}", e))?;
+
+    // 解析 stderr 获取实时进度
+    if let Some(ref mut stderr) = child.stderr {
+        let reader = stderr.try_clone().unwrap();
+        let progress_handle = tokio::spawn(async move {
+            let mut buf_reader = BufReader::new(reader);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match buf_reader.read_line(&mut line) {
+                    Ok(0) => break,  // EOF
+                    Ok(_) => {
+                        // 解析 "time=00:01:23.45 fps=30.0 speed=2.5x" 格式
+                        if let Some(time_str) = parse_ffmpeg_time(&line) {
+                            let progress = calc_progress(time_str, total_duration);
+                            let _ = progress_tx.send(progress);
+                        }
+                    }
+                    Err(e) => break,
+                }
+            }
+        });
+
+        let status = child.wait().await?;
+        progress_handle.abort();
+
+        if status.success() {
+            // 更新数据库
+            Ok(record)
+        } else {
+            Err("FFmpeg 返回非零退出码".into())
+        }
+    }
+}
+
+3. Tauri 命令变更
+
+#[tauri::command]
+async fn start_video_generation(
+    project_id: i64,
+    config: VideoConfig,
+    output_path: String,
+    state: State<AppState>,
+) -> Result<String, String> {  // 返回 task_id
+    let progress_rx = task_manager.submit_task(project_id, config, output_path).await?;
+    Ok(task_id)
+}
+
+#[tauri::command]
+fn listen_video_progress(
+    task_id: String,
+    state: State<AppState>,
+) -> Result<broadcast::Receiver<i32>, String> {
+    // 注意: Tauri 2.0 不直接支持返回 broadcast::Receiver
+    // 需要用 tauri::Emitter 的 emit 替代
+    Ok(task_manager.get_progress_channel(&task_id)?.subscribe())
+}
+
+===== 前端改动 =====
+
+// VideoGeneratePage.tsx 改造
+
+const handleGenerate = async () => {
+  // 1. 提交生成任务
+  const taskId = await generateGrowthVideo(projectId, config, outputPath);
+  
+  // 2. 监听进度事件
+  const unlisten = await listen('video://progress', (event: Payload) => {
+    const { task_id, progress } = event.payload;
+    if (task_id === taskId) {
+      setGenerationProgress(progress);
+    }
+  });
+  
+  // 3. 轮询完成状态（Tauri 2.0 不支持直接返回 Receiver，用 polling 替代）
+  const checkCompletion = setInterval(async () => {
+    const status = await getGenerationStatus(taskId);
+    if (status === 'success') {
+      clearInterval(checkCompletion);
+      unlisten();
+      setGenerationProgress(100);
+      alert('视频生成完成！');
+    } else if (status === 'failed') {
+      clearInterval(checkCompletion);
+      unlisten();
+      alert('视频生成失败');
+    }
+  }, 1000);
+};
+
+
+==== 替代方案: 使用 Tauri 事件系统（更简单，推荐） ====
+
+因为 Tauri 2.0 不支持返回 Channel 类型，最简单的方案是:
+
+// Rust: 直接用 window.emit 推送到前端
+pub async fn generate_growth_video_async(
+    db: &Database,
+    project_id: i64,
+    config: &VideoConfig,
+    output_path: &str,
+    window: tauri::Window,
+) -> Result<ExportRecord, String> {
+    let mut child = tokio::process::Command::new(ffmpeg_path)
+        .args(args)
+        .stderr(std::process::Stdio::piped())
+        .spawn()?;
+
+    if let Some(ref mut stderr) = child.stderr {
+        // 实时解析并 emit
+        let reader = BufReader::new(stderr.try_clone().unwrap());
+        for line in reader.lines() {
+            let line = line?;
+            if line.contains("time=") {
+                let progress = calc_progress_from_line(&line);
+                let _ = window.emit("video://progress", ProgressEvent { progress });
+            }
+        }
+    }
+
+    child.wait().await?
+}
+
+// 前端:
+useEffect(() => {
+  const unlisten = listen<'ProgressEvent'>('video://progress', (event) => {
+    setGenerationProgress(event.payload.progress);
+  });
+  return () => unlisten();
+}, []);
+```
+
+#### 数据流变更对比
+
+```
+Before:
+  前端 ──invoke──→ Rust: Command::status() ──等待──→ Rust 返回 ──→ 前端
+  ↑                                    ↓
+  └──────────── 完全阻塞，进度虚假 ─────┘
+
+After:
+  前端 ──invoke(start_video_gen)──→ Rust: tokio::spawn(Command) ──→ 立即返回 task_id
+  ↓                                                                        ↓
+  ←── listen('video://progress') ←──── FFmpeg stderr parsing ←────────────┘
+```
+
+### 难点 4: 数据库并发安全改造
+
+#### 详细方案
+
+```
+// main.rs 改动
+
+use std::sync::Arc;
+use tokio::sync::RwLock;  // 替换 Mutex
+
+// 1. Database 结构加 init_wal 方法
+impl Database {
+    pub fn init(&mut self) -> Result<()> {
+        let conn = Connection::open(Self::get_db_path())?;
+        // 关键: 启用 WAL 模式
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        // 提升并发读性能
+        conn.pragma_update(None, "busy_timeout", "5000")?;  // 5秒超时
+        conn.pragma_update(None, "wal_autocheckpoint", "1000")?;
+        
+        self.conn = Some(conn);
+        self.create_tables()?;
+        Ok(())
+    }
+}
+
+// 2. AppState 改用 RwLock
+struct AppState {
+    db: Arc<RwLock<Database>>,  // 原来是 Arc<Mutex<Database>>
+}
+
+// 3. 所有 Tauri 命令的锁获取方式变更
+#[tauri::command]
+async fn scan_media_folder(
+    project_id: i64,
+    folder_path: String,
+    window: tauri::Window,
+    state: State<'_, AppState>,
+) -> Result<media::ScanResult, String> {
+    let db = state.db.read().await;  // 读锁，不阻塞其他读
+    media::scan_media_folder(&db, project_id, &folder_path, window)
+}
+
+// 写操作仍然用写锁
+#[tauri::command]
+async fn set_final_photo(
+    period_id: i64,
+    photo_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let mut db = state.db.write().await;  // 排他锁
+    db.set_final_photo(period_id, photo_id)
+}
+```
+
+#### 读写锁对比
+
+| 操作 | 当前 (Mutex) | 改造后 (RwLock) | WAL 模式 |
+|------|-------------|----------------|---------|
+| 100 并发读照片 | 串行 | 并行 | 并行 |
+| 写 + 读 | 互斥 | 读不阻塞写，写阻塞读 | 读不阻塞读 |
+| 扫描并发生成 | ❌ 死锁 | ⚠️ 写锁冲突 | ✅ WAL 分离 |
+
+### 难点 5: 状态一致性与约束加固
+
+#### 当前问题
+
+```sql
+-- Photos 表
+is_selected INTEGER NOT NULL DEFAULT 0  -- 用户点了哪个
+is_final INTEGER NOT NULL DEFAULT 0     -- 是否是最终选定
+
+-- Periods 表
+selected_photo_id INTEGER               -- 最终选定的照片ID
+
+-- 这三个字段可能不一致!
+-- 例如: Photo.is_final=1 但 Period.selected_photo_id=NULL
+```
+
+#### 详细方案
+
+```
+// db.rs 改动: 添加约束并重构 set_final_photo
+
+pub fn set_final_photo(&self, period_id: i64, photo_id: i64) -> Result<()> {
+    let conn = self.get_conn();
+    
+    // 在一个事务中原子执行
+    let txn = conn.transaction()?;
+    
+    // Step 1: 取消该周期内所有照片的 is_final
+    txn.execute(
+        "UPDATE photos SET is_final = 0, is_selected = 0 WHERE period_id = ?1",
+        params![period_id],
+    )?;
+    
+    // Step 2: 设置选中照片的 is_final 和 is_selected
+    txn.execute(
+        "UPDATE photos SET is_final = 1, is_selected = 1 WHERE id = ?1",
+        params![photo_id],
+    )?;
+    
+    // Step 3: 同步更新 Periods 表的 selected_photo_id
+    txn.execute(
+        "UPDATE periods SET selected_photo_id = ?1 WHERE id = ?2",
+        params![photo_id, period_id],
+    )?;
+    
+    txn.commit()?;
+    Ok(())
+}
+
+// DDL 改造: 添加 CHECK 约束防止逻辑冲突
+conn.execute(
+    "ALTER TABLE photos ADD CONSTRAINT chk_photo_period_selection
+     CHECK (is_final = 0 OR (period_id IN (SELECT id FROM periods WHERE selected_photo_id = photos.id)))",
+    [],
+)?;
+
+// 或者更简单的: 在 photos 表加唯一索引（每周期最多一个 final）
+conn.execute(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_photos_period_final 
+     ON photos(period_id) 
+     WHERE is_final = 1",
+    [],
+)?;
+
+// 前端 TypeScript 类型也需调整
+// types/index.ts
+export interface Photo {
+  // is_final 变为派生属性，不再直接编辑
+  // 只操作 setFinalPhoto(periodId, photoId)
+}
+
+// Store 变更
+const setFinalPhoto = (periodId: number, photoId: number) => {
+  setFinalPhotoCommand(periodId, photoId);  // Tauri invoke
+  // 自动刷新对应 period 的 photos 列表
+  invalidatePeriodPhotos(periodId);
+};
+```
+
+### 难点 6: HEIC 支持完整方案
+
+#### 方案对比
+
+```
+方案 A: libheif (推荐，纯 Rust)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
++ 编译即得，无需外部依赖
++ 原生解码，性能优秀
++ 可集成到现有 media.rs 流程
+- heif-rs crate 维护不活跃（最近 commit 2 年前）
+- 需要链接 libheif C 库（构建时依赖）
+
+方案 B: heif-convert 子进程 (快速实现)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
++ 零 Rust 代码改动
++ 利用现成的 heif-convert 工具
+- 每次 HEIC 需要 spawn 子进程，性能差
+- 需要分发 heif-convert 二进制
+
+方案 C: ffmpeg 转换 (最通用)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
++ ffmpeg 已经必须安装
++ 支持所有格式
+- 调用链过长（HEIC → JPEG → base64）
+- 依赖已存在的 ffmpeg 安装
+
+方案 D: 降级体验 (最低成本)
+━━━━━━━━━━━━━━━━━━━━━━━━━━
++ 零开发成本
+- 用户看到 HEIC 照片只有文件名和占位图标
+```
+
+#### 推荐方案: A + D 组合
+
+```
+// media.rs: get_image_dimensions 新增 HEIC 分支
+
+fn get_heic_dimensions(path: &Path) -> (i64, i64) {
+    // 检测 libheif 是否可用
+    match unsafe { heif_context_open(path.to_str().unwrap()) } {
+        Ok(ctx) => {
+            let handle = unsafe { heif_context_get_primary_image(ctx) };
+            let info = unsafe { heif_image_handle_get_info(handle) };
+            let width = info.width;
+            let height = info.height;
+            unsafe { heif_release_handle(handle) };
+            unsafe { heif_context_close(ctx) };
+            (width as i64, height as i64)
+        }
+        Err(_) => (0, 0),
+    }
+}
+
+// Cargo.toml 新增:
+heif-rs = { version = "0.1", optional = true }
+
+// 编译特征控制
+[features]
+default = []
+heic-support = ["heif-rs"]
+
+// 前端兼容:
+// 获取到 (0,0) 时显示警告标签: "HEIC 格式，需要安装 libheif 才能预览"
+```
+
+---
+
+## 十、技术债务清单
+
+| 编号 | 债务项 | 影响 | 优先级 | 预计工时 |
+|------|--------|------|--------|---------|
+| TD-001 | 视频生成同步阻塞 | 核心体验 | P0 | 2天 |
+| TD-002 | HEIC 照片尺寸返回 (0,0) | iOS 用户 | P1 | 1天 |
+| TD-003 | db.rs ~1000 行单文件 | 可维护性 | P2 | 半天 |
+| TD-004 | 无单元测试 | 回归风险 | P1 | 持续 |
+| TD-005 | 转场效果 placeholder (zoom/slide = fade) | 产品体验 | P2 | 2天 |
+| TD-006 | 路径 traversal 未校验 | 安全性 | P1 | 半天 |
+| TD-007 | 文件复制无进度反馈 | 扫描体验 | P2 | 半天 |
+| TD-008 | progress bar 前端模拟 | 信任度 | P0 | 2天 |

@@ -4,11 +4,15 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::{self, File};
-use std::io::{BufReader, Read, Write};
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use tauri::Emitter;
 use uuid::Uuid;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use walkdir::WalkDir;
+
+/// 每批次处理多少个文件后上报一次进度
+const PROGRESS_BATCH_SIZE: usize = 50;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScanResult {
@@ -28,10 +32,12 @@ pub struct ScanResult {
     pub skipped_copy_failed_videos: i64,
 }
 
+#[allow(dead_code)]
 const PHOTO_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic", "heif", "tiff", "tif",
 ];
 
+#[allow(dead_code)]
 const VIDEO_EXTENSIONS: &[&str] = &[
     "mp4", "mov", "avi", "mkv", "flv", "wmv", "webm", "m4v", "3gp",
 ];
@@ -125,17 +131,29 @@ pub fn load_scan_log(project_id: i64) -> Result<Option<ScanLogFile>, String> {
     Ok(Some(log_file))
 }
 
+// ==================== 格式检测 ====================
+
+lazy_static::lazy_static! {
+    static ref PHOTO_SET: HashSet<&'static str> = [
+        "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic", "heif", "tiff", "tif",
+    ].into_iter().collect();
+
+    static ref VIDEO_SET: HashSet<&'static str> = [
+        "mp4", "mov", "avi", "mkv", "flv", "wmv", "webm", "m4v", "3gp",
+    ].into_iter().collect();
+}
+
 fn is_photo_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| PHOTO_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+        .map(|ext| PHOTO_SET.contains(ext.to_lowercase().as_str()))
         .unwrap_or(false)
 }
 
 fn is_video_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| VIDEO_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+        .map(|ext| VIDEO_SET.contains(ext.to_lowercase().as_str()))
         .unwrap_or(false)
 }
 
@@ -371,7 +389,27 @@ fn get_project_videos_dir(project_id: i64) -> PathBuf {
     path
 }
 
+/// 备用复制函数（保留供未来回退使用）
+#[allow(dead_code)]
 fn copy_file_to_project_dir(
+    source_path: &Path,
+    dest_dir: &Path,
+) -> Result<String, String> {
+    let file_name = source_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+    let uuid = Uuid::new_v4().to_string();
+    let dest_file_name = format!("{}_{}", uuid, file_name);
+    let dest_path = dest_dir.join(&dest_file_name);
+    fs::copy(source_path, &dest_path)
+        .map(|_| dest_path.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+/// 原子复制: 先复制到临时文件名，成功后再 rename
+/// 避免并行复制时产生损坏的中途文件
+fn copy_file_to_project_dir_atomic(
     source_path: &Path,
     dest_dir: &Path,
 ) -> Result<String, String> {
@@ -386,17 +424,17 @@ fn copy_file_to_project_dir(
     let dest_file_name = format!("{}_{}", uuid, file_name);
     let dest_path = dest_dir.join(&dest_file_name);
 
-    let mut source_file = File::open(source_path).map_err(|e| e.to_string())?;
-    let mut dest_file = File::create(&dest_path).map_err(|e| e.to_string())?;
+    // 先写到临时文件
+    let tmp_name = format!(".tmp_{}", dest_file_name);
+    let tmp_path = dest_dir.join(&tmp_name);
 
-    let mut buffer = [0u8; 65536];
-    loop {
-        let bytes_read = source_file.read(&mut buffer).map_err(|e| e.to_string())?;
-        if bytes_read == 0 {
-            break;
-        }
-        dest_file.write_all(&buffer[..bytes_read]).map_err(|e| e.to_string())?;
-    }
+    // 使用标准库的 copy（内部已优化为 8MB buffer）
+    fs::copy(source_path, &tmp_path)
+        .map_err(|e| e.to_string())?;
+
+    // atomic rename
+    fs::rename(&tmp_path, &dest_path)
+        .map_err(|e| e.to_string())?;
 
     Ok(dest_path.to_string_lossy().to_string())
 }
@@ -407,6 +445,203 @@ pub fn delete_project_dir(project_id: i64) -> Result<(), String> {
         fs::remove_dir_all(&project_dir).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+/// 单个文件的处理结果（纯数据，无副作用）
+#[derive(Debug, Clone)]
+#[allow(dead_code)]  // 调试用途，future-proof
+struct ProcessedFile {
+    file_path: PathBuf,           // 原始路径
+    dest_path: PathBuf,           // 目标路径 (已复制)
+    is_photo: bool,
+    is_video: bool,
+    date_str: String,
+    file_name: String,
+    file_size: i64,
+    width: i64,
+    height: i64,
+    period_id: i64,
+    // 视频专用
+    duration: f64,
+    // 跳过原因
+    skip_reason: Option<SkipReason>,
+}
+
+#[derive(Debug, Clone)]
+enum SkipReason {
+    NoDate,
+    NoPeriod,
+    Duplicate,
+    CopyFailed,
+}
+
+impl std::fmt::Display for SkipReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SkipReason::NoDate => write!(f, "无法识别日期"),
+            SkipReason::NoPeriod => write!(f, "日期不在周期内"),
+            SkipReason::Duplicate => write!(f, "重复文件"),
+            SkipReason::CopyFailed => write!(f, "复制失败"),
+        }
+    }
+}
+
+/// 单个文件的处理逻辑 — 纯函数，无共享可变状态
+fn process_single_entry(
+    path: &Path,
+    periods: &[crate::db::Period],
+    existing_paths: &HashSet<String>,
+    photos_dir: &Path,
+    videos_dir: &Path,
+) -> ProcessedFile {
+    let is_photo = is_photo_file(path);
+    let is_video = is_video_file(path);
+
+    if !is_photo && !is_video {
+        return ProcessedFile {
+            file_path: path.to_path_buf(),
+            dest_path: PathBuf::new(),
+            is_photo: false,
+            is_video: false,
+            date_str: String::new(),
+            file_name: String::new(),
+            file_size: 0,
+            width: 0,
+            height: 0,
+            period_id: 0,
+            duration: 0.0,
+            skip_reason: None,
+        };
+    }
+
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    // 提取日期
+    let date_str = match extract_date_from_filename(&file_name) {
+        Some(d) => d,
+        None => {
+            return ProcessedFile {
+                file_path: path.to_path_buf(),
+                dest_path: PathBuf::new(),
+                is_photo,
+                is_video,
+                date_str: String::new(),
+                file_name: file_name.clone(),
+                file_size: 0,
+                width: 0,
+                height: 0,
+                period_id: 0,
+                duration: 0.0,
+                skip_reason: Some(SkipReason::NoDate),
+            };
+        }
+    };
+
+    // 匹配周期
+    let period_id = match find_period_for_date(periods, &date_str) {
+        Some(id) => id,
+        None => {
+            return ProcessedFile {
+                file_path: path.to_path_buf(),
+                dest_path: PathBuf::new(),
+                is_photo,
+                is_video,
+                date_str: date_str.clone(),
+                file_name: file_name.clone(),
+                file_size: 0,
+                width: 0,
+                height: 0,
+                period_id: 0,
+                duration: 0.0,
+                skip_reason: Some(SkipReason::NoPeriod),
+            };
+        }
+    };
+
+    // 确定目标目录
+    let dest_dir = if is_photo { photos_dir } else { videos_dir };
+
+    // 复制文件
+    let copied_path = match copy_file_to_project_dir_atomic(path, dest_dir) {
+        Ok(p) => p,
+        Err(_) => {
+            return ProcessedFile {
+                file_path: path.to_path_buf(),
+                dest_path: PathBuf::new(),
+                is_photo,
+                is_video,
+                date_str: date_str.clone(),
+                file_name: file_name.clone(),
+                file_size: 0,
+                width: 0,
+                height: 0,
+                period_id: 0,
+                duration: 0.0,
+                skip_reason: Some(SkipReason::CopyFailed),
+            };
+        }
+    };
+
+    // 查重 (复制后查)
+    if existing_paths.contains(&copied_path) {
+        // 删除重复文件
+        fs::remove_file(&copied_path).ok();
+        return ProcessedFile {
+            file_path: path.to_path_buf(),
+            dest_path: PathBuf::new(),
+            is_photo,
+            is_video,
+            date_str: date_str.clone(),
+            file_name: file_name.clone(),
+            file_size: 0,
+            width: 0,
+            height: 0,
+            period_id: 0,
+            duration: 0.0,
+            skip_reason: Some(SkipReason::Duplicate),
+        };
+    }
+
+    let file_size = get_file_size(Path::new(&copied_path));
+
+    if is_photo {
+        let (width, height) = get_image_dimensions(Path::new(&copied_path));
+        ProcessedFile {
+            file_path: path.to_path_buf(),
+            dest_path: PathBuf::from(&copied_path),
+            is_photo: true,
+            is_video: false,
+            date_str: date_str.clone(),
+            file_name,
+            file_size,
+            width,
+            height,
+            period_id,
+            duration: 0.0,
+            skip_reason: None,
+        }
+    } else {
+        // 视频: 获取时长
+        let (duration, width, height) = video::get_video_info(&copied_path).unwrap_or((0.0, 0, 0));
+        ProcessedFile {
+            file_path: path.to_path_buf(),
+            dest_path: PathBuf::from(&copied_path),
+            is_photo: false,
+            is_video: true,
+            date_str: date_str.clone(),
+            file_name,
+            file_size,
+            width,
+            height,
+            period_id,
+            duration,
+            skip_reason: None,
+        }
+    }
 }
 
 pub fn scan_media_folder(
@@ -429,24 +664,95 @@ pub fn scan_media_folder(
     let photos_dir = get_project_photos_dir(project_id);
     let videos_dir = get_project_videos_dir(project_id);
 
-    let mut existing_paths = HashSet::new();
+    // 构建已存在文件集合（用于去重）
+    let mut existing_paths: HashSet<String> = HashSet::new();
     for period in &periods {
         if let Ok(photos) = db.get_period_photos(period.id) {
             for photo in photos {
-                existing_paths.insert(photo.file_path);
+                existing_paths.insert(photo.file_path.clone());
             }
         }
         if let Ok(videos) = db.get_period_videos(period.id) {
             for video in videos {
-                existing_paths.insert(video.file_path);
+                existing_paths.insert(video.file_path.clone());
             }
         }
     }
 
-    let mut new_photos: Vec<NewPhoto> = Vec::new();
-    let mut new_videos: Vec<NewVideo> = Vec::new();
+    // ==================== Phase 1: 收集所有条目路径 ====================
+    let entries: Vec<PathBuf> = WalkDir::new(folder)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .filter(|e| is_photo_file(e.path()) || is_video_file(e.path()))
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    let total_count = entries.len() as i64;
+
+    if total_count == 0 {
+        emit_scan_log(&window, "info", "文件夹中没有找到照片或视频文件".to_string(), None, &mut scan_logs);
+        return Ok(ScanResult {
+            photos: vec![],
+            videos: vec![],
+            total_photos: 0,
+            total_videos: 0,
+            recognized_photos: 0,
+            recognized_videos: 0,
+            skipped_duplicate_photos: 0,
+            skipped_duplicate_videos: 0,
+            skipped_no_date_photos: 0,
+            skipped_no_date_videos: 0,
+            skipped_no_period_photos: 0,
+            skipped_no_period_videos: 0,
+            skipped_copy_failed_photos: 0,
+            skipped_copy_failed_videos: 0,
+        });
+    }
+
+    // ==================== Phase 2: 并行处理每个文件 ====================
+    // 用 channel 让每个线程独立 emit 日志，避免 Mutex 竞争
+    // 但由于 tauri::Window::emit 不是 Send + Sync，所以我们在线程结束后统一 emit
+    
+    let entries_arc = entries; // Move into closure scope
+    let periods_arc = periods.clone();
+    let existing_arc = existing_paths.clone();
+    let photos_dir_arc = photos_dir.clone();
+    let videos_dir_arc = videos_dir.clone();
+
+    // 计算每个类型的数量
     let mut total_photos = 0i64;
     let mut total_videos = 0i64;
+    
+    for path in &entries_arc {
+        if is_photo_file(path) {
+            total_photos += 1;
+        } else {
+            total_videos += 1;
+        }
+    }
+
+    // 在线程外先统计 skip 原因,避免在 par_iter 中 emit Window 事件
+    // 然后在 par_iter 中只做纯 IO 操作（复制、解析尺寸），最后一次性 merge
+    
+    let processed_results: Vec<ProcessedFile> = entries_arc
+        .par_iter()
+        .map(|path| {
+            process_single_entry(
+                path,
+                &periods_arc,
+                &existing_arc,
+                &photos_dir_arc,
+                &videos_dir_arc,
+            )
+        })
+        .collect();
+
+    // ==================== Phase 3: 统计结果 ====================
+    let mut new_photos: Vec<NewPhoto> = Vec::new();
+    let mut new_videos: Vec<NewVideo> = Vec::new();
+    let mut processed_count = 0usize;
+    
     let mut skipped_duplicate_photos = 0i64;
     let mut skipped_duplicate_videos = 0i64;
     let mut skipped_no_date_photos = 0i64;
@@ -456,162 +762,116 @@ pub fn scan_media_folder(
     let mut skipped_copy_failed_photos = 0i64;
     let mut skipped_copy_failed_videos = 0i64;
 
-    for entry in WalkDir::new(folder).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
+    for result in &processed_results {
+        processed_count += 1;
 
-        let is_photo = is_photo_file(path);
-        let is_video = is_video_file(path);
-
-        if !is_photo && !is_video {
-            continue;
-        }
-
-        let file_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .to_string();
-
-        if is_photo {
-            total_photos += 1;
-        } else {
-            total_videos += 1;
-        }
-
-        let date_str = extract_date_from_filename(&file_name);
-
-        if date_str.is_none() {
-            if is_photo {
-                skipped_no_date_photos += 1;
-            } else {
-                skipped_no_date_videos += 1;
-            }
+        // 每 BATCH 个文件 emit 一条进度
+        if processed_count % PROGRESS_BATCH_SIZE == 0 {
             emit_scan_log(
                 &window,
-                "warn",
-                format!("⚠ 无法识别日期: {}", file_name),
-                Some(file_name.clone()),
+                "info",
+                format!("已处理 {}/{}", processed_count, total_count),
+                None,
                 &mut scan_logs,
             );
-            continue;
         }
 
-        let period_id = match find_period_for_date(&periods, date_str.as_ref().unwrap()) {
-            Some(id) => id,
+        let skip = match &result.skip_reason {
+            Some(reason) => reason,
             None => {
-                if is_photo {
+                // 成功处理
+                if result.is_photo {
+                    let new_photo = NewPhoto {
+                        period_id: result.period_id,
+                        file_path: result.dest_path.to_string_lossy().to_string(),
+                        file_name: result.file_name.clone(),
+                        file_size: result.file_size,
+                        width: result.width,
+                        height: result.height,
+                        taken_at: Some(result.date_str.clone()),
+                    };
+                    new_photos.push(new_photo);
+                    
+                    emit_scan_log(
+                        &window,
+                        "success",
+                        format!(
+                            "✓ 已识别照片: {} ({})",
+                            result.file_name, result.date_str
+                        ),
+                        Some(result.file_name.clone()),
+                        &mut scan_logs,
+                    );
+                } else if result.is_video {
+                    let new_video = NewVideo {
+                        period_id: result.period_id,
+                        file_path: result.dest_path.to_string_lossy().to_string(),
+                        file_name: result.file_name.clone(),
+                        file_size: result.file_size,
+                        duration: result.duration,
+                        width: result.width,
+                        height: result.height,
+                        taken_at: Some(result.date_str.clone()),
+                    };
+                    new_videos.push(new_video);
+                    
+                    emit_scan_log(
+                        &window,
+                        "success",
+                        format!(
+                            "✓ 已识别视频: {} ({})",
+                            result.file_name, result.date_str
+                        ),
+                        Some(result.file_name.clone()),
+                        &mut scan_logs,
+                    );
+                }
+                continue;
+            }
+        };
+
+        // 统计 skip
+        match skip {
+            SkipReason::NoDate => {
+                if result.is_photo {
+                    skipped_no_date_photos += 1;
+                    emit_scan_log(&window, "warn", format!("⚠ 无法识别日期: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                } else {
+                    skipped_no_date_videos += 1;
+                    emit_scan_log(&window, "warn", format!("⚠ 无法识别日期: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                }
+            }
+            SkipReason::NoPeriod => {
+                if result.is_photo {
                     skipped_no_period_photos += 1;
+                    emit_scan_log(&window, "warn", format!("⚠ 日期不在周期内: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 } else {
                     skipped_no_period_videos += 1;
+                    emit_scan_log(&window, "warn", format!("⚠ 日期不在周期内: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 }
-                emit_scan_log(
-                    &window,
-                    "warn",
-                    format!("⚠ 日期不在周期内: {}", file_name),
-                    Some(file_name.clone()),
-                    &mut scan_logs,
-                );
-                continue;
             }
-        };
-
-        let dest_dir = if is_photo { &photos_dir } else { &videos_dir };
-        let copied_path = match copy_file_to_project_dir(path, dest_dir) {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!("复制文件失败: {} -> {}", path.display(), e);
-                if is_photo {
+            SkipReason::Duplicate => {
+                if result.is_photo {
+                    skipped_duplicate_photos += 1;
+                    emit_scan_log(&window, "warn", format!("⚠ 跳过重复: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                } else {
+                    skipped_duplicate_videos += 1;
+                    emit_scan_log(&window, "warn", format!("⚠ 跳过重复: {}", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
+                }
+            }
+            SkipReason::CopyFailed => {
+                if result.is_photo {
                     skipped_copy_failed_photos += 1;
+                    emit_scan_log(&window, "error", format!("✗ 复制失败: {} - 磁盘空间不足或权限不足", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 } else {
                     skipped_copy_failed_videos += 1;
+                    emit_scan_log(&window, "error", format!("✗ 复制失败: {} - 磁盘空间不足或权限不足", result.file_name), Some(result.file_name.clone()), &mut scan_logs);
                 }
-                emit_scan_log(
-                    &window,
-                    "error",
-                    format!("✗ 复制失败: {} - {}", file_name, e),
-                    Some(file_name.clone()),
-                    &mut scan_logs,
-                );
-                continue;
             }
-        };
-
-        if existing_paths.contains(&copied_path) {
-            fs::remove_file(&copied_path).ok();
-            if is_photo {
-                skipped_duplicate_photos += 1;
-            } else {
-                skipped_duplicate_videos += 1;
-            }
-            emit_scan_log(
-                &window,
-                "warn",
-                format!("⚠ 跳过重复: {}", file_name),
-                Some(file_name.clone()),
-                &mut scan_logs,
-            );
-            continue;
-        }
-
-        let file_size = get_file_size(Path::new(&copied_path));
-
-        if is_photo {
-            let (width, height) = get_image_dimensions(Path::new(&copied_path));
-
-            let new_photo = NewPhoto {
-                period_id,
-                file_path: copied_path.clone(),
-                file_name: file_name.clone(),
-                file_size,
-                width,
-                height,
-                taken_at: date_str.clone(),
-            };
-
-            existing_paths.insert(copied_path);
-            new_photos.push(new_photo);
-            emit_scan_log(
-                &window,
-                "success",
-                format!("✓ 已识别照片: {} ({})", file_name, date_str.clone().unwrap_or_default()),
-                Some(file_name.clone()),
-                &mut scan_logs,
-            );
-        } else {
-            let (duration, width, height) = match video::get_video_info(&copied_path) {
-                Ok(info) => info,
-                Err(e) => {
-                    eprintln!("获取视频信息失败: {} - {}", file_name, e);
-                    (0.0, 0, 0)
-                }
-            };
-
-            let new_video = NewVideo {
-                period_id,
-                file_path: copied_path.clone(),
-                file_name: file_name.clone(),
-                file_size,
-                duration,
-                width,
-                height,
-                taken_at: date_str.clone(),
-            };
-
-            existing_paths.insert(copied_path);
-            new_videos.push(new_video);
-            emit_scan_log(
-                &window,
-                "success",
-                format!("✓ 已识别视频: {} ({})", file_name, date_str.clone().unwrap_or_default()),
-                Some(file_name.clone()),
-                &mut scan_logs,
-            );
         }
     }
 
-    // 批量插入数据库（事务，性能提升 10-100 倍）
+    // ==================== Phase 4: 批量插入数据库（事务，不变）====================
     let photos = db.add_photos(&new_photos).unwrap_or_else(|e| {
         eprintln!("批量插入照片失败: {}", e);
         Vec::new()
@@ -627,7 +887,7 @@ pub fn scan_media_folder(
     let total_files = total_photos + total_videos;
     emit_scan_log(&window, "info", format!("扫描完成，共处理 {} 个文件", total_files), None, &mut scan_logs);
 
-    // 保存日志到文件（失败不影响扫描结果）
+    // 保存日志到文件
     if let Err(e) = save_scan_log(project_id, folder_path, total_files, scan_logs) {
         eprintln!("保存扫描日志失败: {}", e);
     }
@@ -650,7 +910,7 @@ pub fn scan_media_folder(
     })
 }
 
-// ==================== 按周期扫描 ====================
+// ==================== 按周期扫描（并行版）====================
 
 pub fn scan_period_folder(
     db: &Database,
@@ -663,17 +923,14 @@ pub fn scan_period_folder(
         return Err("文件夹不存在".to_string());
     }
 
-    // 获取周期信息
     let period = db.get_period(period_id).map_err(|e| e.to_string())?;
-    let period_start = &period.start_date;
-    let period_end = &period.end_date;
+    let period_start = period.start_date.clone();
+    let period_end = period.end_date.clone();
 
     // 清空该周期的旧文件
-    // 1. 获取旧的照片和视频
     let old_photos = db.get_period_photos(period_id).unwrap_or_default();
     let old_videos = db.get_period_videos(period_id).unwrap_or_default();
     
-    // 2. 删除磁盘上的文件
     for photo in &old_photos {
         if let Err(e) = fs::remove_file(&photo.file_path) {
             eprintln!("删除旧照片失败: {} -> {}", photo.file_path, e);
@@ -685,7 +942,6 @@ pub fn scan_period_folder(
         }
     }
     
-    // 3. 删除数据库记录
     if let Err(e) = db.delete_period_photos(period_id) {
         eprintln!("删除周期照片记录失败: {}", e);
     }
@@ -696,23 +952,94 @@ pub fn scan_period_folder(
     let photos_dir = get_project_photos_dir(project_id);
     let videos_dir = get_project_videos_dir(project_id);
 
-    // 获取已存在的文件路径（用于去重） - 清空后应该是空的，但保留以防万一
     let mut existing_paths = HashSet::new();
-    if let Ok(photos) = db.get_period_photos(period_id) {
-        for photo in photos {
-            existing_paths.insert(photo.file_path);
-        }
-    }
-    if let Ok(videos) = db.get_period_videos(period_id) {
-        for video in videos {
-            existing_paths.insert(video.file_path);
+
+    let mut total_photos = 0i64;
+    let mut total_videos = 0i64;
+
+    // 收集条目
+    let entries: Vec<PathBuf> = WalkDir::new(folder)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .filter(|e| is_photo_file(e.path()) || is_video_file(e.path()))
+        .map(|e| e.path().to_path_buf())
+        .collect();
+
+    // 统计总数
+    for path in &entries {
+        if is_photo_file(path) {
+            total_photos += 1;
+        } else {
+            total_videos += 1;
         }
     }
 
+    // 并行处理
+    let results: Vec<ProcessedFile> = entries
+        .par_iter()
+        .map(|path| {
+            // 周期扫描的特殊逻辑: 直接过滤日期范围
+            let file_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            let date_str = match extract_date_from_filename(&file_name) {
+                Some(d) => d,
+                None => {
+                    return ProcessedFile {
+                        file_path: path.clone(),
+                        dest_path: PathBuf::new(),
+                        is_photo: is_photo_file(path),
+                        is_video: is_video_file(path),
+                        date_str: String::new(),
+                        file_name,
+                        file_size: 0,
+                        width: 0,
+                        height: 0,
+                        period_id,
+                        duration: 0.0,
+                        skip_reason: Some(SkipReason::NoDate),
+                    };
+                }
+            };
+
+            if date_str < period_start || date_str > period_end {
+                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown").to_string();
+                return ProcessedFile {
+                    file_path: path.clone(),
+                    dest_path: PathBuf::new(),
+                    is_photo: is_photo_file(path),
+                    is_video: is_video_file(path),
+                    date_str: date_str.clone(),
+                    file_name,
+                    file_size: 0,
+                    width: 0,
+                    height: 0,
+                    period_id,
+                    duration: 0.0,
+                    skip_reason: Some(SkipReason::NoPeriod),
+                };
+            }
+
+            // 正常处理
+            let cloned_period = period.clone();
+            process_single_entry(
+                path,
+                &vec![cloned_period],  // 只用当前周期
+                &existing_paths,
+                &photos_dir,
+                &videos_dir,
+            )
+        })
+        .collect();
+
+    // 统计结果
     let mut new_photos: Vec<NewPhoto> = Vec::new();
     let mut new_videos: Vec<NewVideo> = Vec::new();
-    let mut total_photos = 0i64;
-    let mut total_videos = 0i64;
+
     let mut skipped_duplicate_photos = 0i64;
     let mut skipped_duplicate_videos = 0i64;
     let mut skipped_no_date_photos = 0i64;
@@ -722,113 +1049,59 @@ pub fn scan_period_folder(
     let mut skipped_copy_failed_photos = 0i64;
     let mut skipped_copy_failed_videos = 0i64;
 
-    for entry in WalkDir::new(folder).into_iter().filter_map(|e| e.ok()) {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-
-        let is_photo = is_photo_file(path);
-        let is_video = is_video_file(path);
-
-        if !is_photo && !is_video {
-            continue;
-        }
-
-        let file_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .to_string();
-
-        if is_photo {
-            total_photos += 1;
-        } else {
-            total_videos += 1;
-        }
-
-        // 提取日期
-        let date_str = match extract_date_from_filename(&file_name) {
-            Some(d) => d,
+    for result in &results {
+        match &result.skip_reason {
             None => {
-                // 提取不到日期，跳过
-                if is_photo {
-                    skipped_no_date_photos += 1;
-                } else {
-                    skipped_no_date_videos += 1;
+                if result.is_photo {
+                    let new_photo = NewPhoto {
+                        period_id: result.period_id,
+                        file_path: result.dest_path.to_string_lossy().to_string(),
+                        file_name: result.file_name.clone(),
+                        file_size: result.file_size,
+                        width: result.width,
+                        height: result.height,
+                        taken_at: Some(result.date_str.clone()),
+                    };
+                    new_photos.push(new_photo);
+                    existing_paths.insert(result.dest_path.to_string_lossy().to_string());
+                } else if result.is_video {
+                    let new_video = NewVideo {
+                        period_id: result.period_id,
+                        file_path: result.dest_path.to_string_lossy().to_string(),
+                        file_name: result.file_name.clone(),
+                        file_size: result.file_size,
+                        duration: result.duration,
+                        width: result.width,
+                        height: result.height,
+                        taken_at: Some(result.date_str.clone()),
+                    };
+                    new_videos.push(new_video);
+                    existing_paths.insert(result.dest_path.to_string_lossy().to_string());
                 }
-                continue;
             }
-        };
-
-        // 判断是否在周期时间范围内
-        if date_str < *period_start || date_str > *period_end {
-            if is_photo {
-                skipped_no_period_photos += 1;
-            } else {
-                skipped_no_period_videos += 1;
-            }
-            continue;
-        }
-
-        let dest_dir = if is_photo { &photos_dir } else { &videos_dir };
-        let copied_path = match copy_file_to_project_dir(path, dest_dir) {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!("复制文件失败: {} -> {}", path.display(), e);
-                if is_photo {
-                    skipped_copy_failed_photos += 1;
-                } else {
-                    skipped_copy_failed_videos += 1;
+            Some(skip) => {
+                match skip {
+                    SkipReason::NoDate => {
+                        if result.is_photo { skipped_no_date_photos += 1; }
+                        else { skipped_no_date_videos += 1; }
+                    }
+                    SkipReason::NoPeriod => {
+                        if result.is_photo { skipped_no_period_photos += 1; }
+                        else { skipped_no_period_videos += 1; }
+                    }
+                    SkipReason::Duplicate => {
+                        if result.is_photo { skipped_duplicate_photos += 1; }
+                        else { skipped_duplicate_videos += 1; }
+                    }
+                    SkipReason::CopyFailed => {
+                        if result.is_photo { skipped_copy_failed_photos += 1; }
+                        else { skipped_copy_failed_videos += 1; }
+                    }
                 }
-                continue;
             }
-        };
-
-        if existing_paths.contains(&copied_path) {
-            fs::remove_file(&copied_path).ok();
-            if is_photo {
-                skipped_duplicate_photos += 1;
-            } else {
-                skipped_duplicate_videos += 1;
-            }
-            continue;
-        }
-
-        let file_size = get_file_size(Path::new(&copied_path));
-
-        if is_photo {
-            let (width, height) = get_image_dimensions(Path::new(&copied_path));
-
-            let new_photo = NewPhoto {
-                period_id,
-                file_path: copied_path.clone(),
-                file_name: file_name.clone(),
-                file_size,
-                width,
-                height,
-                taken_at: Some(date_str),
-            };
-
-            existing_paths.insert(copied_path);
-            new_photos.push(new_photo);
-        } else {
-            let new_video = NewVideo {
-                period_id,
-                file_path: copied_path.clone(),
-                file_name: file_name.clone(),
-                file_size,
-                duration: 0.0,
-                width: 0,
-                height: 0,
-                taken_at: Some(date_str),
-            };
-
-            existing_paths.insert(copied_path);
-            new_videos.push(new_video);
         }
     }
 
-    // 批量插入数据库
     let photos = db.add_photos(&new_photos).unwrap_or_else(|e| {
         eprintln!("批量插入照片失败: {}", e);
         Vec::new()
