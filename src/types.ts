@@ -49,6 +49,8 @@ export interface Photo {
   is_selected: boolean;
   is_multi_selected: boolean;
   is_final: boolean;
+  thumbnail_path?: string;
+  source: 'scan' | 'collage';
   created_at: string;
 }
 
@@ -69,7 +71,8 @@ export interface VideoFrame {
   id: number;
   video_id: number;
   period_id: number;
-  file_path: string;
+  file_path?: string;
+  thumbnail_path?: string;
   time_seconds: number;
   is_selected: boolean;
   is_multi_selected: boolean;
@@ -178,4 +181,30 @@ export interface PeriodStats {
   video_count: number;
   pending_count: number;
   has_final: boolean;
+}
+
+// ==================== 待处理项 & 临时帧 ====================
+
+export interface PendingItem {
+  item_type: 'photo' | 'collage' | 'video_frame';
+  id: number;
+  period_id: number;
+  file_path?: string;
+  file_name?: string;
+  thumbnail_path?: string;
+  width: number;
+  height: number;
+  time_seconds?: number;
+  taken_at?: string;
+  is_final: boolean;
+  source?: 'scan' | 'collage';
+}
+
+export interface VideoFrameTemp {
+  id: number;
+  video_id: number;
+  period_id: number;
+  time_seconds: number;
+  temp_thumb_path: string;
+  created_at: string;
 }

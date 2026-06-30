@@ -1,35 +1,49 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Camera, Play, Pause, SkipBack, SkipForward } from 'lucide-react';
-import type { Video, VideoFrame } from '../types';
+import { ArrowLeft, Camera, Play, Pause, SkipBack, SkipForward, Loader2, Check } from 'lucide-react';
+import { useAppStore } from '../store';
+import { getImageBase64, generateVideoFrames } from '../utils/tauriCommands';
+import { showToast } from '../store/toastStore';
+import type { Video } from '../types';
 
 interface VideoFramePlayerProps {
   video: Video;
   onBack: () => void;
-  onCapture: (frame: VideoFrame) => void;
-  onAddToStash: (frame: VideoFrame) => void;
-  capturedFrames: VideoFrame[];
-  loadedImages: Record<number, string>;
 }
 
 /**
  * 内嵌视频截帧播放器
  * 支持播放/暂停、逐帧控制、倍速、截帧操作
+ * 截帧结果以临时帧形式展示，可持久化到待选区或放弃
  */
 export default function VideoFramePlayer({
   video,
   onBack,
-  onCapture,
-  onAddToStash: _onAddToStash,
-  capturedFrames,
-  loadedImages,
 }: VideoFramePlayerProps) {
   const [progress, setProgress] = useState(38);
   const [speed, setSpeed] = useState(1);
   const currentTime = '0:52';
   const playerRef = useRef<HTMLDivElement>(null);
 
+  const {
+    tempFrames,
+    persistVideoFrame,
+    discardTempFrames,
+    loadTempFrames,
+    currentProject,
+  } = useAppStore();
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [persistingIds, setPersistingIds] = useState<Set<number>>(new Set());
+  const [discardingIds, setDiscardingIds] = useState<Set<number>>(new Set());
+  const [processedIds, setProcessedIds] = useState<Set<number>>(new Set());
+  const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
+  const [isClosing, setIsClosing] = useState(false);
+
   const totalDuration = formatDuration(video.duration);
   const availableSpeeds = [0.25, 0.5, 1, 2];
+  const projectId = currentProject?.id;
+
+  const visibleFrames = tempFrames.filter((f) => !processedIds.has(f.id));
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -45,13 +59,38 @@ export default function VideoFramePlayer({
           setProgress((p) => Math.min(100, p + 1));
           break;
         case 'Escape':
-          onBack();
+          handleClose();
           break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onBack]);
+  }, [onBack, video.id]);
+
+  // Load temp frame thumbnails
+  useEffect(() => {
+    const loadImages = async () => {
+      const framesToLoad = visibleFrames.filter((f) => !loadedImages[f.id]);
+      if (framesToLoad.length === 0) return;
+      const results = await Promise.all(
+        framesToLoad.map(async (frame) => {
+          try {
+            const url = await getImageBase64(frame.temp_thumb_path);
+            return { id: frame.id, url };
+          } catch (error) {
+            console.error('加载临时帧缩略图失败:', error);
+            return { id: frame.id, url: '' };
+          }
+        })
+      );
+      const newImages: Record<number, string> = {};
+      results.forEach(({ id, url }) => {
+        if (url) newImages[id] = url;
+      });
+      setLoadedImages((prev) => ({ ...prev, ...newImages }));
+    };
+    loadImages();
+  }, [visibleFrames]);
 
   function formatDuration(seconds: number): string {
     const m = Math.floor(seconds / 60);
@@ -59,20 +98,69 @@ export default function VideoFramePlayer({
     return `${m}:${s.toString().padStart(2, '0')}`;
   }
 
-  const handleCapture = () => {
-    // Simulate frame capture — real implementation would use FFmpeg
-    const mockFrame: VideoFrame = {
-      id: Date.now(),
-      video_id: video.id,
-      period_id: video.period_id,
-      file_path: '',
-      time_seconds: (video.duration * progress) / 100,
-      is_selected: false,
-      is_multi_selected: false,
-      is_final: false,
-      created_at: new Date().toISOString(),
-    };
-    onCapture(mockFrame);
+  const handleCapture = async () => {
+    if (!projectId) {
+      showToast('error', '项目未选择', '无法截帧，请确认已选择项目');
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      await generateVideoFrames(video.id, 1);
+      await loadTempFrames(video.id);
+    } catch (error) {
+      console.error('截帧失败:', error);
+      showToast('error', '截帧失败', '请重试');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handlePersist = async (tempId: number) => {
+    if (!projectId) {
+      showToast('error', '项目未选择', '无法保存截帧');
+      return;
+    }
+    setPersistingIds((prev) => new Set(prev).add(tempId));
+    try {
+      await persistVideoFrame(tempId, projectId);
+      setProcessedIds((prev) => new Set(prev).add(tempId));
+      showToast('success', '已加入待选区', '截帧已保存到待选区');
+    } catch (error) {
+      console.error('保存截帧失败:', error);
+      showToast('error', '保存失败', '请重试');
+    } finally {
+      setPersistingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+    }
+  };
+
+  const handleDiscard = (tempId: number) => {
+    setDiscardingIds((prev) => new Set(prev).add(tempId));
+    // 短暂延迟以显示加载状态，然后过滤掉
+    setTimeout(() => {
+      setProcessedIds((prev) => new Set(prev).add(tempId));
+      setDiscardingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+    }, 200);
+  };
+
+  const handleClose = async () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    try {
+      await discardTempFrames(video.id);
+    } catch (error) {
+      console.error('清理临时帧失败:', error);
+    } finally {
+      onBack();
+      setIsClosing(false);
+    }
   };
 
   // Nearby frame previews (simulated)
@@ -88,10 +176,15 @@ export default function VideoFramePlayer({
       {/* Top Bar */}
       <div className="h-[52px] flex items-center gap-3 px-5 border-b border-stone-200 bg-white flex-shrink-0">
         <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-stone-900 transition-colors"
+          onClick={handleClose}
+          disabled={isClosing}
+          className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-stone-900 transition-colors disabled:opacity-50"
         >
-          <ArrowLeft className="w-4 h-4" />
+          {isClosing ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <ArrowLeft className="w-4 h-4" />
+          )}
           返回照片库
         </button>
         <span className="text-stone-200">|</span>
@@ -145,9 +238,17 @@ export default function VideoFramePlayer({
                 </button>
               ))}
 
-              <button className="capture-frame-btn" onClick={handleCapture}>
-                <Camera className="w-3.5 h-3.5" />
-                截取此帧
+              <button
+                className="capture-frame-btn disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleCapture}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Camera className="w-3.5 h-3.5" />
+                )}
+                {isGenerating ? '截帧中...' : '截取此帧'}
               </button>
             </div>
           </div>
@@ -188,27 +289,63 @@ export default function VideoFramePlayer({
           </div>
         </div>
 
-        {/* Already Captured Frames */}
-        {capturedFrames.length > 0 && (
+        {/* Temp Frames */}
+        {visibleFrames.length > 0 && (
           <div className="p-3 px-4 bg-stone-50 border-t border-stone-200">
-            <div className="text-[11px] text-stone-400 mb-2">已截取 ({capturedFrames.length})</div>
-            <div className="flex gap-2 overflow-x-auto">
-              {capturedFrames.map((frame) => (
-                <div key={frame.id} className="relative flex-shrink-0">
+            <div className="text-[11px] text-stone-400 mb-2">待处理截帧 ({visibleFrames.length})</div>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {visibleFrames.map((frame) => {
+                const isPersisting = persistingIds.has(frame.id);
+                const isDiscarding = discardingIds.has(frame.id);
+                const isProcessing = isPersisting || isDiscarding;
+                return (
                   <div
-                    className="w-14 h-9 rounded border-2 border-success"
-                    style={{
-                      backgroundImage: loadedImages[frame.id] ? `url(${loadedImages[frame.id]})` : undefined,
-                      background: loadedImages[frame.id]
-                        ? 'center/cover'
-                        : 'var(--color-warmth-950)',
-                    }}
-                  />
-                  <span className="absolute -top-1 -right-1 bg-stash-600 text-white text-[8px] px-1 py-0.5 rounded">
-                    待选区
-                  </span>
-                </div>
-              ))}
+                    key={frame.id}
+                    className="relative flex-shrink-0 w-28 bg-white rounded-lg border border-stone-200 overflow-hidden"
+                  >
+                    <div
+                      className="w-full h-16 bg-cover bg-center"
+                      style={{
+                        backgroundImage: loadedImages[frame.id]
+                          ? `url(${loadedImages[frame.id]})`
+                          : undefined,
+                        background: loadedImages[frame.id]
+                          ? undefined
+                          : 'var(--color-warmth-950)',
+                      }}
+                    />
+                    <div className="p-1.5">
+                      <div className="text-[9px] text-stone-500 mb-1">
+                        {formatDuration(frame.time_seconds)}
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handlePersist(frame.id)}
+                          disabled={isProcessing}
+                          className="flex-1 flex items-center justify-center gap-0.5 px-1.5 py-1 text-[9px] bg-success text-white rounded hover:bg-success-dark disabled:opacity-50"
+                        >
+                          {isPersisting ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <Check className="w-2.5 h-2.5" />
+                          )}
+                          加入待选区
+                        </button>
+                        <button
+                          onClick={() => handleDiscard(frame.id)}
+                          disabled={isProcessing}
+                          className="flex-1 px-1.5 py-1 text-[9px] bg-stone-200 text-stone-600 rounded hover:bg-stone-300 disabled:opacity-50"
+                        >
+                          {isDiscarding ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin inline" />
+                          ) : null}
+                          放弃
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

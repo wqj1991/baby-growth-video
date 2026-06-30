@@ -95,6 +95,8 @@ pub struct Photo {
     pub description: Option<String>,
     pub is_selected: bool,
     pub is_final: bool,
+    pub thumbnail_path: Option<String>,
+    pub source: String,
     pub created_at: String,
 }
 
@@ -117,10 +119,11 @@ pub struct VideoFrame {
     pub id: i64,
     pub video_id: i64,
     pub period_id: i64,
-    pub file_path: String,
+    pub file_path: Option<String>,
     pub time_seconds: f64,
     pub is_selected: bool,
     pub is_final: bool,
+    pub thumbnail_path: Option<String>,
     pub created_at: String,
 }
 
@@ -135,6 +138,16 @@ pub struct ExportRecord {
     pub resolution: String,
     pub status: String,
     pub error_message: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VideoFrameTemp {
+    pub id: i64,
+    pub video_id: i64,
+    pub period_id: i64,
+    pub time_seconds: f64,
+    pub temp_thumb_path: String,
     pub created_at: String,
 }
 
@@ -243,6 +256,8 @@ impl Database {
                 description TEXT,
                 is_selected INTEGER NOT NULL DEFAULT 0,
                 is_final INTEGER NOT NULL DEFAULT 0,
+                thumbnail_path TEXT,
+                source TEXT NOT NULL DEFAULT 'scan',
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
             )",
@@ -273,11 +288,27 @@ impl Database {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 video_id INTEGER NOT NULL,
                 period_id INTEGER NOT NULL,
-                file_path TEXT NOT NULL,
+                file_path TEXT,
                 time_seconds REAL NOT NULL DEFAULT 0,
                 is_selected INTEGER NOT NULL DEFAULT 0,
                 is_final INTEGER NOT NULL DEFAULT 0,
+                thumbnail_path TEXT,
                 created_at TEXT NOT NULL,
+                FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
+                FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        // 视频帧临时表
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS video_frame_temp (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                video_id INTEGER NOT NULL,
+                period_id INTEGER NOT NULL,
+                time_seconds REAL NOT NULL,
+                temp_thumb_path TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
                 FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
             )",
@@ -694,7 +725,9 @@ impl Database {
                 description: row.get(8)?,
                 is_selected: row.get::<_, i64>(9)? != 0,
                 is_final: row.get::<_, i64>(10)? != 0,
-                created_at: row.get(11)?,
+                thumbnail_path: row.get(11)?,
+                source: row.get::<_, String>(12)?,
+                created_at: row.get(13)?,
             })
         })?;
         photos.collect()
@@ -724,8 +757,8 @@ impl Database {
 
         for photo in photos {
             match conn.execute(
-                "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, thumbnail_path, source, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     photo.period_id,
                     photo.file_path,
@@ -734,13 +767,20 @@ impl Database {
                     photo.width,
                     photo.height,
                     photo.taken_at,
+                    photo.thumbnail_path,
+                    photo.source,
                     &now,
                 ],
             ) {
                 Ok(_) => {
                     let id = conn.last_insert_rowid();
-                    let photo = self.get_photo_by_id(id)?;
-                    result.push(photo);
+                    match self.get_photo_by_id(id) {
+                        Ok(photo) => result.push(photo),
+                        Err(e) => {
+                            conn.execute("ROLLBACK", params![]).ok();
+                            return Err(e);
+                        }
+                    }
                 }
                 Err(e) => {
                     // 出错回滚
@@ -763,14 +803,15 @@ impl Database {
         file_size: i64,
         width: i64,
         height: i64,
+        thumbnail_path: Option<String>,
         description: &str,
     ) -> Result<Photo> {
         let conn = self.get_conn();
         let now = Self::now();
         
         conn.execute(
-            "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, description, is_selected, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, description, is_selected, thumbnail_path, source, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 period_id,
                 file_path,
@@ -781,12 +822,198 @@ impl Database {
                 &now[..10], // taken_at: YYYY-MM-DD
                 description,
                 1, // is_selected: true
+                thumbnail_path,
+                "collage", // source: mark as collage
                 &now,
             ],
         )?;
         
         let id = conn.last_insert_rowid();
         self.get_photo_by_id(id)
+    }
+
+    pub fn get_pending_items(&self, period_id: i64) -> Result<Vec<PendingItem>> {
+        let conn = self.get_conn();
+        let mut items = Vec::new();
+
+        // 查询 photos (is_selected = 1)
+        {
+            let mut stmt = conn.prepare(
+                "SELECT id, period_id, file_path, file_name, thumbnail_path, width, height,
+                        taken_at, is_final, source
+                 FROM photos
+                 WHERE period_id = ?1 AND is_selected = 1
+                 ORDER BY created_at ASC"
+            )?;
+            let photo_rows = stmt.query_map(params![period_id], |row| {
+                let source: String = row.get(9)?;
+                Ok(PendingItem {
+                    item_type: if source == "collage" { "collage".to_string() } else { "photo".to_string() },
+                    id: row.get(0)?,
+                    period_id: row.get(1)?,
+                    file_path: Some(row.get::<_, String>(2)?),
+                    file_name: Some(row.get(3)?),
+                    thumbnail_path: row.get(4)?,
+                    width: row.get(5)?,
+                    height: row.get(6)?,
+                    time_seconds: None,
+                    taken_at: row.get(7)?,
+                    is_final: row.get::<_, i64>(8)? != 0,
+                    source: Some(source),
+                })
+            })?;
+            for row in photo_rows {
+                items.push(row?);
+            }
+        }
+
+        // 查询 video_frames (is_selected = 1)
+        {
+            let mut stmt = conn.prepare(
+                "SELECT id, period_id, file_path, thumbnail_path, time_seconds, is_final
+                 FROM video_frames
+                 WHERE period_id = ?1 AND is_selected = 1
+                 ORDER BY created_at ASC"
+            )?;
+            let frame_rows = stmt.query_map(params![period_id], |row| {
+                Ok(PendingItem {
+                    item_type: "video_frame".to_string(),
+                    id: row.get(0)?,
+                    period_id: row.get(1)?,
+                    file_path: row.get(2)?,
+                    file_name: None,
+                    thumbnail_path: row.get(3)?,
+                    width: 0,
+                    height: 0,
+                    time_seconds: Some(row.get(4)?),
+                    taken_at: None,
+                    is_final: row.get::<_, i64>(5)? != 0,
+                    source: None,
+                })
+            })?;
+            for row in frame_rows {
+                items.push(row?);
+            }
+        }
+
+        Ok(items)
+    }
+
+    pub fn delete_from_pending(&self, item_type: &str, item_id: i64) -> Result<Option<(String, Option<String>)>> {
+        let conn = self.get_conn();
+        match item_type {
+            "photo" => {
+                // 扫描照片: 仅取消 is_selected，不删文件
+                conn.execute(
+                    "UPDATE photos SET is_selected = 0 WHERE id = ?1 AND source = 'scan'",
+                    params![item_id],
+                )?;
+                Ok(None)
+            }
+            "collage" => {
+                // 拼图: 删 DB + 返回文件路径供调用方删除
+                let paths: (String, Option<String>) = conn.query_row(
+                    "SELECT file_path, thumbnail_path FROM photos WHERE id = ?1 AND source = 'collage'",
+                    params![item_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?;
+                conn.execute("DELETE FROM photos WHERE id = ?1", params![item_id])?;
+                Ok(Some(paths))
+            }
+            "video_frame" => {
+                // 视频帧: 删 DB + 返回文件路径供调用方删除
+                let paths: (Option<String>, Option<String>) = conn.query_row(
+                    "SELECT file_path, thumbnail_path FROM video_frames WHERE id = ?1",
+                    params![item_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?;
+                conn.execute("DELETE FROM video_frames WHERE id = ?1", params![item_id])?;
+                // flatten Option
+                let fp = paths.0.unwrap_or_default();
+                if fp.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some((fp, paths.1)))
+                }
+            }
+            _ => Err(rusqlite::Error::InvalidParameterName("unknown item_type".to_string())),
+        }
+    }
+
+    pub fn insert_video_frame_temp(&self, video_id: i64, period_id: i64, time_seconds: f64, temp_thumb_path: &str) -> Result<VideoFrameTemp> {
+        let conn = self.get_conn();
+        let now = Self::now();
+        conn.execute(
+            "INSERT INTO video_frame_temp (video_id, period_id, time_seconds, temp_thumb_path, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![video_id, period_id, time_seconds, temp_thumb_path, &now],
+        )?;
+        let id = conn.last_insert_rowid();
+        Ok(VideoFrameTemp {
+            id,
+            video_id,
+            period_id,
+            time_seconds,
+            temp_thumb_path: temp_thumb_path.to_string(),
+            created_at: now,
+        })
+    }
+
+    pub fn get_temp_frames(&self, video_id: i64) -> Result<Vec<VideoFrameTemp>> {
+        let conn = self.get_conn();
+        let mut stmt = conn.prepare(
+            "SELECT id, video_id, period_id, time_seconds, temp_thumb_path, created_at
+             FROM video_frame_temp WHERE video_id = ?1 ORDER BY time_seconds ASC"
+        )?;
+        let frames = stmt.query_map(params![video_id], |row| {
+            Ok(VideoFrameTemp {
+                id: row.get(0)?,
+                video_id: row.get(1)?,
+                period_id: row.get(2)?,
+                time_seconds: row.get(3)?,
+                temp_thumb_path: row.get(4)?,
+                created_at: row.get(5)?,
+            })
+        })?;
+        frames.collect()
+    }
+
+    pub fn get_temp_frame_by_id(&self, temp_id: i64) -> Result<VideoFrameTemp> {
+        let conn = self.get_conn();
+        conn.query_row(
+            "SELECT id, video_id, period_id, time_seconds, temp_thumb_path, created_at
+             FROM video_frame_temp WHERE id = ?1",
+            params![temp_id],
+            |row| Ok(VideoFrameTemp {
+                id: row.get(0)?,
+                video_id: row.get(1)?,
+                period_id: row.get(2)?,
+                time_seconds: row.get(3)?,
+                temp_thumb_path: row.get(4)?,
+                created_at: row.get(5)?,
+            }),
+        )
+    }
+
+    pub fn delete_temp_frame(&self, temp_id: i64) -> Result<Option<String>> {
+        let conn = self.get_conn();
+        let thumb_path: String = conn.query_row(
+            "SELECT temp_thumb_path FROM video_frame_temp WHERE id = ?1",
+            params![temp_id],
+            |row| row.get(0),
+        )?;
+        conn.execute("DELETE FROM video_frame_temp WHERE id = ?1", params![temp_id])?;
+        Ok(Some(thumb_path))
+    }
+
+    pub fn delete_all_temp_frames(&self, video_id: i64) -> Result<Vec<String>> {
+        let conn = self.get_conn();
+        let mut stmt = conn.prepare("SELECT temp_thumb_path FROM video_frame_temp WHERE video_id = ?1")?;
+        let paths: Vec<String> = stmt.query_map(params![video_id], |row| row.get(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        conn.execute("DELETE FROM video_frame_temp WHERE video_id = ?1", params![video_id])?;
+        Ok(paths)
     }
 
     pub fn update_photo(&self, photo: &Photo) -> Result<Photo> {
@@ -853,7 +1080,9 @@ impl Database {
                 description: row.get(8)?,
                 is_selected: row.get::<_, i64>(9)? != 0,
                 is_final: row.get::<_, i64>(10)? != 0,
-                created_at: row.get(11)?,
+                thumbnail_path: row.get(11)?,
+                source: row.get::<_, String>(12)?,
+                created_at: row.get(13)?,
             })
         })
     }
@@ -915,8 +1144,13 @@ impl Database {
             ) {
                 Ok(_) => {
                     let id = conn.last_insert_rowid();
-                    let video = self.get_video_by_id(id)?;
-                    result.push(video);
+                    match self.get_video_by_id(id) {
+                        Ok(video) => result.push(video),
+                        Err(e) => {
+                            conn.execute("ROLLBACK", params![]).ok();
+                            return Err(e);
+                        }
+                    }
                 }
                 Err(e) => {
                     // 出错回滚
@@ -964,7 +1198,8 @@ impl Database {
                 time_seconds: row.get(4)?,
                 is_selected: row.get::<_, i64>(5)? != 0,
                 is_final: row.get::<_, i64>(6)? != 0,
-                created_at: row.get(7)?,
+                thumbnail_path: row.get(7)?,
+                created_at: row.get(8)?,
             })
         })?;
         frames.collect()
@@ -984,7 +1219,8 @@ impl Database {
                 time_seconds: row.get(4)?,
                 is_selected: row.get::<_, i64>(5)? != 0,
                 is_final: row.get::<_, i64>(6)? != 0,
-                created_at: row.get(7)?,
+                thumbnail_path: row.get(7)?,
+                created_at: row.get(8)?,
             })
         })?;
         frames.collect()
@@ -1019,13 +1255,14 @@ impl Database {
         let conn = self.get_conn();
         let now = Self::now();
         conn.execute(
-            "INSERT INTO video_frames (video_id, period_id, file_path, time_seconds, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO video_frames (video_id, period_id, file_path, time_seconds, thumbnail_path, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 frame.video_id,
                 frame.period_id,
                 frame.file_path,
                 frame.time_seconds,
+                frame.thumbnail_path,
                 &now,
             ],
         )?;
@@ -1044,7 +1281,8 @@ impl Database {
                 time_seconds: row.get(4)?,
                 is_selected: row.get::<_, i64>(5)? != 0,
                 is_final: row.get::<_, i64>(6)? != 0,
-                created_at: row.get(7)?,
+                thumbnail_path: row.get(7)?,
+                created_at: row.get(8)?,
             })
         })
     }
@@ -1184,6 +1422,22 @@ pub struct AiSettings {
 
 // ==================== 辅助结构体 ====================
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PendingItem {
+    pub item_type: String,
+    pub id: i64,
+    pub period_id: i64,
+    pub file_path: Option<String>,
+    pub file_name: Option<String>,
+    pub thumbnail_path: Option<String>,
+    pub width: i64,
+    pub height: i64,
+    pub time_seconds: Option<f64>,
+    pub taken_at: Option<String>,
+    pub is_final: bool,
+    pub source: Option<String>,
+}
+
 pub struct NewPhoto {
     pub period_id: i64,
     pub file_path: String,
@@ -1192,6 +1446,8 @@ pub struct NewPhoto {
     pub width: i64,
     pub height: i64,
     pub taken_at: Option<String>,
+    pub thumbnail_path: Option<String>,
+    pub source: String,
 }
 
 pub struct NewVideo {
@@ -1208,8 +1464,9 @@ pub struct NewVideo {
 pub struct NewVideoFrame {
     pub video_id: i64,
     pub period_id: i64,
-    pub file_path: String,
+    pub file_path: Option<String>,
     pub time_seconds: f64,
+    pub thumbnail_path: Option<String>,
 }
 
 pub struct NewExportRecord {

@@ -16,6 +16,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { useAppStore } from '../store';
+import { showToast } from '../store/toastStore';
 import type { SelectableItem } from '../types';
 import { PREVIEW_COLORS } from './TemplateSelector';
 import { estimateFileSize, QUALITY_PRESETS, OUTPUT_SIZE_PRESETS, DEFAULT_TRANSFORM } from '../utils/collageTemplates';
@@ -33,6 +34,8 @@ interface CollageWorkspaceProps {
     transforms: Record<number, { rotation: number; flipH: boolean; flipV: boolean }>,
     quality: number,
     outputSize: number,
+    projectId: number,
+    periodId: number,
   ) => void;
   generating: boolean;
 }
@@ -68,6 +71,8 @@ export default function CollageWorkspace({
     collageOutputSize,
     setCollageOutputSize,
     addToSelectedItems,
+    currentProject,
+    currentPeriod,
   } = useAppStore();
 
   // 照片替换面板
@@ -428,6 +433,10 @@ export default function CollageWorkspace({
   /** 处理生成拼图 */
   const handleGenerate = () => {
     if (!selectedTemplateId) return;
+    if (!currentProject || !currentPeriod) {
+      showToast?.('error', '项目或周期未选择', '无法生成拼图');
+      return;
+    }
 
     // 收集所有 transforms（确保非空）
     const transforms: Record<number, { rotation: number; flipH: boolean; flipV: boolean }> = {};
@@ -442,7 +451,7 @@ export default function CollageWorkspace({
       });
     }
 
-    onGenerate(selectedTemplateId, collageGap, order, transforms, collageQuality, collageOutputSize);
+    onGenerate(selectedTemplateId, collageGap, order, transforms, collageQuality, collageOutputSize, currentProject.id, currentPeriod.id);
   };
 
   // 当前选中的区域信息

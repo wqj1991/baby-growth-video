@@ -18,6 +18,7 @@ pub struct CollageRegion {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CollageRequest {
     pub template_id: String,
+    pub period_id: i64,
     pub output_width: i64,
     pub output_height: i64,
     pub gap_px: i64,
@@ -94,7 +95,7 @@ fn apply_rotation(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, rotation: i64) -> ImageB
     )
 }
 
-pub fn generate_collage(req: CollageRequest, project_id: i64) -> Result<CollageResult, String> {
+pub fn generate_collage(req: &CollageRequest, project_id: i64) -> Result<CollageResult, String> {
     let output_width = req.output_width as u32;
     let output_height = req.output_height as u32;
     let gap_px = req.gap_px as u32;

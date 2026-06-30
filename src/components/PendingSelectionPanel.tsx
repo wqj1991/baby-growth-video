@@ -1,48 +1,114 @@
-import { Check, X, Grid3X3, Wand2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, X, Grid3X3, Wand2, Loader2 } from 'lucide-react';
+import { useAppStore } from '../store';
+import { getImageBase64 } from '../utils/tauriCommands';
 import { MIN_PHOTOS, MAX_PHOTOS } from '../utils/collageTemplates';
-import type { SelectableItem, Photo, VideoFrame } from '../types';
+import type { PendingItem } from '../types';
 
 interface PendingSelectionPanelProps {
-  selectedItems: SelectableItem[];
-  loadedImages: Record<number, string>;
-  onToggleMultiSelect: (item: SelectableItem) => void;
-  onRemoveItem: (item: SelectableItem) => void;
-  onSelectSingle: (item: SelectableItem) => void;
-  onCancelFinal?: (item: SelectableItem) => void;
-  onGenerateCollage: () => void;
-  onPreview?: (item: SelectableItem) => void;
-  loading?: boolean;
+  onGenerateCollage?: () => void;
+  onPreview?: (item: PendingItem) => void;
+  onToggleMultiSelect?: (item: PendingItem) => void;
+  onSelectSingle?: (item: PendingItem) => void;
+  onCancelFinal?: (item: PendingItem) => void;
 }
 
 export default function PendingSelectionPanel({
-  selectedItems,
-  loadedImages,
-  onToggleMultiSelect,
-  onRemoveItem,
-  onSelectSingle,
-  onCancelFinal,
   onGenerateCollage,
   onPreview,
-  loading = false,
+  onToggleMultiSelect,
+  onSelectSingle,
+  onCancelFinal,
 }: PendingSelectionPanelProps) {
-  const multiSelectedCount = selectedItems.filter((item) => {
-    if (item.type === 'photo') return item.item.is_multi_selected;
-    return item.item.is_multi_selected;
-  }).length;
+  const {
+    pendingItems,
+    pendingLoading,
+    deletingItemId,
+    loadPendingItems,
+    deletePendingItem,
+    currentPeriod,
+  } = useAppStore();
 
+  const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [generatingCollage, setGeneratingCollage] = useState(false);
+
+  // Load pending items on mount / period change
+  useEffect(() => {
+    if (currentPeriod) {
+      loadPendingItems(currentPeriod.id);
+    }
+  }, [currentPeriod?.id]);
+
+  // Load item thumbnails
+  useEffect(() => {
+    const loadImages = async () => {
+      const itemsToLoad = pendingItems.filter((item) => !loadedImages[item.id]);
+      if (itemsToLoad.length === 0) return;
+      const results = await Promise.all(
+        itemsToLoad.map(async (item) => {
+          const imagePath = item.thumbnail_path || item.file_path;
+          if (!imagePath) return { id: item.id, url: '' };
+          try {
+            const url = await getImageBase64(imagePath);
+            return { id: item.id, url };
+          } catch (error) {
+            console.error(`加载待选项图片失败 ${item.id}:`, error);
+            return { id: item.id, url: '' };
+          }
+        })
+      );
+      const newImages: Record<number, string> = {};
+      results.forEach(({ id, url }) => {
+        if (url) newImages[id] = url;
+      });
+      setLoadedImages((prev) => ({ ...prev, ...newImages }));
+    };
+    if (pendingItems.length > 0) loadImages();
+  }, [pendingItems]);
+
+  const multiSelectedCount = pendingItems.filter((item) => selectedIds.has(item.id)).length;
   const canCollage = multiSelectedCount >= MIN_PHOTOS && multiSelectedCount <= MAX_PHOTOS;
 
-  const getFileName = (item: SelectableItem): string => {
-    if (item.type === 'photo') return (item.item as Photo).file_name;
-    return `视频截帧 · ${Math.floor((item.item as VideoFrame).time_seconds / 60)}:${((item.item as VideoFrame).time_seconds % 60).toString().padStart(2, '0')}`;
+  const getFileName = (item: PendingItem): string => {
+    if (item.file_name) return item.file_name;
+    if (item.item_type === 'video_frame') {
+      return `视频截帧 · ${Math.floor((item.time_seconds || 0) / 60)}:${((item.time_seconds || 0) % 60).toString().padStart(2, '0')}`;
+    }
+    return `项目 #${item.id}`;
   };
 
-  const isItemMultiSelected = (item: SelectableItem): boolean => {
-    return item.item.is_multi_selected;
+  const getSourceLabel = (item: PendingItem): { text: string; className: string } => {
+    switch (item.item_type) {
+      case 'photo':
+        return { text: '扫描', className: 'bg-indigo-600 text-white' };
+      case 'collage':
+        return { text: '拼图', className: 'bg-purple-600 text-white' };
+      case 'video_frame':
+        return { text: '截帧', className: 'bg-warmth-600 text-white' };
+      default:
+        return { text: '未知', className: 'bg-stone-500 text-white' };
+    }
   };
 
-  const isItemFinal = (item: SelectableItem): boolean => {
-    return item.item.is_final;
+  const handleToggleMultiSelect = (item: PendingItem) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      return next;
+    });
+    onToggleMultiSelect?.(item);
+  };
+
+  const handleGenerateCollage = async () => {
+    if (!onGenerateCollage) return;
+    setGeneratingCollage(true);
+    try {
+      onGenerateCollage();
+    } finally {
+      setGeneratingCollage(false);
+    }
   };
 
   return (
@@ -51,13 +117,13 @@ export default function PendingSelectionPanel({
         <Grid3X3 className="w-4 h-4 text-stash-600" />
         <h3 className="text-sm font-semibold text-stone-900">候选照片</h3>
         <span className="text-[11px] font-bold text-stash-600 bg-stash-100 px-2 py-0.5 rounded-full">
-          {selectedItems.length} 张
+          {pendingItems.length} 张
         </span>
         <span className="ml-auto text-[11px] text-stone-400">单击选择 · 双击预览</span>
       </div>
 
       {/* 已选中状态条 — 紧跟标题栏 */}
-      {selectedItems.length > 0 && (
+      {pendingItems.length > 0 && (
         <div className="px-5 py-2.5 border-b border-stone-100 bg-stone-50/80">
           {multiSelectedCount >= 2 ? (
             <div className="flex items-center gap-2">
@@ -93,7 +159,12 @@ export default function PendingSelectionPanel({
       )}
 
       <div className="flex-1 overflow-y-auto p-5">
-        {selectedItems.length === 0 ? (
+        {pendingLoading ? (
+          <div className="empty-state-v2">
+            <div className="w-6 h-6 border-2 border-stone-200 border-t-warmth-400 rounded-full animate-spin mb-3" />
+            <h4>加载待选区...</h4>
+          </div>
+        ) : pendingItems.length === 0 ? (
           <div className="empty-state-v2">
             <div className="empty-icon">📋</div>
             <h4>暂无待选项目</h4>
@@ -102,17 +173,19 @@ export default function PendingSelectionPanel({
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2">
-              {selectedItems.map((item) => {
-                const uniqueKey = `${item.type}-${item.item.id}`;
-                const imageUrl = loadedImages[item.item.id];
-                const multiSelected = isItemMultiSelected(item);
-                const final = isItemFinal(item);
+              {pendingItems.map((item) => {
+                const uniqueKey = `${item.item_type}-${item.id}`;
+                const imageUrl = loadedImages[item.id];
+                const multiSelected = selectedIds.has(item.id);
+                const final = item.is_final;
+                const source = getSourceLabel(item);
+                const isDeleting = deletingItemId === item.id;
 
                 return (
                   <div
                     key={uniqueKey}
                     className={`stash-compare-item relative cursor-pointer group ${final ? 'ring-2 ring-success' : multiSelected ? 'ring-2 ring-stash-600' : ''}`}
-                    onClick={() => onToggleMultiSelect(item)}
+                    onClick={() => handleToggleMultiSelect(item)}
                     onDoubleClick={() => onPreview?.(item)}
                   >
                     <div className="stash-compare-thumb" style={{ aspectRatio: '4/3' }}>
@@ -124,13 +197,18 @@ export default function PendingSelectionPanel({
                     </div>
 
                     <button
-                      className="stash-remove-btn bg-black/50 hover:bg-black/70 text-white rounded-full p-1 shadow-sm"
+                      className="stash-remove-btn bg-black/50 hover:bg-black/70 text-white rounded-full p-1 shadow-sm disabled:opacity-50"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onRemoveItem(item);
+                        deletePendingItem(item.item_type, item.id);
                       }}
+                      disabled={isDeleting}
                     >
-                      <X className="w-3 h-3" />
+                      {isDeleting ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <X className="w-3 h-3" />
+                      )}
                     </button>
 
                     {multiSelected && !final && (
@@ -157,8 +235,8 @@ export default function PendingSelectionPanel({
                         {getFileName(item)}
                       </div>
                       <div className="flex items-center gap-1 mt-0.5">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${item.type === 'photo' ? 'bg-indigo-600 text-white' : 'bg-warmth-600 text-white'}`}>
-                          {item.type === 'photo' ? '扫描' : '截帧'}
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${source.className}`}>
+                          {source.text}
                         </span>
                       </div>
                     </div>
@@ -173,7 +251,7 @@ export default function PendingSelectionPanel({
                           style={{ pointerEvents: 'auto' }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            onSelectSingle(item);
+                            onSelectSingle?.(item);
                           }}
                         >
                           <Check className="w-3 h-3 inline mr-1" />
@@ -201,30 +279,30 @@ export default function PendingSelectionPanel({
         )}
       </div>
 
-      {selectedItems.length > 0 && (
+      {pendingItems.length > 0 && (
         <div className="p-3 border-t border-stone-200 bg-white">
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => {
-                if (selectedItems.length > 0) {
-                  onSelectSingle(selectedItems[0]);
+                if (pendingItems.length > 0) {
+                  onSelectSingle?.(pendingItems[0]);
                 }
               }}
-              disabled={loading}
+              disabled={generatingCollage}
               className="btn btn-secondary w-full !justify-center text-xs"
             >
-              {loading && <div className="w-3 h-3 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />}
+              {generatingCollage && <div className="w-3 h-3 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />}
               <Check className="w-3 h-3" />
-              {loading ? '处理中...' : '单独选定'}
+              {generatingCollage ? '处理中...' : '单独选定'}
             </button>
             <button
-              onClick={onGenerateCollage}
-              disabled={!canCollage || loading}
+              onClick={handleGenerateCollage}
+              disabled={!canCollage || generatingCollage}
               className="btn btn-primary w-full !justify-center text-xs"
             >
-              {loading && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {generatingCollage && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               <Wand2 className="w-3 h-3" />
-              {loading ? '生成中...' : `生成拼图${canCollage ? `(${multiSelectedCount}张)` : ''}`}
+              {generatingCollage ? '生成中...' : `生成拼图${canCollage ? `(${multiSelectedCount}张)` : ''}`}
             </button>
           </div>
         </div>

@@ -16,6 +16,8 @@ import type {
   AiSettings,
   PeriodStats,
   PhotoText,
+  PendingItem,
+  VideoFrameTemp,
 } from '../types';
 
 /**
@@ -189,12 +191,12 @@ export async function getPeriodVideoFrames(periodId: number): Promise<VideoFrame
 }
 
 // 生成视频截图（按数量）
-export async function generateVideoFrames(videoId: number, count: number): Promise<VideoFrame[]> {
+export async function generateVideoFrames(videoId: number, count: number): Promise<VideoFrameTemp[]> {
   return invoke('generate_video_frames', { videoId, count });
 }
 
 // 生成视频截图（按间隔）
-export async function generateVideoFramesByInterval(videoId: number, intervalSeconds: number): Promise<VideoFrame[]> {
+export async function generateVideoFramesByInterval(videoId: number, intervalSeconds: number): Promise<VideoFrameTemp[]> {
   return invoke('generate_video_frames_by_interval', { videoId, intervalSeconds });
 }
 
@@ -345,6 +347,7 @@ export interface CollageRegion {
 
 export interface CollageRequest {
   template_id: string;
+  period_id: number;
   output_width: number;
   output_height: number;
   gap_px: number;
@@ -384,4 +387,30 @@ export async function getAiSettings(): Promise<AiSettings> {
 // 测试 AI 连接
 export async function testAiConnection(): Promise<string> {
   return invoke('test_ai_connection');
+}
+
+// ==================== 待处理项 & 临时帧 ====================
+
+export async function getPendingItems(periodId: number): Promise<PendingItem[]> {
+  return invoke('get_pending_items', { periodId });
+}
+
+export async function deleteSelectedItem(itemType: string, itemId: number): Promise<void> {
+  return invoke('delete_selected_item', { itemType, itemId });
+}
+
+export async function generateThumbnail(sourcePath: string, projectId: number, uuid: string): Promise<string> {
+  return invoke('generate_thumbnail', { sourcePath, projectId, uuid });
+}
+
+export async function persistVideoFrame(tempId: number, projectId: number): Promise<void> {
+  return invoke('persist_video_frame', { tempId, projectId });
+}
+
+export async function discardTempFrames(videoId: number): Promise<void> {
+  return invoke('discard_temp_frames', { videoId });
+}
+
+export async function getTempFrames(videoId: number): Promise<VideoFrameTemp[]> {
+  return invoke('get_temp_frames', { videoId });
 }

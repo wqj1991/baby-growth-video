@@ -27,15 +27,14 @@ import {
   getImageBase64,
   generateVideoFrames,
   generateVideoFramesByInterval,
-  updateVideoFrame,
   setFinalVideoFrame,
+  cancelFinalVideoFrame,
   getVideoThumbnail,
   getPeriodStats,
   generateCollage,
   createCollagePhoto,
-  deletePhoto,
 } from '../utils/tauriCommands';
-import type { Photo, Video, VideoFrame, SelectableItem } from '../types';
+import type { Photo, Video, VideoFrame, SelectableItem, PendingItem } from '../types';
 import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
 import VideoFrameSettingsModal from '../components/VideoFrameSettingsModal';
 import VideoFrameViewerModal from '../components/VideoFrameViewerModal';
@@ -63,13 +62,15 @@ export default function PeriodSelectPage() {
     setIsScanning,
     currentBaby,
     selectedItems,
-  setSelectedItems,
-  addToSelectedItems,
-  removeFromSelectedItems,
-  periodStats,
-  setPeriodStats,
-  updatePeriodStat,
-  // Collage state
+    setSelectedItems,
+    addToSelectedItems,
+    removeFromSelectedItems,
+    periodStats,
+    setPeriodStats,
+    updatePeriodStat,
+    loadPendingItems,
+    loadTempFrames,
+    // Collage state
     collageMode,
     setCollageMode,
     setCollagePhotoOrder,
@@ -89,6 +90,8 @@ export default function PeriodSelectPage() {
   const loadedImageIds = useRef<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
+  const [previewingPendingItem, setPreviewingPendingItem] = useState<PendingItem | null>(null);
 
   const [currentVideoForFrames, setCurrentVideoForFrames] = useState<Video | null>(null);
   const [showFrameSettings, setShowFrameSettings] = useState(false);
@@ -148,8 +151,10 @@ export default function PeriodSelectPage() {
   useEffect(() => {
     if (currentPeriod) {
       loadPeriodMedia(currentPeriod.id);
+      loadPendingItems(currentPeriod.id);
       setShowPreview(false);
       setPreviewIndex(0);
+      setPendingPreviewUrl(null);
       setShowFrameSettings(false);
       setShowFrameViewer(false);
       setShowInlinePlayer(false);
@@ -202,7 +207,7 @@ export default function PeriodSelectPage() {
         const results = await Promise.all(
           batch.map(async (frame) => {
             try {
-              const base64 = await getImageBase64(frame.file_path);
+              const base64 = await getImageBase64(frame.file_path!);
               return { id: frame.id, url: base64 };
             } catch (error) {
               loadedImageIds.current.delete(frame.id);
@@ -286,49 +291,14 @@ export default function PeriodSelectPage() {
       setCurrentPhotos(photos);
       setCurrentVideos(videos);
 
-      const pendingPhotos: SelectableItem[] = photos
-        .filter(p => p.is_selected)
-        .map(p => ({ type: 'photo' as const, item: { ...p, is_multi_selected: false } }));
-      
-      let pendingFrames: SelectableItem[] = [];
       try {
         const frames = await getPeriodVideoFrames(periodId);
         setCurrentVideoFrames(frames);
-        pendingFrames = frames
-          .filter(f => f.is_selected)
-          .map(f => ({ type: 'video_frame' as const, item: { ...f, is_multi_selected: false } }));
       } catch (frameError) {
         console.error('加载视频帧失败:', frameError);
         setCurrentVideoFrames([]);
       }
-      
-      const allPending = [...pendingPhotos, ...pendingFrames];
-      if (allPending.length > 0) setSelectedItems(allPending);
-      
-      const pendingPhotoItems: Photo[] = pendingPhotos.map(p => p.item as Photo);
-      if (pendingPhotoItems.length > 0) {
-        pendingPhotoItems.forEach(p => loadedImageIds.current.add(p.id));
-        const batchSize = 5;
-        for (let i = 0; i < pendingPhotoItems.length; i += batchSize) {
-          const batch = pendingPhotoItems.slice(i, i + batchSize);
-          const results = await Promise.all(
-            batch.map(async (photo) => {
-              try {
-                const base64 = await getImageBase64(photo.file_path);
-                return { id: photo.id, url: base64 };
-              } catch (error) {
-                console.error(`加载图片 ${photo.file_name} 失败:`, error);
-                loadedImageIds.current.delete(photo.id);
-                return { id: photo.id, url: '' };
-              }
-            })
-          );
-          const newLoadedImages: Record<number, string> = {};
-          results.forEach(({ id, url }) => { if (url) newLoadedImages[id] = url; });
-          setLoadedImages(prev => ({ ...prev, ...newLoadedImages }));
-        }
-      }
-      
+
       setSelectedTab('photos');
     } catch (error) { console.error('加载周期媒体失败:', error); }
     finally { setLoadingMedia(false); }
@@ -456,34 +426,17 @@ export default function PeriodSelectPage() {
     setShowFrameSettings(false);
     setIsExtractingFrames(true);
     try {
-      let frames: VideoFrame[];
-      if (mode === 'count') frames = await generateVideoFrames(currentVideoForFrames!.id, value);
-      else frames = await generateVideoFramesByInterval(currentVideoForFrames!.id, value);
-      setCurrentVideoFrames(frames);
-      setVideoFrameCounts(prev => ({ ...prev, [currentVideoForFrames!.id]: frames.length }));
-      setShowFrameViewer(true);
+      if (mode === 'count') {
+        await generateVideoFrames(currentVideoForFrames!.id, value);
+      } else {
+        await generateVideoFramesByInterval(currentVideoForFrames!.id, value);
+      }
+      await loadTempFrames(currentVideoForFrames!.id);
+      setCurrentPlayingVideo(currentVideoForFrames);
+      setShowVideoPlayer(true);
+      setShowInlinePlayer(true);
     } catch (error) { showToast('error', '抽帧失败', '请重试'); }
     finally { setIsExtractingFrames(false); }
-  };
-
-  const handleToggleFrameSelect = async (frame: VideoFrame) => {
-    try {
-      const newSelected = !frame.is_selected;
-      const updated = await updateVideoFrame({ ...frame, is_selected: newSelected });
-      const localUpdated = { ...updated, is_multi_selected: newSelected ? frame.is_multi_selected : false };
-      setCurrentVideoFrames(currentVideoFrames.map(f => f.id === updated.id ? localUpdated : f));
-      if (newSelected) {
-        addToSelectedItems({ type: 'video_frame', item: localUpdated });
-      } else {
-        removeFromSelectedItems({ type: 'video_frame', item: localUpdated });
-      }
-      if (currentPeriod) {
-        const currentStat = periodStats[currentPeriod.id];
-        updatePeriodStat(currentPeriod.id, {
-          pending_count: (currentStat?.pending_count || 0) + (newSelected ? 1 : -1),
-        });
-      }
-    } catch (error) { console.error('更新视频帧失败:', error); }
   };
 
   const handleSetFinalVideoFrame = async (frame: VideoFrame) => {
@@ -511,14 +464,14 @@ export default function PeriodSelectPage() {
   // PREVIEW
   // ============================
 
-  const handleOpenPreview = (index: number) => { setPreviewIndex(index); setShowPreview(true); };
-  const handleClosePreview = () => setShowPreview(false);
+  const handleOpenPreview = (index: number) => { setPreviewIndex(index); setPreviewingPendingItem(null); setPendingPreviewUrl(null); setShowPreview(true); };
+  const handleClosePreview = () => { setShowPreview(false); setPreviewingPendingItem(null); setPendingPreviewUrl(null); };
   const handlePrevPhoto = () => {
-    if (currentPhotos.length === 0) return;
+    if (previewingPendingItem || currentPhotos.length === 0) return;
     setPreviewIndex(prev => (prev - 1 + currentPhotos.length) % currentPhotos.length);
   };
   const handleNextPhoto = () => {
-    if (currentPhotos.length === 0) return;
+    if (previewingPendingItem || currentPhotos.length === 0) return;
     setPreviewIndex(prev => (prev + 1) % currentPhotos.length);
   };
 
@@ -548,24 +501,67 @@ export default function PeriodSelectPage() {
     }
   };
 
-  const handleRemoveFromStash = (item: SelectableItem) => {
-    if (item.type === 'photo') {
-      const photo = item.item as Photo;
-      if (photo.description?.includes('拼图')) {
-        deletePhoto(photo.id).catch(console.error);
+  // 待选区 PendingItem 回调适配
+  const handleTogglePendingMultiSelect = (item: PendingItem) => {
+    if (item.item_type === 'photo' || item.item_type === 'collage') {
+      const photo = currentPhotos.find((p) => p.id === item.id);
+      if (photo) {
+        handleToggleMultiSelect({ type: 'photo', item: { ...photo, is_multi_selected: !photo.is_multi_selected } });
       }
-      handleTogglePhotoSelect({ ...photo, is_selected: true } as Photo);
-    } else {
-      handleToggleFrameSelect({ ...(item.item as VideoFrame), is_selected: true } as VideoFrame);
+    } else if (item.item_type === 'video_frame') {
+      const frame = currentVideoFrames.find((f) => f.id === item.id);
+      if (frame) {
+        handleToggleMultiSelect({ type: 'video_frame', item: { ...frame, is_multi_selected: !frame.is_multi_selected } });
+      }
     }
   };
 
-  const handleSelectSingle = (item: SelectableItem) => {
-    if (item.type === 'photo') {
-      handleSetFinalPhoto(item.item as Photo);
-    } else {
-      handleSetFinalVideoFrame(item.item as VideoFrame);
+  const handlePendingSelectSingle = (item: PendingItem) => {
+    if (item.item_type === 'photo' || item.item_type === 'collage') {
+      const photo = currentPhotos.find((p) => p.id === item.id);
+      if (photo) handleSetFinalPhoto(photo);
+    } else if (item.item_type === 'video_frame') {
+      const frame = currentVideoFrames.find((f) => f.id === item.id);
+      if (frame) handleSetFinalVideoFrame(frame);
     }
+  };
+
+  const handlePendingCancelFinal = (item: PendingItem) => {
+    if (!currentPeriod) return;
+    if (item.item_type === 'photo' || item.item_type === 'collage') {
+      handleCancelFinalPhoto();
+    } else if (item.item_type === 'video_frame') {
+      cancelFinalVideoFrame(currentPeriod.id).catch(console.error);
+      setCurrentVideoFrames(currentVideoFrames.map((f) => ({ ...f, is_final: false })));
+      setSelectedItems(selectedItems.map((i) =>
+        i.type === 'video_frame' ? { ...i, item: { ...i.item, is_final: false } } : i
+      ));
+      setPeriods(periods.map((p) =>
+        p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
+      ));
+      setCurrentPeriod({ ...currentPeriod, selected_photo_id: undefined });
+      updatePeriodStat(currentPeriod.id, { has_final: false });
+    }
+  };
+
+  const handlePendingPreview = async (item: PendingItem) => {
+    if (!item.file_path) return;
+    try {
+      const url = await getImageBase64(item.file_path);
+      setPendingPreviewUrl(url);
+      setPreviewingPendingItem(item);
+      setShowPreview(true);
+    } catch (error) {
+      console.error('加载预览图失败:', error);
+    }
+  };
+
+  const getFileNameForPending = (item: PendingItem): string => {
+    if (item.file_name) return item.file_name;
+    if (item.item_type === 'video_frame') {
+      return `视频截帧 · ${Math.floor((item.time_seconds || 0) / 60)}:${((item.time_seconds || 0) % 60).toString().padStart(2, '0')}`;
+    }
+    return `项目 #${item.id}`;
   };
 
   const handleEnterCollage = () => {
@@ -598,6 +594,8 @@ export default function PeriodSelectPage() {
     transforms: Record<number, { rotation: number; flipH: boolean; flipV: boolean }>,
     quality: number,
     outputSize: number,
+    projectIdParam: number,
+    periodIdParam: number,
   ) => {
     // Build the payload for Rust backend
     const photoPaths = order.map(idx => {
@@ -608,7 +606,7 @@ export default function PeriodSelectPage() {
       }
       return item.type === 'photo'
         ? (item.item as Photo).file_path
-        : (item.item as VideoFrame).file_path;
+        : (item.item as VideoFrame).file_path || '';
     });
 
     if (photoPaths.some(p => p === '')) {
@@ -624,6 +622,7 @@ export default function PeriodSelectPage() {
 
     const collagePayload = {
       template_id: templateId,
+      period_id: periodIdParam,
       output_width: outputSize,
       output_height: outputSize,
       gap_px: gap,
@@ -643,16 +642,7 @@ export default function PeriodSelectPage() {
 
     console.log('拼图生成请求:', collagePayload);
 
-    if (!projectId) {
-      showToast('error', '项目错误', '项目ID无效');
-      return;
-    }
-
-    const pId = parseInt(projectId);
-    if (isNaN(pId)) {
-      showToast('error', '项目错误', '项目ID格式错误');
-      return;
-    }
+    const pId = projectIdParam;
 
     setGeneratingCollage(true);
     try {
@@ -667,7 +657,7 @@ export default function PeriodSelectPage() {
 
       const fileName = `collage_${Date.now()}.jpg`;
       const fileSize = estimateFileSize(outputSize * outputSize, quality).bytes;
-      const periodId = currentPeriod?.id ?? 0;
+      const periodId = periodIdParam;
 
       // 持久化到数据库
       const persistedPhoto = await createCollagePhoto(
@@ -764,14 +754,6 @@ export default function PeriodSelectPage() {
         <VideoFramePlayer
           video={currentPlayingVideo}
           onBack={handleCloseInlinePlayer}
-          onCapture={(frame) => {
-            addToSelectedItems({ type: 'video_frame', item: { ...frame, is_selected: true } });
-          }}
-          onAddToStash={(frame) => {
-            addToSelectedItems({ type: 'video_frame', item: { ...frame, is_selected: true } });
-          }}
-          capturedFrames={currentVideoFrames}
-          loadedImages={loadedImages}
         />
       </div>
     );
@@ -885,20 +867,11 @@ export default function PeriodSelectPage() {
           style={{ width: pendingPanelWidth }}
         >
           <PendingSelectionPanel
-            selectedItems={selectedItems}
-            loadedImages={loadedImages}
-            onToggleMultiSelect={handleToggleMultiSelect}
-            onRemoveItem={handleRemoveFromStash}
-            onSelectSingle={handleSelectSingle}
-            onCancelFinal={() => handleCancelFinalPhoto()}
             onGenerateCollage={handleEnterCollage}
-            onPreview={(item) => {
-              if (item.type === 'photo') {
-                const index = currentPhotos.findIndex(p => p.id === item.item.id);
-                if (index !== -1) handleOpenPreview(index);
-              }
-            }}
-            loading={generatingCollage}
+            onPreview={handlePendingPreview}
+            onToggleMultiSelect={handleTogglePendingMultiSelect}
+            onSelectSingle={handlePendingSelectSingle}
+            onCancelFinal={handlePendingCancelFinal}
           />
         </div>
         
@@ -1088,7 +1061,7 @@ export default function PeriodSelectPage() {
       </div>
 
       {/* ===== IMAGE PREVIEW MODAL ===== */}
-      {showPreview && currentPhotos[previewIndex] && (
+      {showPreview && (previewingPendingItem || currentPhotos[previewIndex]) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 animate-fade-in"
           onClick={handleClosePreview}
@@ -1100,32 +1073,44 @@ export default function PeriodSelectPage() {
             <X className="w-8 h-8" />
           </button>
 
-          <button
-            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
-            onClick={(e) => { e.stopPropagation(); handlePrevPhoto(); }}
-          >
-            <ChevronLeft className="w-10 h-10" />
-          </button>
+          {!previewingPendingItem && (
+            <>
+              <button
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
+                onClick={(e) => { e.stopPropagation(); handlePrevPhoto(); }}
+              >
+                <ChevronLeft className="w-10 h-10" />
+              </button>
 
-          <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
-            onClick={(e) => { e.stopPropagation(); handleNextPhoto(); }}
-          >
-            <ChevronRight className="w-10 h-10" />
-          </button>
+              <button
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
+                onClick={(e) => { e.stopPropagation(); handleNextPhoto(); }}
+              >
+                <ChevronRight className="w-10 h-10" />
+              </button>
+            </>
+          )}
 
           <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             <img
-              src={loadedImages[currentPhotos[previewIndex].id] || ''}
-              alt={currentPhotos[previewIndex].file_name}
+              src={previewingPendingItem ? pendingPreviewUrl || '' : loadedImages[currentPhotos[previewIndex].id] || ''}
+              alt={previewingPendingItem ? getFileNameForPending(previewingPendingItem) : currentPhotos[previewIndex].file_name}
               className="max-w-full max-h-[85vh] object-contain"
             />
           </div>
 
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 text-sm">
-            <span className="font-medium">{currentPhotos[previewIndex].file_name}</span>
-            <span className="mx-2">·</span>
-            <span>{previewIndex + 1} / {currentPhotos.length}</span>
+            <span className="font-medium">
+              {previewingPendingItem
+                ? getFileNameForPending(previewingPendingItem)
+                : currentPhotos[previewIndex].file_name}
+            </span>
+            {!previewingPendingItem && (
+              <>
+                <span className="mx-2">·</span>
+                <span>{previewIndex + 1} / {currentPhotos.length}</span>
+              </>
+            )}
           </div>
         </div>
       )}

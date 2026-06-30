@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem, PeriodStats, AiSettings } from '../types';
+import { invoke } from '@tauri-apps/api/core';
+import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem, PeriodStats, AiSettings, PendingItem, VideoFrameTemp } from '../types';
 import type { CollageTemplate, RegionTransform } from '../utils/collageTemplates';
 import { getTemplateById, DEFAULT_TRANSFORM } from '../utils/collageTemplates';
 
@@ -119,6 +120,19 @@ interface AppState {
   // AI 设置
   aiSettings: AiSettings;
   setAiSettings: (settings: Partial<AiSettings>) => void;
+
+  // 待处理项
+  pendingItems: PendingItem[];
+  pendingLoading: boolean;
+  deletingItemId: number | null;
+  loadPendingItems: (periodId: number) => Promise<void>;
+  deletePendingItem: (itemType: string, itemId: number) => Promise<void>;
+
+  // 临时帧
+  tempFrames: VideoFrameTemp[];
+  persistVideoFrame: (tempId: number, projectId: number) => Promise<void>;
+  discardTempFrames: (videoId: number) => Promise<void>;
+  loadTempFrames: (videoId: number) => Promise<void>;
 }
 
 const DEFAULT_AI_SETTINGS: AiSettings = {
@@ -132,7 +146,7 @@ const DEFAULT_AI_SETTINGS: AiSettings = {
   frame_duration: 1.5,
 };
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   currentBaby: null,
   setCurrentBaby: (baby) => set({ currentBaby: baby }),
 
@@ -316,6 +330,69 @@ export const useAppStore = create<AppState>((set) => ({
   aiSettings: { ...DEFAULT_AI_SETTINGS },
   setAiSettings: (partial) =>
     set((state) => ({ aiSettings: { ...state.aiSettings, ...partial } })),
+
+  // 待处理项
+  pendingItems: [],
+  pendingLoading: false,
+  deletingItemId: null,
+
+  loadPendingItems: async (periodId: number) => {
+    set({ pendingLoading: true });
+    try {
+      const items = await invoke<PendingItem[]>('get_pending_items', { periodId });
+      set({ pendingItems: items, pendingLoading: false });
+    } catch (e) {
+      console.error('Failed to load pending items:', e);
+      set({ pendingLoading: false });
+    }
+  },
+
+  deletePendingItem: async (itemType: string, itemId: number) => {
+    set({ deletingItemId: itemId });
+    try {
+      await invoke('delete_selected_item', { itemType, itemId });
+      const state = get();
+      set({
+        pendingItems: state.pendingItems.filter(
+          i => !(i.item_type === itemType && i.id === itemId)
+        ),
+        deletingItemId: null,
+      });
+    } catch (e) {
+      console.error('Failed to delete item:', e);
+      set({ deletingItemId: null });
+    }
+  },
+
+  // 临时帧
+  tempFrames: [],
+
+  persistVideoFrame: async (tempId: number, projectId: number) => {
+    try {
+      await invoke('persist_video_frame', { tempId, projectId });
+    } catch (e) {
+      console.error('Failed to persist video frame:', e);
+      throw e;
+    }
+  },
+
+  discardTempFrames: async (videoId: number) => {
+    try {
+      await invoke('discard_temp_frames', { videoId });
+      set({ tempFrames: [] });
+    } catch (e) {
+      console.error('Failed to discard temp frames:', e);
+    }
+  },
+
+  loadTempFrames: async (videoId: number) => {
+    try {
+      const frames = await invoke<VideoFrameTemp[]>('get_temp_frames', { videoId });
+      set({ tempFrames: frames });
+    } catch (e) {
+      console.error('Failed to load temp frames:', e);
+    }
+  },
 }));
 
 /** 检查 AI 是否已配置完整 */

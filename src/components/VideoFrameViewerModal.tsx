@@ -47,7 +47,7 @@ export default function VideoFrameViewerModal({
         const results = await Promise.all(
           batch.map(async (frame) => {
             try {
-              const base64 = await getImageBase64(frame.file_path);
+              const base64 = await getImageBase64(frame.file_path!);
               return { id: frame.id, url: base64 };
             } catch (error) {
               console.error('加载视频帧失败:', frame.id, error);

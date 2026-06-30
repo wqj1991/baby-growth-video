@@ -1,4 +1,4 @@
-use crate::db::{Database, ExportRecord, NewExportRecord, Photo, Period, VideoFrame, NewVideoFrame};
+use crate::db::{Database, ExportRecord, NewExportRecord, Photo, Period};
 use crate::ai;
 use crate::agnes;
 use serde::{Deserialize, Serialize};
@@ -953,15 +953,18 @@ pub fn get_video_thumbnail(video_path: &str) -> Result<String, String> {
 
 // 生成视频截图
 pub fn generate_video_frames(
-    db: &Database,
+    db: &crate::db::Database,
     video_id: i64,
     count: i64,
-) -> Result<Vec<VideoFrame>, String> {
+) -> Result<Vec<crate::db::VideoFrameTemp>, String> {
+    use image::imageops::FilterType;
+    use uuid::Uuid;
+
     // 获取视频信息
     let video = db.get_video_by_id(video_id).map_err(|e| e.to_string())?;
-
     let video_path = &video.file_path;
     let duration = video.duration;
+    let period_id = video.period_id;
 
     // 如果时长为0，尝试获取视频信息
     let actual_duration = if duration <= 0.0 {
@@ -979,27 +982,23 @@ pub fn generate_video_frames(
 
     // 计算截图时间点
     let interval = actual_duration / (count + 1) as f64;
-    let mut frames = Vec::new();
 
-    // 创建截图保存目录（在应用数据目录下）
-    let frames_dir = dirs_next::data_dir()
+    // 创建临时帧保存目录
+    let temp_dir = dirs_next::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("baby-growth-video")
-        .join("frames")
-        .join(video_id.to_string());
-    std::fs::create_dir_all(&frames_dir).map_err(|e| e.to_string())?;
+        .join("temp_frames");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
 
-    let video_stem = Path::new(video_path)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("video");
+    let mut frames = Vec::new();
 
     for i in 1..=count {
         let time_seconds = interval * i as f64;
-        let frame_file_name = format!("{}_frame_{:03}.jpg", video_stem, i);
-        let frame_path = frames_dir.join(&frame_file_name);
+        let uuid = Uuid::new_v4().to_string();
+        let frame_path = temp_dir.join(format!("{}_frame.jpg", uuid));
+        let thumb_path = temp_dir.join(format!("{}_thumb.jpg", uuid));
 
-        // 使用ffmpeg截图（静默模式）
+        // 使用ffmpeg截取全分辨率帧（静默模式）
         let status = Command::new(get_ffmpeg_path())
             .args([
                 "-ss", &time_seconds.to_string(),
@@ -1015,17 +1014,42 @@ pub fn generate_video_frames(
             .status()
             .map_err(|e| format!("截图失败: {}", e))?;
 
-        if status.success() {
-            let new_frame = NewVideoFrame {
-                video_id,
-                period_id: video.period_id,
-                file_path: frame_path.to_string_lossy().to_string(),
-                time_seconds,
-            };
+        if !status.success() {
+            let _ = std::fs::remove_file(&frame_path);
+            let _ = std::fs::remove_file(&thumb_path);
+            continue;
+        }
 
-            match db.add_video_frame(&new_frame) {
-                Ok(frame) => frames.push(frame),
-                Err(e) => eprintln!("保存截图失败: {}", e),
+        // 生成缩略图（400px宽）
+        let thumb_result = (|| -> Result<(), String> {
+            let img = image::open(&frame_path)
+                .map_err(|e| format!("读取帧图片失败: {}", e))?;
+            let ratio = 400.0 / img.width() as f64;
+            let new_height = (img.height() as f64 * ratio) as u32;
+            let scaled = img.resize(400, new_height, FilterType::Lanczos3);
+            let mut output = std::fs::File::create(&thumb_path)
+                .map_err(|e| format!("创建缩略图文件失败: {}", e))?;
+            scaled.write_to(&mut output, image::ImageFormat::Jpeg)
+                .map_err(|e| format!("写入缩略图失败: {}", e))?;
+            Ok(())
+        })();
+
+        if let Err(e) = thumb_result {
+            eprintln!("缩略图生成失败: {}", e);
+            let _ = std::fs::remove_file(&frame_path);
+            let _ = std::fs::remove_file(&thumb_path);
+            continue;
+        }
+
+        let thumb_path_str = thumb_path.to_string_lossy().to_string();
+
+        // 插入临时帧记录
+        match db.insert_video_frame_temp(video_id, period_id, time_seconds, &thumb_path_str) {
+            Ok(frame) => frames.push(frame),
+            Err(e) => {
+                eprintln!("保存临时帧失败: {}", e);
+                let _ = std::fs::remove_file(&frame_path);
+                let _ = std::fs::remove_file(&thumb_path);
             }
         }
     }

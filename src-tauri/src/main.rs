@@ -6,6 +6,7 @@ mod video;
 mod ai;
 mod agnes;
 mod collage;
+mod thumbnail;
 
 use db::Database;
 use std::sync::{Arc, Mutex};
@@ -14,6 +15,7 @@ use tauri_plugin_dialog::init as init_dialog;
 use tauri_plugin_fs::init as init_fs;
 use tauri_plugin_shell::init as init_shell;
 use base64::Engine;
+use uuid::Uuid;
 
 struct AppState {
     db: Arc<Mutex<Database>>,
@@ -169,6 +171,7 @@ fn create_collage_photo(
         file_size,
         width,
         height,
+        None, // thumbnail_path: 暂无缩略图，后续由 thumbnail 模块补充
         &description,
     )
     .map_err(|e| e.to_string())
@@ -205,7 +208,7 @@ fn generate_video_frames(
     video_id: i64,
     count: i64,
     state: State<AppState>,
-) -> Result<Vec<db::VideoFrame>, String> {
+) -> Result<Vec<db::VideoFrameTemp>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     video::generate_video_frames(&db, video_id, count).map_err(|e| e.to_string())
 }
@@ -452,10 +455,50 @@ fn get_export_records(
 
 #[tauri::command]
 fn generate_collage(
-    req: collage::CollageRequest,
+    request: collage::CollageRequest,
     project_id: i64,
+    state: State<AppState>,
 ) -> Result<collage::CollageResult, String> {
-    collage::generate_collage(req, project_id)
+    let result = collage::generate_collage(&request, project_id)?;
+
+    // Generate thumbnail for the collage output
+    let uuid = Uuid::new_v4().to_string();
+    let thumb_path = match crate::thumbnail::generate_thumbnail(
+        &result.output_path,
+        project_id,
+        &uuid,
+    ) {
+        Ok(p) => Some(p),
+        Err(e) => {
+            eprintln!("Collage thumbnail generation failed: {}", e);
+            None
+        }
+    };
+
+    // Get collage dimensions
+    let (w, h) = crate::thumbnail::get_image_dimensions(&result.output_path)
+        .unwrap_or((request.output_width as u32, request.output_height as u32));
+
+    // Get file size
+    let metadata = std::fs::metadata(&result.output_path)
+        .map_err(|e| format!("Failed to read collage file: {}", e))?;
+    let file_size = metadata.len() as i64;
+
+    // Persist to DB
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.create_collage_photo(
+        request.period_id,
+        &result.output_path,
+        &format!("collage_{}.jpg", uuid),
+        file_size,
+        w as i64,
+        h as i64,
+        thumb_path,
+        "拼图合成",
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(result)
 }
 
 // ==================== 设置相关 ====================
@@ -527,6 +570,133 @@ fn get_image_base64(file_path: String) -> Result<String, String> {
     Ok(format!("data:{};base64,{}", mime_type, base64))
 }
 
+// ==================== 缩略图生成 ====================
+
+#[tauri::command]
+fn generate_thumbnail(
+    source_path: String,
+    project_id: i64,
+    uuid: String,
+) -> Result<String, String> {
+    crate::thumbnail::generate_thumbnail(&source_path, project_id, &uuid)
+}
+
+// ==================== 临时帧持久化 ====================
+
+#[tauri::command]
+fn persist_video_frame(
+    temp_id: i64,
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<db::VideoFrame, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    
+    let temp = db.get_temp_frame_by_id(temp_id).map_err(|e| e.to_string())?;
+    
+    let data_dir = dirs_next::data_dir().ok_or("Cannot get data directory")?;
+    let project_dir = data_dir.join("baby-growth-video").join("projects").join(project_id.to_string());
+    let frames_dir = project_dir.join("frames");
+    let thumb_dir = project_dir.join("thumbnails");
+    std::fs::create_dir_all(&frames_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
+    
+    let uuid = uuid::Uuid::new_v4().to_string();
+    let dest_frame = frames_dir.join(format!("{}_frame.jpg", uuid));
+    let dest_thumb = thumb_dir.join(format!("{}_thumb.jpg", uuid));
+    
+    // Move thumbnail
+    std::fs::rename(&temp.temp_thumb_path, &dest_thumb)
+        .map_err(|e| format!("Failed to move thumbnail: {}", e))?;
+    
+    // Derive temp frame path from thumb path using UUID extraction
+    let temp_frame_path = {
+        let parent = std::path::Path::new(&temp.temp_thumb_path).parent().unwrap_or(std::path::Path::new("."));
+        let stem = std::path::Path::new(&temp.temp_thumb_path)
+            .file_stem().unwrap_or_default().to_string_lossy();
+        let frame_stem = stem.strip_suffix("_thumb").unwrap_or(&stem);
+        parent.join(format!("{}_frame.jpg", frame_stem))
+    };
+    
+    if temp_frame_path.exists() {
+        std::fs::rename(&temp_frame_path, &dest_frame)
+            .map_err(|e| format!("Failed to move frame: {}", e))?;
+    }
+    
+    let new_frame = db::NewVideoFrame {
+        video_id: temp.video_id,
+        period_id: temp.period_id,
+        file_path: Some(dest_frame.to_string_lossy().to_string()),
+        time_seconds: temp.time_seconds,
+        thumbnail_path: Some(dest_thumb.to_string_lossy().to_string()),
+    };
+    
+    let frame = db.add_video_frame(&new_frame).map_err(|e| e.to_string())?;
+    db.delete_temp_frame(temp_id).map_err(|e| e.to_string())?;
+    
+    Ok(frame)
+}
+
+#[tauri::command]
+fn discard_temp_frames(
+    video_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let paths = db.delete_all_temp_frames(video_id).map_err(|e| e.to_string())?;
+    for p in &paths {
+        // Derive frame path from thumb path using UUID extraction
+        let frame_path = {
+            let parent = std::path::Path::new(p).parent().unwrap_or(std::path::Path::new("."));
+            let stem = std::path::Path::new(p)
+                .file_stem().unwrap_or_default().to_string_lossy();
+            let frame_stem = stem.strip_suffix("_thumb").unwrap_or(&stem);
+            parent.join(format!("{}_frame.jpg", frame_stem))
+        };
+        if let Err(e) = std::fs::remove_file(p) {
+            eprintln!("Failed to remove temp thumb file {}: {}", p, e);
+        }
+        if let Err(e) = std::fs::remove_file(&frame_path) {
+            eprintln!("Failed to remove temp frame file {}: {}", frame_path.display(), e);
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_selected_item(
+    item_type: String,
+    item_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let paths = db.delete_from_pending(&item_type, item_id).map_err(|e| e.to_string())?;
+    if let Some((file_path, thumb_path)) = paths {
+        let _ = std::fs::remove_file(&file_path);
+        if let Some(tp) = thumb_path {
+            let _ = std::fs::remove_file(&tp);
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn get_pending_items(
+    period_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<db::PendingItem>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_pending_items(period_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_temp_frames(
+    video_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<db::VideoFrameTemp>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_temp_frames(video_id).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut db = Database::new();
@@ -583,6 +753,12 @@ pub fn run() {
             save_settings,
             get_ai_settings,
             test_ai_connection,
+            generate_thumbnail,
+            persist_video_frame,
+            discard_temp_frames,
+            delete_selected_item,
+            get_pending_items,
+            get_temp_frames,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

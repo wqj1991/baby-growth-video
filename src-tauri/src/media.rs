@@ -1,4 +1,5 @@
 use crate::db::{NewPhoto, NewVideo, Photo, Video};
+use crate::thumbnail;
 use crate::video;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -779,14 +780,35 @@ pub fn process_media_folder(
             None => {
                 // 成功处理
                 if result.is_photo {
+                    let dest_path_str = result.dest_path.to_string_lossy().to_string();
+
+                    // Extract UUID from dest filename — format is {uuid}_{original_name}
+                    let uuid = result.dest_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .and_then(|s| s.split('_').next())
+                        .unwrap_or("unknown")
+                        .to_string();
+
+                    // Generate thumbnail (non-fatal: degrade gracefully if it fails)
+                    let thumb_path = match thumbnail::generate_thumbnail(&dest_path_str, project_id, &uuid) {
+                        Ok(p) => Some(p),
+                        Err(e) => {
+                            eprintln!("Thumbnail generation failed for {}: {}", dest_path_str, e);
+                            None
+                        }
+                    };
+
                     let new_photo = NewPhoto {
                         period_id: result.period_id,
-                        file_path: result.dest_path.to_string_lossy().to_string(),
+                        file_path: dest_path_str,
                         file_name: result.file_name.clone(),
                         file_size: result.file_size,
                         width: result.width,
                         height: result.height,
                         taken_at: Some(result.date_str.clone()),
+                        thumbnail_path: thumb_path,
+                        source: "scan".to_string(),
                     };
                     new_photos.push(new_photo);
 
@@ -1012,14 +1034,35 @@ pub fn process_period_folder(
         match &result.skip_reason {
             None => {
                 if result.is_photo {
+                    let dest_path_str = result.dest_path.to_string_lossy().to_string();
+
+                    // Extract UUID from dest filename — format is {uuid}_{original_name}
+                    let uuid = result.dest_path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .and_then(|s| s.split('_').next())
+                        .unwrap_or("unknown")
+                        .to_string();
+
+                    // Generate thumbnail (non-fatal: degrade gracefully if it fails)
+                    let thumb_path = match thumbnail::generate_thumbnail(&dest_path_str, project_id, &uuid) {
+                        Ok(p) => Some(p),
+                        Err(e) => {
+                            eprintln!("Thumbnail generation failed for {}: {}", dest_path_str, e);
+                            None
+                        }
+                    };
+
                     new_photos.push(NewPhoto {
                         period_id: result.period_id,
-                        file_path: result.dest_path.to_string_lossy().to_string(),
+                        file_path: dest_path_str,
                         file_name: result.file_name.clone(),
                         file_size: result.file_size,
                         width: result.width,
                         height: result.height,
                         taken_at: Some(result.date_str.clone()),
+                        thumbnail_path: thumb_path,
+                        source: "scan".to_string(),
                     });
                 } else if result.is_video {
                     new_videos.push(NewVideo {

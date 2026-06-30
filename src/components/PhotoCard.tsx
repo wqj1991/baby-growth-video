@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import { Plus, Check, X, Camera } from 'lucide-react';
+import { getImageBase64 } from '../utils/tauriCommands';
 import type { Photo } from '../types';
 
 interface PhotoCardProps {
   photo: Photo;
-  imageUrl: string;
+  imageUrl?: string;
   onDoubleClick?: (photo: Photo) => void;
   onToggleSelect?: (photo: Photo) => void;
   onSetFinal?: (photo: Photo) => void;
@@ -28,8 +30,26 @@ export default function PhotoCard({
   onSelect,
   onAddToStash,
 }: PhotoCardProps) {
+  const [loadedUrl, setLoadedUrl] = useState<string>('');
   const actualToggleSelect = onToggleSelect ?? onAddToStash;
   const actualSetFinal = onSetFinal ?? onSelect;
+
+  // 优先使用缩略图路径，未生成缩略图时回退到原图
+  useEffect(() => {
+    let cancelled = false;
+    const imagePath = photo.thumbnail_path || photo.file_path;
+    if (!imagePath) {
+      setLoadedUrl('');
+      return;
+    }
+    getImageBase64(imagePath)
+      .then((url) => { if (!cancelled) setLoadedUrl(url); })
+      .catch(() => { if (!cancelled) setLoadedUrl(imageUrl || ''); });
+    return () => { cancelled = true; };
+  }, [photo.thumbnail_path, photo.file_path, imageUrl]);
+
+  const displayUrl = loadedUrl || imageUrl || '';
+
   return (
     <div
       className={`photo-card relative group ${isFinal ? 'ring-2 ring-success' : ''}`}
@@ -37,8 +57,8 @@ export default function PhotoCard({
       onClick={onClick}
     >
       <div className="photo-thumb" style={{ aspectRatio: '4/3' }}>
-        {imageUrl ? (
-          <img src={imageUrl} alt={photo.file_name} className="w-full h-full object-cover" loading="lazy" />
+        {displayUrl ? (
+          <img src={displayUrl} alt={photo.file_name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-stone-100 to-stone-200">
             <Camera className="w-6 h-6 text-stone-300" />
