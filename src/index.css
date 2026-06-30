@@ -608,6 +608,35 @@ body {
 }
 
 /* ============================================
+   PhotoCard (新样式)
+   ============================================ */
+.photo-card {
+  @apply rounded-lg overflow-hidden cursor-pointer bg-gray-100;
+  transition: all var(--transition-base);
+}
+
+.photo-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.1);
+}
+
+.photo-thumb {
+  @apply w-full h-full flex items-center justify-center overflow-hidden;
+}
+
+.photo-thumb img {
+  @apply w-full h-full object-cover;
+}
+
+.photo-action-btn {
+  @apply flex items-center justify-center;
+}
+
+.photo-status {
+  @apply pointer-events-none;
+}
+
+/* ============================================
    Photo Badge (保留兼容)
    ============================================ */
 .photo-badge {
@@ -668,22 +697,27 @@ body {
   flex-shrink: 0;
 }
 
-.period-step-dot.done {
-  background: linear-gradient(135deg, #2d9d5f, #1f7e4a);
+.period-step-dot.confirmed {
+  background: linear-gradient(135deg, #10b981, #059669);
   color: white;
-  box-shadow: 0 2px 8px rgba(45,157,95,0.2);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
-.period-step-dot.current {
+.period-step-dot.has_pending {
   background: linear-gradient(135deg, #f58b3d 0%, #d44d68 100%);
   color: white;
   box-shadow: 0 0 0 3px rgba(245,139,61,0.18), 0 4px 12px rgba(245,139,61,0.25);
 }
 
-.period-step-dot.pending {
+.period-step-dot.not_started {
   background: #f5f4f0;
   color: #b0aca0;
   border: 1.5px solid #e8e6de;
+}
+
+.period-step-dot.selected {
+  outline: 2px solid #f58b3d;
+  outline-offset: 2px;
 }
 
 .period-step-dot:hover {
@@ -708,8 +742,9 @@ body {
   margin-top: 1px;
 }
 
-.period-step-info .ps-status.done { color: #2d9d5f; }
-.period-step-info .ps-status.current { color: #f58b3d; font-weight: 500; }
+.period-step-info .ps-status.confirmed { color: #10b981; font-weight: 600; }
+.period-step-info .ps-status.has_pending { color: #f58b3d; font-weight: 500; }
+.period-step-info .ps-status.not_started { color: #b0aca0; }
 
 .period-step-connector {
   width: 24px;
@@ -722,20 +757,10 @@ body {
   background: #2d9d5f;
 }
 
-.period-step-dot.final {
-  background: linear-gradient(135deg, #10b981, #059669) !important;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 2px 8px rgba(16, 185, 129, 0.3);
-}
-
 .period-step-dot .pending-badge {
   font-size: 10px;
   font-weight: 700;
-  color: #7c5cbf;
-}
-
-.period-step-info .ps-status.final {
-  color: #10b981;
-  font-weight: 600;
+  color: #fff;
 }
 
 .period-step-info .ps-stats {
