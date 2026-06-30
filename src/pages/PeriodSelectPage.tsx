@@ -81,7 +81,7 @@ export default function PeriodSelectPage() {
   const [showAddPeriod, setShowAddPeriod] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newPeriodDate, setNewPeriodDate] = useState('');
-  const [selectedTab, setSelectedTab] = useState<'photos' | 'pending' | 'videos'>('pending');
+  const [selectedTab, setSelectedTab] = useState<'photos' | 'videos'>('photos');
   const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
   const loadedImageIds = useRef<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
@@ -105,6 +105,33 @@ export default function PeriodSelectPage() {
 
   // Template selector state
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+
+  // Draggable pending panel state
+  const [pendingPanelWidth, setPendingPanelWidth] = useState(320);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMouseDown = () => setIsDragging(true);
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return;
+    const minWidth = 200;
+    const maxWidth = window.innerWidth * 0.5;
+    const newWidth = Math.max(minWidth, Math.min(maxWidth, e.clientX));
+    setPendingPanelWidth(newWidth);
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
 
   const gridWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -259,7 +286,7 @@ export default function PeriodSelectPage() {
         .map(p => ({ type: 'photo' as const, item: { ...p, is_multi_selected: false } }));
       if (pendingPhotos.length > 0) setSelectedItems(pendingPhotos);
       
-      setSelectedTab('pending');
+      setSelectedTab('photos');
     } catch (error) { console.error('加载周期媒体失败:', error); }
   };
 
@@ -615,7 +642,7 @@ export default function PeriodSelectPage() {
         <CollageWorkspace
           selectedItems={selectedItems.filter(i => i.item.is_multi_selected)}
           loadedImages={loadedImages}
-          allPhotos={currentPhotos}
+          pendingItems={selectedItems}
           onBack={handleExitCollage}
           onGenerate={handleGenerateCollage}
         />
@@ -734,161 +761,177 @@ export default function PeriodSelectPage() {
           </div>
         )}
 
-        {/* ---- Tab Bar ---- */}
-        <div className="tab-bar-v2">
-          <button
-            onClick={() => { setSelectedTab('pending'); handleCloseContextMenu(); }}
-            className={`tab-item-v2 ${selectedTab === 'pending' ? 'active' : ''}`}
-          >
-            <Plus className="w-4 h-4" />
-            待选区
-            <span className="tab-count-v2 stash">{selectedItems.length}</span>
-          </button>
-          <button
-            onClick={() => { setSelectedTab('photos'); handleCloseContextMenu(); }}
-            className={`tab-item-v2 ${selectedTab === 'photos' ? 'active' : ''}`}
-          >
-            <Image className="w-4 h-4" />
-            全部照片
-            <span className="tab-count-v2">{currentPhotos.length}</span>
-          </button>
-          <button
-            onClick={() => { setSelectedTab('videos'); handleCloseContextMenu(); }}
-            className={`tab-item-v2 ${selectedTab === 'videos' ? 'active' : ''}`}
-          >
-            <VideoIcon className="w-4 h-4" />
-            视频
-            <span className="tab-count-v2 video">{currentVideos.length}</span>
-          </button>
         </div>
-      </div>
 
       {/* ---- Content Area ---- */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {!currentPeriod ? (
-          <div className="empty-state-v2 flex-1">
-            <Calendar className="w-16 h-16 text-[#d4d1c7] mb-4" />
-            <h4>选择一个周期开始</h4>
-            <p>在上方周期进度条中选择一个周期，或通过「扫描文件夹」导入照片</p>
-          </div>
-        ) : selectedTab === 'photos' ? (
-          /* ===== PHOTOS TAB ===== */
-          <div className="flex-1 flex flex-col min-h-0">
-            {currentPhotos.length === 0 ? (
-              <div className="empty-state-v2 flex-1">
-                <Image className="w-16 h-16 text-[#d4d1c7] mb-4" />
-                <h4>暂无照片</h4>
-                <p>点击「扫描文件夹」导入照片，或从视频中截取画面</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between px-5 py-3">
-                  <span className="text-xs text-[#706c63]">
-                    显示 <strong className="text-[#33312d]">{currentPhotos.length}</strong> 张照片
-                    {currentPeriod && (
-                      <span className="ml-2 text-[#b0aca0]">
-                        · {currentPeriod.start_date} ~ {currentPeriod.end_date}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <div 
-                  ref={gridWrapperRef} 
-                  className="flex-1 overflow-y-auto px-5 pb-5"
+      <div className="flex-1 flex min-h-0">
+        {/* 左侧待选区面板 */}
+        <div 
+          className="flex-shrink-0 border-r border-[#e8e6de] bg-white flex flex-col"
+          style={{ width: pendingPanelWidth }}
+        >
+          <PendingSelectionPanel
+            selectedItems={selectedItems}
+            loadedImages={loadedImages}
+            onToggleMultiSelect={handleToggleMultiSelect}
+            onRemoveItem={handleRemoveFromStash}
+            onSelectSingle={handleSelectSingle}
+            onGenerateCollage={handleEnterCollage}
+          />
+        </div>
+        
+        {/* 拖拽分割条 */}
+        <div 
+          className={`w-1 cursor-col-resize bg-[#e8e6de] hover:bg-[#d4d1c7] transition-colors flex-shrink-0 flex items-center justify-center ${isDragging ? 'bg-[#7c5cbf]' : ''}`}
+          onMouseDown={handleMouseDown}
+        >
+          <div className="w-3 h-8 bg-[#c4c0b6] rounded-full" />
+        </div>
+        
+        {/* 右侧内容区 */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {!currentPeriod ? (
+            <div className="empty-state-v2 flex-1">
+              <Calendar className="w-16 h-16 text-[#d4d1c7] mb-4" />
+              <h4>选择一个周期开始</h4>
+              <p>在上方周期进度条中选择一个周期，或通过「扫描文件夹」导入照片</p>
+            </div>
+          ) : (
+            <>
+              {/* 标签页 */}
+              <div className="tab-bar-v2">
+                <button
+                  onClick={() => { setSelectedTab('photos'); handleCloseContextMenu(); }}
+                  className={`tab-item-v2 ${selectedTab === 'photos' ? 'active' : ''}`}
                 >
-                  <VirtualPhotoGrid
-                    photos={currentPhotos}
-                    loadedImages={loadedImages}
-                    onContextMenu={handlePhotoContextMenu}
-                    onDoubleClick={(photo) => {
-                      const index = currentPhotos.findIndex(p => p.id === photo.id);
-                      if (index !== -1) handleOpenPreview(index);
-                    }}
-                    onOpenPreview={handleOpenPreview}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        ) : selectedTab === 'pending' ? (
-          /* ===== PENDING TAB ===== */
-          <div className="flex-1 overflow-hidden">
-            <PendingSelectionPanel
-              selectedItems={selectedItems}
-              loadedImages={loadedImages}
-              onToggleMultiSelect={handleToggleMultiSelect}
-              onRemoveItem={handleRemoveFromStash}
-              onSelectSingle={handleSelectSingle}
-              onGenerateCollage={handleEnterCollage}
-            />
-          </div>
-        ) : (
-          /* ===== VIDEOS TAB ===== */
-          <div className="flex-1 overflow-y-auto p-5">
-            {currentVideos.length === 0 ? (
-              <div className="empty-state-v2">
-                <VideoIcon className="w-16 h-16 text-[#d4d1c7] mb-4" />
-                <h4>暂无视频</h4>
-                <p>点击「扫描文件夹」导入视频，然后从中截取画面</p>
+                  <Image className="w-4 h-4" />
+                  全部照片
+                  <span className="tab-count-v2">{currentPhotos.length}</span>
+                </button>
+                <button
+                  onClick={() => { setSelectedTab('videos'); handleCloseContextMenu(); }}
+                  className={`tab-item-v2 ${selectedTab === 'videos' ? 'active' : ''}`}
+                >
+                  <VideoIcon className="w-4 h-4" />
+                  视频
+                  <span className="tab-count-v2 video">{currentVideos.length}</span>
+                </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {currentVideos.map((video) => (
-                  <div
-                    key={video.id}
-                    className="cursor-pointer rounded-xl overflow-hidden bg-white border border-[#e8e6de] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
-                  >
-                    {/* Thumbnail */}
-                    <div
-                      className="aspect-video bg-[#3a2010] relative overflow-hidden"
-                      onClick={() => handleOpenInlinePlayer(video)}
-                    >
-                      {videoThumbnails[video.id] ? (
-                        <img
-                          src={videoThumbnails[video.id]}
-                          alt={video.file_name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
-                            <VideoIcon className="w-5 h-5 text-white/60" />
-                          </div>
+              
+              {/* 内容区域 */}
+              <div className="flex-1 overflow-hidden">
+                {selectedTab === 'photos' && (
+                  <div className="h-full overflow-y-auto">
+                    {currentPhotos.length === 0 ? (
+                      <div className="empty-state-v2 flex-1 h-full flex flex-col items-center justify-center">
+                        <Image className="w-16 h-16 text-[#d4d1c7] mb-4" />
+                        <h4>暂无照片</h4>
+                        <p>点击「扫描文件夹」导入照片，或从视频中截取画面</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between px-5 py-3">
+                          <span className="text-xs text-[#706c63]">
+                            显示 <strong className="text-[#33312d]">{currentPhotos.length}</strong> 张照片
+                            {currentPeriod && (
+                              <span className="ml-2 text-[#b0aca0]">
+                                · {currentPeriod.start_date} ~ {currentPeriod.end_date}
+                              </span>
+                            )}
+                          </span>
                         </div>
-                      )}
-                      <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/65 text-white text-[10px] font-medium rounded">
-                        {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
-                      </div>
-                    </div>
-
-                    {/* Info */}
-                    <div className="p-3">
-                      <p className="text-xs font-medium text-[#33312d] truncate">{video.file_name}</p>
-                      <p className="text-[10px] text-[#b0aca0] mt-0.5">
-                        {video.width}×{video.height}
-                      </p>
-                      <div className="flex gap-1.5 mt-2">
-                        <button
-                          onClick={() => handleExtractFrames(video)}
-                          className="btn btn-outline btn-sm flex-1 text-[11px]"
-                          disabled={isExtractingFrames}
+                        <div 
+                          ref={gridWrapperRef} 
+                          className="h-full overflow-y-auto px-5 pb-5"
                         >
-                          {isExtractingFrames ? '抽帧中...' : videoFrameCounts[video.id] > 0 ? `查看(${videoFrameCounts[video.id]})` : '截取画面'}
-                        </button>
-                        <button
-                          onClick={() => handleOpenInlinePlayer(video)}
-                          className="btn btn-ghost btn-sm flex-1 text-[11px]"
-                        >
-                          播放
-                        </button>
-                      </div>
-                    </div>
+                          <VirtualPhotoGrid
+                            photos={currentPhotos}
+                            loadedImages={loadedImages}
+                            onContextMenu={handlePhotoContextMenu}
+                            onDoubleClick={(photo) => {
+                              const index = currentPhotos.findIndex(p => p.id === photo.id);
+                              if (index !== -1) handleOpenPreview(index);
+                            }}
+                            onToggleSelect={handleTogglePhotoSelect}
+                            onSetFinal={handleSetFinalPhoto}
+                            onCancelFinal={() => handleCancelFinalPhoto()}
+                            onOpenPreview={handleOpenPreview}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
-                ))}
+                )}
+                {selectedTab === 'videos' && (
+                  <div className="h-full overflow-y-auto p-5">
+                    {currentVideos.length === 0 ? (
+                      <div className="empty-state-v2">
+                        <VideoIcon className="w-16 h-16 text-[#d4d1c7] mb-4" />
+                        <h4>暂无视频</h4>
+                        <p>点击「扫描文件夹」导入视频，然后从中截取画面</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        {currentVideos.map((video) => (
+                          <div
+                            key={video.id}
+                            className="cursor-pointer rounded-xl overflow-hidden bg-white border border-[#e8e6de] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                          >
+                            {/* Thumbnail */}
+                            <div
+                              className="aspect-video bg-[#3a2010] relative overflow-hidden"
+                              onClick={() => handleOpenInlinePlayer(video)}
+                            >
+                              {videoThumbnails[video.id] ? (
+                                <img
+                                  src={videoThumbnails[video.id]}
+                                  alt={video.file_name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur flex items-center justify-center">
+                                    <VideoIcon className="w-5 h-5 text-white/60" />
+                                  </div>
+                                </div>
+                              )}
+                              <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/65 text-white text-[10px] font-medium rounded">
+                                {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+                              </div>
+                            </div>
+
+                            {/* Info */}
+                            <div className="p-3">
+                              <p className="text-xs font-medium text-[#33312d] truncate">{video.file_name}</p>
+                              <p className="text-[10px] text-[#b0aca0] mt-0.5">
+                                {video.width}×{video.height}
+                              </p>
+                              <div className="flex gap-1.5 mt-2">
+                                <button
+                                  onClick={() => handleExtractFrames(video)}
+                                  className="btn btn-outline btn-sm flex-1 text-[11px]"
+                                  disabled={isExtractingFrames}
+                                >
+                                  {isExtractingFrames ? '抽帧中...' : videoFrameCounts[video.id] > 0 ? `查看(${videoFrameCounts[video.id]})` : '截取画面'}
+                                </button>
+                                <button
+                                  onClick={() => handleOpenInlinePlayer(video)}
+                                  className="btn btn-ghost btn-sm flex-1 text-[11px]"
+                                >
+                                  播放
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* ===== IMAGE PREVIEW MODAL ===== */}

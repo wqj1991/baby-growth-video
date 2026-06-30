@@ -6,6 +6,9 @@ interface VirtualPhotoGridProps {
   loadedImages: Record<number, string>;
   onContextMenu?: (e: React.MouseEvent, photo: Photo) => void;
   onDoubleClick?: (photo: Photo) => void;
+  onToggleSelect?: (photo: Photo) => void;
+  onSetFinal?: (photo: Photo) => void;
+  onCancelFinal?: (photo: Photo) => void;
   onOpenPreview?: (index: number) => void;
   onSelect?: (photo: Photo) => void;
   onAddToStash?: (photo: Photo) => void;
@@ -16,6 +19,9 @@ export default function VirtualPhotoGrid({
   loadedImages,
   onContextMenu,
   onDoubleClick,
+  onToggleSelect,
+  onSetFinal,
+  onCancelFinal,
   onOpenPreview,
   onSelect,
   onAddToStash,
@@ -31,6 +37,9 @@ export default function VirtualPhotoGrid({
             imageUrl={imageUrl}
             onContextMenu={onContextMenu}
             onDoubleClick={onDoubleClick ? () => onDoubleClick(photo) : undefined}
+            onToggleSelect={onToggleSelect}
+            onSetFinal={onSetFinal}
+            onCancelFinal={onCancelFinal}
             onClick={onOpenPreview ? () => onOpenPreview(idx) : undefined}
             onSelect={onSelect}
             onAddToStash={onAddToStash}
