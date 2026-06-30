@@ -157,6 +157,11 @@ export async function getVideoFrames(videoId: number): Promise<VideoFrame[]> {
   return invoke('get_video_frames', { videoId });
 }
 
+// 获取周期的所有视频帧
+export async function getPeriodVideoFrames(periodId: number): Promise<VideoFrame[]> {
+  return invoke('get_period_video_frames', { periodId });
+}
+
 // 生成视频截图（按数量）
 export async function generateVideoFrames(videoId: number, count: number): Promise<VideoFrame[]> {
   return invoke('generate_video_frames', { videoId, count });

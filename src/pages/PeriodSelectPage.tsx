@@ -17,6 +17,7 @@ import {
   createPeriod,
   getPeriodPhotos,
   getPeriodVideos,
+  getPeriodVideoFrames,
   scanPeriodFolder,
   selectFolder,
   updatePhoto,
@@ -283,7 +284,16 @@ export default function PeriodSelectPage() {
       const pendingPhotos: SelectableItem[] = photos
         .filter(p => p.is_selected)
         .map(p => ({ type: 'photo' as const, item: { ...p, is_multi_selected: false } }));
-      if (pendingPhotos.length > 0) setSelectedItems(pendingPhotos);
+      
+      const frames = await getPeriodVideoFrames(periodId);
+      setCurrentVideoFrames(frames);
+      
+      const pendingFrames: SelectableItem[] = frames
+        .filter(f => f.is_selected)
+        .map(f => ({ type: 'video_frame' as const, item: { ...f, is_multi_selected: false } }));
+      
+      const allPending = [...pendingPhotos, ...pendingFrames];
+      if (allPending.length > 0) setSelectedItems(allPending);
       
       setSelectedTab('photos');
     } catch (error) { console.error('加载周期媒体失败:', error); }
