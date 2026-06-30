@@ -777,6 +777,12 @@ export default function PeriodSelectPage() {
             onRemoveItem={handleRemoveFromStash}
             onSelectSingle={handleSelectSingle}
             onGenerateCollage={handleEnterCollage}
+            onPreview={(item) => {
+              if (item.type === 'photo') {
+                const index = currentPhotos.findIndex(p => p.id === item.item.id);
+                if (index !== -1) handleOpenPreview(index);
+              }
+            }}
           />
         </div>
         

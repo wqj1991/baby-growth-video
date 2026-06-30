@@ -9,12 +9,9 @@ interface PendingSelectionPanelProps {
   onRemoveItem: (item: SelectableItem) => void;
   onSelectSingle: (item: SelectableItem) => void;
   onGenerateCollage: () => void;
+  onPreview?: (item: SelectableItem) => void;
 }
 
-/**
- * 待选区对比面板（V2）
- * 大图对比模式，支持勾选多选（最多4张）和单独选定/拼图
- */
 export default function PendingSelectionPanel({
   selectedItems,
   loadedImages,
@@ -22,6 +19,7 @@ export default function PendingSelectionPanel({
   onRemoveItem,
   onSelectSingle,
   onGenerateCollage,
+  onPreview,
 }: PendingSelectionPanelProps) {
   const multiSelectedCount = selectedItems.filter((item) => {
     if (item.type === 'photo') return item.item.is_multi_selected;
@@ -35,51 +33,47 @@ export default function PendingSelectionPanel({
     return `视频截帧 · ${Math.floor((item.item as VideoFrame).time_seconds / 60)}:${((item.item as VideoFrame).time_seconds % 60).toString().padStart(2, '0')}`;
   };
 
-  const getSourceTag = (item: SelectableItem) => {
-    if (item.type === 'photo') {
-      return { label: '扫描', className: 'scan' };
-    }
-    return { label: '截帧', className: 'frame' };
+  const isItemMultiSelected = (item: SelectableItem): boolean => {
+    return item.item.is_multi_selected;
   };
 
-  const isItemSelected = (item: SelectableItem): boolean => {
+  const isItemFinal = (item: SelectableItem): boolean => {
     return item.item.is_final;
   };
 
   return (
-    <div className="stash-panel-v2">
-      {/* Header */}
+    <div className="stash-panel-v2 flex flex-col h-full">
       <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#e8e6de]">
         <Grid3X3 className="w-4 h-4 text-[#7c5cbf]" />
         <h3 className="text-sm font-semibold text-[#33312d]">候选照片</h3>
         <span className="text-[11px] font-bold text-[#7c5cbf] bg-[#f3f0fb] px-2 py-0.5 rounded-full">
           {selectedItems.length} 张
         </span>
-        <span className="ml-auto text-[11px] text-[#b0aca0]">点击放大 · 勾选多选</span>
+        <span className="ml-auto text-[11px] text-[#b0aca0]">单击选择 · 双击预览</span>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto p-5">
         {selectedItems.length === 0 ? (
           <div className="empty-state-v2">
             <div className="empty-icon">📋</div>
             <h4>暂无待选项目</h4>
-            <p>在「全部照片」中点击「待选区」按钮，或在视频中截帧加入</p>
+            <p>在「全部照片」中点击「加入待选区」按钮，或在视频中截帧加入</p>
           </div>
         ) : (
           <>
-            {/* Photo Grid - 3 columns */}
-            <div className="stash-compare-grid mb-3">
+            <div className="grid grid-cols-2 gap-2">
               {selectedItems.map((item) => {
                 const uniqueKey = `${item.type}-${item.item.id}`;
                 const imageUrl = loadedImages[item.item.id];
-                const selected = isItemSelected(item);
+                const multiSelected = isItemMultiSelected(item);
+                const final = isItemFinal(item);
 
                 return (
                   <div
                     key={uniqueKey}
-                    className={`stash-compare-item ${selected ? 'multi-selected' : ''}`}
+                    className={`stash-compare-item relative cursor-pointer ${multiSelected ? 'ring-2 ring-[#7c5cbf]' : ''} ${final ? 'ring-2 ring-[#22c55e]' : ''}`}
                     onClick={() => onToggleMultiSelect(item)}
+                    onDoubleClick={() => onPreview?.(item)}
                   >
                     <div className="stash-compare-thumb" style={{ aspectRatio: '4/3' }}>
                       {imageUrl ? (
@@ -89,14 +83,8 @@ export default function PendingSelectionPanel({
                       )}
                     </div>
 
-                    {selected ? (
-                      <div className="stash-check-mark">✓</div>
-                    ) : (
-                      <div className="stash-uncheck-mark" />
-                    )}
-
                     <button
-                      className="stash-remove-btn"
+                      className="stash-remove-btn absolute top-1 right-1 bg-black/50 hover:bg-black/70 text-white rounded-full p-1"
                       onClick={(e) => {
                         e.stopPropagation();
                         onRemoveItem(item);
@@ -105,25 +93,31 @@ export default function PendingSelectionPanel({
                       <X className="w-3 h-3" />
                     </button>
 
-                    <div className="stash-item-info">
-                      <div className="text-[11px] font-medium text-[#33312d] truncate">
+                    {multiSelected && !final && (
+                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[#7c5cbf] flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+
+                    {final && (
+                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[#22c55e] flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+
+                    <div className="mt-1.5 px-1">
+                      <div className="text-[10px] font-medium text-[#33312d] truncate">
                         {getFileName(item)}
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className={`stash-source-tag ${getSourceTag(item).className}`}>
-                          {getSourceTag(item).label}
-                        </span>
-                        <span className="text-[9px] text-[#b0aca0]">
-                          {item.type === 'photo'
-                            ? `${(item.item as Photo).width}×${(item.item as Photo).height}`
-                            : '视频帧'}
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded ${item.type === 'photo' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                          {item.type === 'photo' ? '扫描' : '截帧'}
                         </span>
                       </div>
                     </div>
 
-                    {/* Single Select Button - shown on hover via parent */}
                     <div
-                      className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 hover:opacity-100 transition-opacity flex justify-center"
+                      className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 hover:opacity-100 transition-opacity flex justify-center"
                       style={{ pointerEvents: 'none' }}
                     >
                       <button
@@ -135,7 +129,7 @@ export default function PendingSelectionPanel({
                         }}
                       >
                         <Check className="w-3 h-3 inline mr-1" />
-                        单独选定
+                        设为最终
                       </button>
                     </div>
                   </div>
@@ -143,9 +137,8 @@ export default function PendingSelectionPanel({
               })}
             </div>
 
-            {/* Hint */}
             {multiSelectedCount >= 2 && (
-              <div className="progress-hint-bar">
+              <div className="progress-hint-bar mt-3">
                 <span>🧩</span>
                 <div>
                   <div className="font-medium">已选中 {multiSelectedCount} 张</div>
@@ -170,49 +163,38 @@ export default function PendingSelectionPanel({
             )}
 
             {multiSelectedCount === 0 && (
-              <div className="progress-hint-bar">
+              <div className="progress-hint-bar mt-3">
                 <span>💡</span>
-                <span className="text-[11px]">点击照片进行多选，选 {MIN_PHOTOS}–{MAX_PHOTOS} 张可启用拼图</span>
+                <span className="text-[11px]">单击照片进行多选，选 {MIN_PHOTOS}–{MAX_PHOTOS} 张可启用拼图</span>
               </div>
             )}
           </>
         )}
       </div>
 
-      {/* Bottom Actions */}
       {selectedItems.length > 0 && (
-        <div className="p-4 border-t border-[#e8e6de] bg-white">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="p-3 border-t border-[#e8e6de] bg-white">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => {
                 if (selectedItems.length > 0) {
                   onSelectSingle(selectedItems[0]);
                 }
               }}
-              className="btn btn-secondary w-full !justify-center"
+              className="btn btn-secondary w-full !justify-center text-xs"
             >
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-3 h-3" />
               单独选定
             </button>
             <button
               onClick={onGenerateCollage}
               disabled={!canCollage}
-              className="btn btn-primary w-full !justify-center"
+              className="btn btn-primary w-full !justify-center text-xs"
             >
-              <Wand2 className="w-3.5 h-3.5" />
+              <Wand2 className="w-3 h-3" />
               生成拼图 {canCollage ? `(${multiSelectedCount}张)` : ''}
             </button>
           </div>
-          {selectedItems.length > MAX_PHOTOS && (
-            <div className="text-[10px] text-[#d44d68] text-center mt-2">
-              ⚠️ 超过 {MAX_PHOTOS} 张无法拼图，建议移除部分后再继续
-            </div>
-          )}
-          {selectedItems.length === 1 && (
-            <div className="text-[10px] text-[#b0aca0] text-center mt-2">
-              选 {MIN_PHOTOS}–{MAX_PHOTOS} 张照片可启用拼图功能
-            </div>
-          )}
         </div>
       )}
     </div>
