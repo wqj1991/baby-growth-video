@@ -325,12 +325,54 @@ export default function PeriodSelectPage() {
     if (!folderPath) return;
     setIsScanning(true);
     try {
-      await scanPeriodFolder(parseInt(projectId), currentPeriod.id, folderPath);
+      const result = await scanPeriodFolder(parseInt(projectId), currentPeriod.id, folderPath);
       await loadPeriodMedia(currentPeriod.id);
       const stats = await getPeriodStats(parseInt(projectId));
       setPeriodStats(stats);
-    } catch (error) { showToast('error', '扫描失败', '扫描文件夹失败，请重试'); }
-    finally { setIsScanning(false); }
+
+      // 汇总扫描结果，给用户明确反馈
+      const {
+        total_photos,
+        total_videos,
+        recognized_photos,
+        recognized_videos,
+        skipped_no_date_photos,
+        skipped_no_period_photos,
+        skipped_duplicate_photos,
+        skipped_copy_failed_photos,
+      } = result;
+      const skippedPhotos =
+        skipped_no_date_photos +
+        skipped_no_period_photos +
+        skipped_duplicate_photos +
+        skipped_copy_failed_photos;
+
+      if (recognized_photos > 0 || recognized_videos > 0) {
+        showToast(
+          'success',
+          '扫描完成',
+          `识别到 ${recognized_photos} 张照片、${recognized_videos} 个视频`
+        );
+      } else if (total_photos === 0 && total_videos === 0) {
+        showToast('info', '扫描完成', '文件夹中没有找到照片或视频文件');
+      } else if (skippedPhotos > 0) {
+        const reasons: string[] = [];
+        if (skipped_no_date_photos > 0) reasons.push(`${skipped_no_date_photos} 张无法识别日期`);
+        if (skipped_no_period_photos > 0) reasons.push(`${skipped_no_period_photos} 张不在当前周期内`);
+        if (skipped_duplicate_photos > 0) reasons.push(`${skipped_duplicate_photos} 张重复`);
+        if (skipped_copy_failed_photos > 0) reasons.push(`${skipped_copy_failed_photos} 张复制失败`);
+        showToast(
+          'warning',
+          '未识别到照片',
+          `跳过 ${skippedPhotos} 张照片：${reasons.join('，')}。可在「历史记录」查看详情`
+        );
+      } else {
+        showToast('info', '扫描完成', '当前周期内没有匹配的照片或视频');
+      }
+    } catch (error) {
+      console.error('扫描失败:', error);
+      showToast('error', '扫描失败', '扫描文件夹失败，请重试');
+    } finally { setIsScanning(false); }
   };
 
   const handleAddPeriod = async () => {

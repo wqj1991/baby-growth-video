@@ -186,6 +186,21 @@ impl Database {
 
         self.conn = Some(conn);
         self.create_tables()?;
+        self.run_migrations()?;
+        Ok(())
+    }
+
+    /// 向后兼容：对旧数据库补加缺失的列（CREATE TABLE IF NOT EXISTS 不会修改已有表）
+    fn run_migrations(&self) -> Result<()> {
+        let conn = self.get_conn();
+
+        // Migration 1: photos 表添加 thumbnail_path（如果还不存在）
+        // SQLite 不支持 ADD COLUMN IF NOT EXISTS，忽略重复列的错误即可
+        let _ = conn.execute("ALTER TABLE photos ADD COLUMN thumbnail_path TEXT", []);
+
+        // Migration 2: video_frames 表添加 thumbnail_path
+        let _ = conn.execute("ALTER TABLE video_frames ADD COLUMN thumbnail_path TEXT", []);
+
         Ok(())
     }
 

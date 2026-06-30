@@ -327,10 +327,12 @@ async fn scan_period_folder(
     project_id: i64,
     period_id: i64,
     folder_path: String,
+    window: tauri::Window,
     state: State<'_, AppState>,
 ) -> Result<media::ScanResult, String> {
     let db = state.db.clone();
     let folder_path2 = folder_path.clone();
+    let window2 = window.clone();
 
     let result = tauri::async_runtime::spawn_blocking(move || {
         // ========== Lock 1: 获取周期信息 + 删除旧 DB 记录（毫秒级）==========
@@ -363,7 +365,7 @@ async fn scan_period_folder(
 
         // ========== Phase 2: 处理新文件（无锁，秒级）==========
         let scan_result = media::process_period_folder(
-            project_id, period_id, &folder_path2, &period
+            project_id, period_id, &folder_path2, &period, &window2
         )?;
 
         // ========== Lock 2: 批量写入数据库（毫秒级）==========
@@ -378,6 +380,12 @@ async fn scan_period_folder(
 
         let recognized_photos = photos.len() as i64;
         let recognized_videos = videos.len() as i64;
+
+        // ========== Phase 3: 保存日志（无锁 IO）==========
+        let total_files = scan_result.total_photos + scan_result.total_videos;
+        if let Err(e) = media::save_scan_log(project_id, &folder_path2, total_files, scan_result.scan_logs) {
+            eprintln!("保存扫描日志失败: {}", e);
+        }
 
         Ok(media::ScanResult {
             photos,

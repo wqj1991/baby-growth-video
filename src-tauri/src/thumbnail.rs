@@ -23,7 +23,7 @@ pub fn generate_thumbnail(
     // Scale to width 400px, maintaining aspect ratio
     let ratio = THUMB_WIDTH as f64 / img.width() as f64;
     let new_height = (img.height() as f64 * ratio) as u32;
-    let scaled = img.resize(THUMB_WIDTH, new_height, FilterType::Lanczos3);
+    let scaled = img.resize(THUMB_WIDTH, new_height, FilterType::CatmullRom);
 
     // Output path
     let data_dir = dirs_next::data_dir()
