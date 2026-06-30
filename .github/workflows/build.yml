@@ -81,8 +81,9 @@ jobs:
       - name: Install ffmpeg for macOS
         run: brew install ffmpeg
 
-      - name: Add macOS ffmpeg binaries
+      - name: Replace with macOS ffmpeg binaries
         run: |
+          rm -f src-tauri/resources/ffmpeg/*.exe
           FFmpeg_PATH=$(brew --prefix ffmpeg)/bin
           cp "$FFmpeg_PATH/ffmpeg" src-tauri/resources/ffmpeg/ffmpeg
           cp "$FFmpeg_PATH/ffprobe" src-tauri/resources/ffmpeg/ffprobe

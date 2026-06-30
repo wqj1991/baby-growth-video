@@ -36,8 +36,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "resources/ffmpeg/ffmpeg.exe",
-      "resources/ffmpeg/ffprobe.exe"
+      "resources/ffmpeg/*"
     ],
     "category": "Productivity",
     "shortDescription": "宝宝成长视频制作工具",
