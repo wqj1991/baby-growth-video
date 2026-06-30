@@ -40,13 +40,16 @@ jobs:
       - name: Build app
         run: pnpm tauri build
 
+      - name: List Windows build artifacts
+        run: dir /s /b src-tauri\target\release\bundle
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.zip
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.zip
 
   build-macos:
     runs-on: macos-latest
@@ -87,13 +90,16 @@ jobs:
       - name: Build app
         run: pnpm tauri build
 
+      - name: List macOS build artifacts
+        run: find src-tauri/target/release/bundle -type f
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-build
           path: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.tar.gz
 
   release:
     needs: [build-windows, build-macos]
@@ -111,11 +117,14 @@ jobs:
           name: macos-build
           path: macos
 
+      - name: List downloaded artifacts
+        run: |
+          ls -la windows/
+          ls -la macos/
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            windows/*.exe
-            windows/*.zip
-            macos/*.dmg
-            macos/*.tar.gz
+            windows/**/*
+            macos/**/*
