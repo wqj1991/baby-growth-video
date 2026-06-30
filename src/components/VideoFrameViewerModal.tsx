@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Check, RefreshCw, Eye, Plus, Minus } from 'lucide-react';
+import { X, Check, RefreshCw, Eye, Plus } from 'lucide-react';
 import type { Video, VideoFrame } from '../types';
 import { getImageBase64 } from '../utils/tauriCommands';
 
@@ -9,10 +9,9 @@ interface VideoFrameViewerModalProps {
   frames: VideoFrame[];
   onClose: () => void;
   onReExtract: () => void;
-  onToggleSelect: (frame: VideoFrame) => void;
-  onSetFinal: (frame: VideoFrame) => void;
-  onCancelFinal: () => void;
   onPreview: (frame: VideoFrame) => void;
+  onAddSingle: (frame: VideoFrame) => void;
+  onConfirmSelection: (frames: VideoFrame[]) => void;
 }
 
 export default function VideoFrameViewerModal({
@@ -21,12 +20,12 @@ export default function VideoFrameViewerModal({
   frames,
   onClose,
   onReExtract,
-  onToggleSelect,
-  onSetFinal,
-  onCancelFinal,
   onPreview,
+  onAddSingle,
+  onConfirmSelection,
 }: VideoFrameViewerModalProps) {
   const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const loadedImageIds = useRef<Set<number>>(new Set());
 
   useEffect(() => {
@@ -83,8 +82,30 @@ export default function VideoFrameViewerModal({
     }
   }, [visible, onClose]);
 
+  useEffect(() => {
+    if (visible) {
+      setSelectedIds(new Set());
+    }
+  }, [visible, frames]);
+
+  const toggleSelect = (frameId: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(frameId)) {
+        next.delete(frameId);
+      } else {
+        next.add(frameId);
+      }
+      return next;
+    });
+  };
+
+  const handleConfirm = () => {
+    const selectedFrames = frames.filter(f => selectedIds.has(f.id));
+    onConfirmSelection(selectedFrames);
+  };
+
   const finalFrame = frames.find(f => f.is_final);
-  const selectedCount = frames.filter(f => f.is_selected).length;
 
   if (!visible) return null;
 
@@ -92,7 +113,7 @@ export default function VideoFrameViewerModal({
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
         <div className="flex items-center gap-4">
-          <h3 className="text-lg font-semibold">视频帧预览</h3>
+          <h3 className="text-lg font-semibold">选择视频帧</h3>
           {video && (
             <span className="text-sm text-gray-500">
               {video.file_name} - {frames.length} 帧
@@ -101,7 +122,7 @@ export default function VideoFrameViewerModal({
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">
-            已选择 {selectedCount} 帧
+            已选择 {selectedIds.size} 帧
             {finalFrame && <span className="ml-2 text-green-600">· 已确认最终帧</span>}
           </span>
           <button
@@ -128,85 +149,50 @@ export default function VideoFrameViewerModal({
             <p className="text-sm mt-1">点击"重新抽帧"生成视频帧</p>
           </div>
         ) : (
-          <div className="grid grid-cols-5 gap-3">
-            {frames.map((frame) => (
-              <div
-                key={frame.id}
-                className={`relative aspect-video rounded-lg overflow-hidden cursor-pointer transition-all ${
-                  frame.is_selected ? 'ring-2 ring-primary-500' : ''
-                } ${frame.is_final ? 'ring-2 ring-green-500' : ''} hover:shadow-md`}
-                onClick={() => onToggleSelect(frame)}
-              >
-                <img
-                  src={loadedImages[frame.id] || ''}
-                  alt={`frame-${frame.id}`}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-                
-                <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors" />
-                
-                <div className="absolute top-1 left-1 flex items-center gap-1">
-                  {frame.is_final && (
-                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  {frame.is_selected && !frame.is_final && (
-                    <div className="w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center">
-                      <Plus className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                </div>
-                
-                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/60 text-white text-xs font-mono rounded">
-                  {Math.floor(frame.time_seconds / 60)}:{(frame.time_seconds % 60).toString().padStart(2, '0')}
-                </div>
-                
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 hover:opacity-100 transition-opacity">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleSelect(frame);
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded"
-                    >
-                      {frame.is_selected ? <Minus className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                      {frame.is_selected ? '移除' : '加入待选'}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (frame.is_final) {
-                          onCancelFinal();
-                        } else {
-                          onSetFinal(frame);
-                        }
-                      }}
-                      className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
-                        frame.is_final
-                          ? 'bg-red-500/80 hover:bg-red-600 text-white'
-                          : 'bg-green-500/80 hover:bg-green-600 text-white'
-                      }`}
-                    >
-                      <Check className="w-3 h-3" />
-                      {frame.is_final ? '取消最终' : '设为最终'}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPreview(frame);
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-xs rounded"
-                    >
-                      <Eye className="w-3 h-3" />
-                      预览
-                    </button>
+          <div className="grid grid-cols-4 gap-3">
+            {frames.map((frame) => {
+              const imageUrl = loadedImages[frame.id];
+              const isSelected = selectedIds.has(frame.id);
+              
+              return (
+                <div
+                  key={frame.id}
+                  className={`relative aspect-video rounded-lg overflow-hidden cursor-pointer transition-all ${
+                    isSelected ? 'ring-2 ring-[#7c5cbf]' : ''
+                  } ${frame.is_final ? 'ring-2 ring-green-500' : ''} hover:shadow-md`}
+                  onDoubleClick={() => onPreview(frame)}
+                >
+                  <img
+                    src={imageUrl || ''}
+                    alt={`frame-${frame.id}`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  
+                  <button
+                    className={`absolute top-1 left-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                      isSelected 
+                        ? 'bg-[#7c5cbf] border-[#7c5cbf]' 
+                        : 'bg-white/80 border-gray-300 hover:border-[#7c5cbf]'
+                    }`}
+                    onClick={(e) => { e.stopPropagation(); toggleSelect(frame.id); }}
+                  >
+                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                  </button>
+
+                  <button
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#22c55e] flex items-center justify-center hover:bg-[#16a34a] transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onAddSingle(frame); }}
+                  >
+                    <Plus className="w-3 h-3 text-white" />
+                  </button>
+                  
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-2 py-1 text-center">
+                    {Math.floor(frame.time_seconds / 60)}:{((frame.time_seconds % 60)).toString().padStart(2, '0')}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -214,14 +200,21 @@ export default function VideoFrameViewerModal({
       <div className="p-4 border-t border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">
-            提示：点击视频帧可加入/移除待选区，右键可查看更多操作
+            提示：双击预览帧，勾选后可批量加入待选区
           </p>
           <div className="flex gap-3">
             <button
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
             >
-              关闭
+              取消
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={selectedIds.size === 0}
+              className="px-4 py-2 bg-[#7c5cbf] text-white rounded-lg hover:bg-[#6a4eb5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              加入待选区 ({selectedIds.size})
             </button>
           </div>
         </div>

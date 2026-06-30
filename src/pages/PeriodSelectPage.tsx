@@ -27,7 +27,6 @@ import {
   generateVideoFramesByInterval,
   updateVideoFrame,
   setFinalVideoFrame,
-  cancelFinalVideoFrame,
   getVideoThumbnail,
   getPeriodStats,
 } from '../utils/tauriCommands';
@@ -439,18 +438,7 @@ export default function PeriodSelectPage() {
     } catch (error) { console.error('设置最终视频帧失败:', error); }
   };
 
-  const handleCancelFinalVideoFrame = async () => {
-    if (!currentPeriod) return;
-    try {
-      await cancelFinalVideoFrame(currentPeriod.id);
-      setCurrentVideoFrames(currentVideoFrames.map(f => ({ ...f, is_final: false })));
-      setPeriods(periods.map(p =>
-        p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
-      ));
-      setCurrentPeriod({ ...currentPeriod, selected_photo_id: undefined });
-      updatePeriodStat(currentPeriod.id, { has_final: false });
-    } catch (error) { console.error('取消最终视频帧失败:', error); }
-  };
+
 
   // ============================
   // CONTEXT MENU
@@ -1026,10 +1014,16 @@ export default function PeriodSelectPage() {
         frames={currentVideoFrames}
         onClose={() => setShowFrameViewer(false)}
         onReExtract={() => { setShowFrameViewer(false); setShowFrameSettings(true); }}
-        onToggleSelect={handleToggleFrameSelect}
-        onSetFinal={handleSetFinalVideoFrame}
-        onCancelFinal={handleCancelFinalVideoFrame}
         onPreview={() => {}}
+        onAddSingle={(frame) => {
+          addToSelectedItems({ type: 'video_frame', item: { ...frame, is_selected: true, is_multi_selected: false } });
+        }}
+        onConfirmSelection={(selectedFrames) => {
+          selectedFrames.forEach(frame => {
+            addToSelectedItems({ type: 'video_frame', item: { ...frame, is_selected: true, is_multi_selected: false } });
+          });
+          setShowFrameViewer(false);
+        }}
       />
     </div>
   );
