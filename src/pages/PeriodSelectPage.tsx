@@ -640,15 +640,11 @@ export default function PeriodSelectPage() {
       })),
     };
 
-    console.log('拼图生成请求:', collagePayload);
-
     const pId = projectIdParam;
 
     setGeneratingCollage(true);
     try {
-      console.log('调用 generateCollage, projectId:', pId);
       const result = await generateCollage(collagePayload, pId);
-      console.log('拼图生成成功:', result);
 
       if (!result.output_path) {
         showToast('error', '拼图生成失败', '返回的输出路径为空');
@@ -669,8 +665,6 @@ export default function PeriodSelectPage() {
         outputSize,
         `拼图 (${template.name})`,
       );
-      console.log('拼图已持久化到数据库:', persistedPhoto);
-
       const newPhoto = {
         ...persistedPhoto,
         is_multi_selected: true,

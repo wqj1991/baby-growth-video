@@ -38,6 +38,7 @@ export default function VideoFramePlayer({
   const [processedIds, setProcessedIds] = useState<Set<number>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
   const [isClosing, setIsClosing] = useState(false);
+  const handleCloseRef = useRef<() => void>(() => {});
 
   const totalDuration = formatDuration(video.duration);
   const availableSpeeds = [0.25, 0.5, 1, 2];
@@ -59,7 +60,7 @@ export default function VideoFramePlayer({
           setProgress((p) => Math.min(100, p + 1));
           break;
         case 'Escape':
-          handleClose();
+          handleCloseRef.current();
           break;
       }
     };
@@ -162,6 +163,7 @@ export default function VideoFramePlayer({
       setIsClosing(false);
     }
   };
+  handleCloseRef.current = handleClose;
 
   // Nearby frame previews (simulated)
   const nearbyFrames = Array.from({ length: 8 }, (_, i) => ({

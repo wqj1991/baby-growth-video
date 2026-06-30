@@ -2,7 +2,8 @@ use image::imageops::FilterType;
 use std::path::Path;
 
 const THUMB_WIDTH: u32 = 400;
-const THUMB_QUALITY: u8 = 75;
+#[allow(dead_code)]
+const THUMB_QUALITY: u8 = 75; // Reserved for future JPEG quality control
 
 /// Generate a thumbnail, saved to projects/{project_id}/thumbnails/{uuid}_thumb.jpg
 /// Returns the absolute path of the thumbnail
