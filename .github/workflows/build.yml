@@ -82,8 +82,9 @@ jobs:
         run: |
           rm -f src-tauri/resources/ffmpeg/ffmpeg.exe
           rm -f src-tauri/resources/ffmpeg/ffprobe.exe
-          cp /usr/local/bin/ffmpeg src-tauri/resources/ffmpeg/ffmpeg
-          cp /usr/local/bin/ffprobe src-tauri/resources/ffmpeg/ffprobe
+          FFmpeg_PATH=$(brew --prefix ffmpeg)/bin
+          cp "$FFmpeg_PATH/ffmpeg" src-tauri/resources/ffmpeg/ffmpeg
+          cp "$FFmpeg_PATH/ffprobe" src-tauri/resources/ffmpeg/ffprobe
 
       - name: Build app
         run: pnpm tauri build
