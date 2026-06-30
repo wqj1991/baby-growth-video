@@ -13,14 +13,15 @@ import {
   Settings2,
 } from 'lucide-react';
 import { useAppStore } from '../store';
-import type { SelectableItem, Photo } from '../types';
+import type { SelectableItem } from '../types';
 import { PREVIEW_COLORS } from './TemplateSelector';
 import { toCssTransform, estimateFileSize, QUALITY_PRESETS, OUTPUT_SIZE_PRESETS } from '../utils/collageTemplates';
 
 interface CollageWorkspaceProps {
   selectedItems: SelectableItem[];
   loadedImages: Record<number, string>;
-  allPhotos: Photo[];
+  /** 待选区全部项目（含非多选），用于替换照片时选择来源 */
+  pendingItems: SelectableItem[];
   onBack: () => void;
   onGenerate: (
     templateId: string,
@@ -41,7 +42,7 @@ interface CollageWorkspaceProps {
 export default function CollageWorkspace({
   selectedItems,
   loadedImages,
-  allPhotos,
+  pendingItems,
   onBack,
   onGenerate,
 }: CollageWorkspaceProps) {
@@ -61,6 +62,7 @@ export default function CollageWorkspace({
     setCollageQuality,
     collageOutputSize,
     setCollageOutputSize,
+    addToSelectedItems,
   } = useAppStore();
 
   // 照片替换面板
@@ -119,17 +121,27 @@ export default function CollageWorkspace({
     setRegionTransform(selectedRegionIndex, { flipV: !(current?.flipV ?? false) });
   };
 
-  /** 替换照片：从所有可用的照片中选 */
-  const handleReplacePhoto = (newPhotoId: number) => {
+  /** 替换照片：从待选区 pendingItems 中选择 */
+  const handleReplacePhoto = (pendingItem: SelectableItem) => {
     if (selectedRegionIndex === null || !template) return;
     const region = template.regions[selectedRegionIndex];
     if (!region) return;
 
-    // 找到新照片在 selectedItems 中的索引
-    const newIdx = selectedItems.findIndex((si) => si.item.id === newPhotoId);
-    if (newIdx === -1) return;
+    // 查找该 pending 项是否已在拼图列表中
+    let newIdx = selectedItems.findIndex(
+      (si) => si.item.id === pendingItem.item.id && si.type === pendingItem.type,
+    );
 
-    // 更新 order 数组：将对应位置的索引替换为新索引
+    if (newIdx === -1) {
+      // 不在拼图中 → 先加入（标记为 multi_selected），再更新顺序
+      addToSelectedItems({
+        type: pendingItem.type,
+        item: { ...pendingItem.item, is_multi_selected: true },
+      } as SelectableItem);
+      // 新增项索引为当前拼图列表末尾
+      newIdx = selectedItems.length;
+    }
+
     const newOrder = [...order];
     newOrder[region.order] = newIdx;
     setCollagePhotoOrder(newOrder);
@@ -335,7 +347,7 @@ export default function CollageWorkspace({
                 </div>
                 <span className="text-[11px] text-[#706c63] truncate flex-1">
                   {('file_name' in selectedPhoto.item
-                    ? (selectedPhoto.item as Photo).file_name
+                    ? (selectedPhoto.item as { file_name: string }).file_name
                     : `视频截帧 #${selectedPhoto.item.id}`)}
                 </span>
               </div>
@@ -384,28 +396,32 @@ export default function CollageWorkspace({
               {showReplacer && (
                 <div className="mt-2 border border-[#e8e6de] rounded-lg bg-white overflow-hidden">
                   <div className="px-2.5 py-1.5 text-[10px] font-semibold text-[#b0aca0] border-b border-[#f5f4f0]">
-                    选择替换照片
+                    从待选区选择替换照片
                   </div>
                   <div className="max-h-[160px] overflow-y-auto p-1.5">
                     <div className="grid grid-cols-4 gap-1">
-                      {allPhotos.map((photo) => {
-                        const thumbUrl = loadedImages[photo.id];
-                        const isUsed = usedPhotoIds.has(photo.id);
+                      {pendingItems.map((pendingItem) => {
+                        const thumbUrl = loadedImages[pendingItem.item.id];
+                        const isUsed = usedPhotoIds.has(pendingItem.item.id);
+                        const displayName =
+                          'file_name' in pendingItem.item
+                            ? (pendingItem.item as { file_name: string }).file_name
+                            : `帧 #${pendingItem.item.id}`;
                         return (
                           <button
-                            key={photo.id}
-                            onClick={() => handleReplacePhoto(photo.id)}
+                            key={`${pendingItem.type}-${pendingItem.item.id}`}
+                            onClick={() => handleReplacePhoto(pendingItem)}
                             className={`relative aspect-square rounded overflow-hidden border-2 transition-all ${
                               isUsed
                                 ? 'border-[#f58b3d]/30 opacity-50'
                                 : 'border-transparent hover:border-[#f58b3d]'
                             }`}
-                            title={photo.file_name}
+                            title={displayName}
                           >
                             {thumbUrl ? (
                               <img
                                 src={thumbUrl}
-                                alt={photo.file_name}
+                                alt={displayName}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
@@ -422,6 +438,11 @@ export default function CollageWorkspace({
                         );
                       })}
                     </div>
+                    {pendingItems.length === 0 && (
+                      <p className="text-[10px] text-[#b0aca0] text-center py-4">
+                        待选区暂无照片
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
