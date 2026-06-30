@@ -40,6 +40,7 @@ import PeriodTimeline from '../components/PeriodTimeline';
 import PendingSelectionPanel from '../components/PendingSelectionPanel';
 import CollageWorkspace from '../components/CollageWorkspace';
 import VideoFramePlayer from '../components/VideoFramePlayer';
+import TemplateSelector from '../components/TemplateSelector';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -67,7 +68,6 @@ export default function PeriodSelectPage() {
   // Collage state
     collageMode,
     setCollageMode,
-    setCollageLayout,
     setCollagePhotoOrder,
     // Video player state
     setShowVideoPlayer,
@@ -100,6 +100,9 @@ export default function PeriodSelectPage() {
 
   // Inline video player state
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
+
+  // Template selector state
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
 
   const gridWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -490,15 +493,26 @@ export default function PeriodSelectPage() {
   };
 
   const handleEnterCollage = () => {
-    // Auto-recommend layout based on count
-    const count = selectedItems.filter(i => i.item.is_multi_selected).length;
-    const layoutMap: Record<number, string> = { 2: '2up', 3: '3up-main', 4: '4grid' };
-    setCollageLayout(layoutMap[count] || '4grid');
-    setCollagePhotoOrder(selectedItems.filter(i => i.item.is_multi_selected).map((_, i) => i));
+    // 获取已勾选的照片
+    const multiSelected = selectedItems.filter(i => i.item.is_multi_selected);
+
+    // 补全 photoOrder 为初始顺序
+    setCollagePhotoOrder(multiSelected.map((_, i) => i));
+
+    // 显示模板选择器（内部会自动匹配 count 数量的模板）
+    setShowTemplateSelector(true);
+  };
+
+  const handleTemplateConfirm = () => {
+    setShowTemplateSelector(false);
     setCollageMode(true);
   };
 
-  const handleGenerateCollage = (_layout: string, _gap: number, _order: number[]) => {
+  const handleTemplateCancel = () => {
+    setShowTemplateSelector(false);
+  };
+
+  const handleGenerateCollage = (_templateId: string, _gap: number, _order: number[]) => {
     // TODO: Call Rust backend to generate collage image via FFmpeg
     alert('拼图生成功能将在后端集成后可用');
     setCollageMode(false);
@@ -534,6 +548,7 @@ export default function PeriodSelectPage() {
         <CollageWorkspace
           selectedItems={selectedItems.filter(i => i.item.is_multi_selected)}
           loadedImages={loadedImages}
+          allPhotos={currentPhotos}
           onBack={handleExitCollage}
           onGenerate={handleGenerateCollage}
         />
@@ -571,7 +586,7 @@ export default function PeriodSelectPage() {
   const completedCount = periods.filter(p => p.selected_photo_id).length;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col min-h-0">
       {/* ---- Top Toolbar ---- */}
       <div className="h-[52px] flex items-center justify-between px-5 border-b border-[#e8e6de] bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -682,7 +697,7 @@ export default function PeriodSelectPage() {
       </div>
 
       {/* ---- Content Area ---- */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {!currentPeriod ? (
           <div className="empty-state-v2 flex-1">
             <Calendar className="w-16 h-16 text-[#d4d1c7] mb-4" />
@@ -691,7 +706,7 @@ export default function PeriodSelectPage() {
           </div>
         ) : selectedTab === 'photos' ? (
           /* ===== PHOTOS TAB ===== */
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-h-0">
             {currentPhotos.length === 0 ? (
               <div className="empty-state-v2 flex-1">
                 <Image className="w-16 h-16 text-[#d4d1c7] mb-4" />
@@ -868,6 +883,17 @@ export default function PeriodSelectPage() {
         }}
         onClose={handleCloseContextMenu}
       />
+
+      {/* ===== TEMPLATE SELECTOR MODAL ===== */}
+      {showTemplateSelector && (
+        <TemplateSelector
+          photoCount={
+            selectedItems.filter(i => i.item.is_multi_selected).length
+          }
+          onConfirm={handleTemplateConfirm}
+          onCancel={handleTemplateCancel}
+        />
+      )}
 
       {/* ===== VIDEO FRAME SETTINGS MODAL ===== */}
       <VideoFrameSettingsModal

@@ -1,19 +1,48 @@
-# 网格布局调整完成
+# 拼图模板系统 — 前端集成完成
 
-## 本次修改
+## 完成内容
 
-- **照片网格统一为 3 列/行**：将 `src/index.css` 中 `.photo-grid` 的默认列数从 5 列改为 3 列，并移除了 1280px/960px 的响应式断点，确保所有使用 `photo-grid` 的地方都统一显示 3 张照片/行。
-- **视频网格改为 2 列/行**：将 `src/pages/PeriodSelectPage.tsx` 中「视频」Tab 的 `grid-cols-3` 改为 `grid-cols-2`，使每个视频卡片更宽、更协调。
-- **待选区统一为 3 列**：将 `src/components/PendingSelectionPanel.tsx` 的顶部 `.stash-compare-grid` 从 2 列改为 3 列，并将底部行内联底部网格也固定为 3 列，与照片网格保持一致。
-- **新增 `.video-grid` 工具类**：在 `src/index.css` 中预留了 `display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;` 样式，方便后续统一使用。
+将拼图能力从硬编码 4 种布局（2-4张）升级为 **36 种模板（2-9张）**，并完成前端全链路集成。
 
-## 影响范围
+## 变更文件
 
-- `VirtualPhotoGrid` 组件（所有使用 `.photo-grid` 的照片列表）现在统一为 3 列。
-- `PeriodSelectPage` 的「视频」Tab 现在每行显示 2 个视频。
-- `PendingSelectionPanel` 的待选区现在统一为 3 列网格。
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `src/utils/collageTemplates.ts` | **新增** | 36 个模板的归一化坐标数据 + 类型定义 + 工具函数 |
+| `src/store/index.ts` | 修改 | `collageLayout` → `selectedTemplateId` + `selectedTemplate` |
+| `src/components/TemplateSelector.tsx` | **新增** | Modal 模板选择器（照片数量匹配、卡片网格、实时预览） |
+| `src/components/CollageWorkspace.tsx` | 重写 | 模板驱动渲染（region-based），替换硬编码 CSS 布局 |
+| `src/components/PendingSelectionPanel.tsx` | 修改 | 移除 "4张上限"，改为 2-9 张自动适配 |
+| `src/pages/PeriodSelectPage.tsx` | 修改 | 集成 TemplateSelector → CollageWorkspace 两段流程 |
 
-## 后续建议
+## 交互流程
 
-- 如果后续想把视频卡片也抽成独立组件并统一使用 `.video-grid`，可以告诉我。
-- 若在大屏下觉得 3 列照片过大，可考虑按最小宽度 (`minmax`) 而非固定列数布局。
+```
+待选区 → 勾选 2-9 张
+  → 点击「生成拼图」
+  → TemplateSelector Modal（按张数自动筛选模板）
+  → 选模板 → 确认
+  → CollageWorkspace（模板驱动预览 + 间距/顺序调整）
+  → 生成拼图（后端待集成）
+```
+
+## 模板数据共享
+
+所有模板定义在 `src/utils/collageTemplates.ts`，类型为：
+```ts
+interface CollageRegion {
+  x: number; y: number; w: number; h: number; order: number;
+}
+interface CollageTemplate {
+  id: string; name: string; desc: string; tips: string;
+  regions: CollageRegion[];
+}
+```
+
+前端渲染和后续 Rust 后端合成共享同一套归一化坐标，直接映射到 1080×1080 输出。
+
+## 后续待做
+
+- Rust 后端：基于 `CollageTemplate.regions` 用 image crate 做像素级拼图合成
+- 拖拽排序：CollageWorkspace 中照片顺序的拖拽交互
+- 实时预览优化：在 TemplateSelector 中使用实际照片缩略图替代色块

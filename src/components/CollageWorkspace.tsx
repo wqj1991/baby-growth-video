@@ -1,77 +1,192 @@
-import { useState } from 'react';
-import { ArrowLeft, GripVertical, Sparkles, Eye } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+  ArrowLeft,
+  GripVertical,
+  Sparkles,
+  Eye,
+  Grid3X3,
+  RotateCw,
+  FlipHorizontal,
+  FlipVertical,
+  RefreshCw,
+  Image,
+  Settings2,
+} from 'lucide-react';
 import { useAppStore } from '../store';
-import type { SelectableItem } from '../types';
+import type { SelectableItem, Photo, VideoFrame } from '../types';
+import { PREVIEW_COLORS } from './TemplateSelector';
+import { toCssTransform, estimateFileSize, QUALITY_PRESETS, OUTPUT_SIZE_PRESETS } from '../utils/collageTemplates';
 
 interface CollageWorkspaceProps {
   selectedItems: SelectableItem[];
   loadedImages: Record<number, string>;
+  allPhotos: Photo[];
   onBack: () => void;
-  onGenerate: (layout: string, gap: number, order: number[]) => void;
+  onGenerate: (
+    templateId: string,
+    gap: number,
+    order: number[],
+    transforms: Record<number, { rotation: number; flipH: boolean; flipV: boolean }>,
+    quality: number,
+    outputSize: number,
+  ) => void;
 }
 
-const LAYOUT_LABELS: Record<string, string> = {
-  '2up': '左右对分',
-  '3up-main': '1大+2小',
-  '4grid': '田字格',
-  '3row': '竖排三格',
-};
-
-const LAYOUT_RECOMMENDATION: Record<number, string> = {
-  2: '2up',
-  3: '3up-main',
-  4: '4grid',
-};
-
 /**
- * 拼图合成工作区
- * 左侧全屏黑色预览 + 右侧控制面板
+ * 拼图合成工作区 — Template-Driven + Region Editing
+ *
+ * 左侧: 实时预览（可点击选中区域、变换预览）
+ * 右侧: 区域编辑工具栏 + 照片顺序 + 间距 + 导出设置
  */
 export default function CollageWorkspace({
   selectedItems,
   loadedImages,
+  allPhotos,
   onBack,
   onGenerate,
 }: CollageWorkspaceProps) {
   const {
-    collageLayout,
-    setCollageLayout,
+    selectedTemplate,
+    selectedTemplateId,
     collageGap,
     setCollageGap,
     collagePhotoOrder,
+    setCollagePhotoOrder,
+    selectedRegionIndex,
+    setSelectedRegionIndex,
+    regionTransforms,
+    setRegionTransform,
+    resetRegionTransforms,
+    collageQuality,
+    setCollageQuality,
+    collageOutputSize,
+    setCollageOutputSize,
   } = useAppStore();
 
-  // 自动推荐布局
-  const recommendedLayout = LAYOUT_RECOMMENDATION[selectedItems.length] || '4grid';
-  const [activeLayout, setActiveLayout] = useState(collageLayout || recommendedLayout);
+  // 照片替换面板
+  const [showReplacer, setShowReplacer] = useState(false);
+  // 导出设置面板
+  const [showExportSettings, setShowExportSettings] = useState(false);
 
-  const getLayoutClass = (layout: string) => {
-    switch (layout) {
-      case '2up': return 'collage-2up';
-      case '3up-main': return 'collage-3up-main';
-      case '4grid': return 'collage-4grid';
-      case '3row': return 'collage-3row';
-      default: return 'collage-4grid';
+  // 默认按区域 order 排序的顺序
+  const order = useMemo(() => {
+    if (collagePhotoOrder.length > 0) return collagePhotoOrder;
+    return selectedItems.map((_, i) => i);
+  }, [collagePhotoOrder, selectedItems]);
+
+  const template = selectedTemplate;
+
+  // ── 帮助函数 ──
+
+  /** 获取指定区域的变换 CSS */
+  const getTransform = (regionIndex: number) => {
+    const tf = regionTransforms[regionIndex];
+    return tf ? toCssTransform(tf) : 'none';
+  };
+
+  /** 处理区域点击 */
+  const handleRegionClick = (regionIndex: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedRegionIndex(selectedRegionIndex === regionIndex ? null : regionIndex);
+    setShowReplacer(false);
+  };
+
+  /** 点击画布空白区取消选中 */
+  const handleCanvasClick = () => {
+    setSelectedRegionIndex(null);
+    setShowReplacer(false);
+  };
+
+  /** 旋转 90° */
+  const handleRotate = () => {
+    if (selectedRegionIndex === null) return;
+    const current = regionTransforms[selectedRegionIndex];
+    const prevRotation = current?.rotation ?? 0;
+    setRegionTransform(selectedRegionIndex, { rotation: (prevRotation + 90) % 360 });
+  };
+
+  /** 水平翻转 */
+  const handleFlipH = () => {
+    if (selectedRegionIndex === null) return;
+    const current = regionTransforms[selectedRegionIndex];
+    setRegionTransform(selectedRegionIndex, { flipH: !(current?.flipH ?? false) });
+  };
+
+  /** 垂直翻转 */
+  const handleFlipV = () => {
+    if (selectedRegionIndex === null) return;
+    const current = regionTransforms[selectedRegionIndex];
+    setRegionTransform(selectedRegionIndex, { flipV: !(current?.flipV ?? false) });
+  };
+
+  /** 替换照片：从所有可用的照片中选 */
+  const handleReplacePhoto = (newPhotoId: number) => {
+    if (selectedRegionIndex === null || !template) return;
+    const region = template.regions[selectedRegionIndex];
+    if (!region) return;
+
+    // 找到新照片在 selectedItems 中的索引
+    const newIdx = selectedItems.findIndex((si) => si.item.id === newPhotoId);
+    if (newIdx === -1) return;
+
+    // 更新 order 数组：将对应位置的索引替换为新索引
+    const newOrder = [...order];
+    newOrder[region.order] = newIdx;
+    setCollagePhotoOrder(newOrder);
+    setShowReplacer(false);
+  };
+
+  /** 处理生成拼图 */
+  const handleGenerate = () => {
+    if (!selectedTemplateId) return;
+
+    // 收集所有 transforms（确保非空）
+    const transforms: Record<number, { rotation: number; flipH: boolean; flipV: boolean }> = {};
+    if (template) {
+      template.regions.forEach((_, idx) => {
+        const tf = regionTransforms[idx];
+        transforms[idx] = {
+          rotation: tf?.rotation ?? 0,
+          flipH: tf?.flipH ?? false,
+          flipV: tf?.flipV ?? false,
+        };
+      });
     }
+
+    onGenerate(selectedTemplateId, collageGap, order, transforms, collageQuality, collageOutputSize);
   };
 
-  const handleLayoutChange = (layout: string) => {
-    setActiveLayout(layout);
-    setCollageLayout(layout);
-  };
+  // 当前选中的区域信息
+  const selectedRegion = selectedRegionIndex !== null && template
+    ? template.regions[selectedRegionIndex]
+    : null;
 
-  const handleGapChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCollageGap(Number(e.target.value));
-  };
+  // 当前画布上已有的 photo IDs
+  const usedPhotoIds = useMemo(
+    () => new Set(order.map((oi) => selectedItems[oi]?.item.id).filter(Boolean)),
+    [order, selectedItems],
+  );
 
-  const order = collagePhotoOrder.length > 0 ? collagePhotoOrder : selectedItems.map((_, i) => i);
+  // 当前选中的 photo (用于编辑工具栏)
+  const selectedPhoto = selectedRegion
+    ? selectedItems[order[selectedRegion.order]]
+    : null;
+
+  // 预估文件大小
+  const estimatedSize = useMemo(
+    () => estimateFileSize(collageOutputSize * collageOutputSize, collageQuality),
+    [collageOutputSize, collageQuality],
+  );
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top Bar */}
+      {/* ── Top Bar ── */}
       <div className="h-[52px] flex items-center gap-3 px-5 border-b border-[#e8e6de] bg-white flex-shrink-0">
         <button
-          onClick={onBack}
+          onClick={() => {
+            resetRegionTransforms();
+            onBack();
+          }}
           className="flex items-center gap-1.5 text-sm text-[#706c63] hover:text-[#33312d] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -79,12 +194,28 @@ export default function CollageWorkspace({
         </button>
         <span className="text-[#e8e6de]">|</span>
         <span className="text-sm font-medium text-[#706c63]">拼图工作区</span>
-        <span className="badge badge-primary ml-2">{selectedItems.length} 张照片</span>
+        <span className="badge badge-primary ml-2 text-xs">
+          {selectedItems.length} 张照片
+        </span>
+        {template && (
+          <span className="text-[11px] text-[#b0aca0] ml-1">
+            · {template.name}
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
-          <button className="btn btn-secondary btn-sm">重置</button>
           <button
-            onClick={() => onGenerate(activeLayout, collageGap, order)}
+            onClick={() => {
+              resetRegionTransforms();
+              setCollageGap(3);
+              setCollagePhotoOrder([]);
+            }}
+            className="btn btn-secondary btn-sm"
+          >
+            重置
+          </button>
+          <button
+            onClick={handleGenerate}
             className="btn btn-primary btn-sm"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -93,94 +224,236 @@ export default function CollageWorkspace({
         </div>
       </div>
 
-      {/* Main Area */}
+      {/* ── Main Area ── */}
       <div className="collage-layout">
         {/* Preview Canvas */}
         <div className="collage-preview">
           <div className="flex flex-col items-center gap-3">
-            <div className="text-[11px] text-white/40">实时预览（输出比例 1:1）</div>
-            <div className="collage-canvas">
-              <div
-                className={`collage-canvas-inner ${getLayoutClass(activeLayout)}`}
-                style={{ gap: `${collageGap}px` }}
-              >
-                {Array.from({ length: Math.min(selectedItems.length, 4) }).map((_, idx) => {
-                  const itemIdx = order[idx] ?? idx;
-                  const item = selectedItems[itemIdx];
-                  const imageUrl = item ? loadedImages[item.item.id] : null;
-                  const isMainCell = activeLayout === '3up-main' && idx === 0;
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`collage-cell ${isMainCell ? 'collage-cell-main' : ''}`}
-                      style={{ background: imageUrl ? `url(${imageUrl}) center/cover` : '#2a1a10' }}
-                    >
-                      {!imageUrl && (
-                        <>
-                          <span className="collage-cell-placeholder">
-                            {idx + 1}
-                          </span>
-                          <div className="collage-cell-drag-hint">
-                            {isMainCell ? '主图 · 拖拽调整' : '拖拽调整'}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="text-[11px] text-white/40">
+              点击区域选中 · 实时编辑预览
+              {selectedRegionIndex !== null && (
+                <span className="ml-2 text-[#f58b3d]">
+                  已选中区域 #{selectedRegionIndex + 1}
+                </span>
+              )}
             </div>
-            <div className="text-[10px] text-white/30">最终输出：1080×1080 · JPG 95%</div>
+            <div className="collage-canvas">
+              {template ? (
+                /* Template-Driven Layout */
+                <div
+                  className="relative w-full aspect-square cursor-pointer"
+                  style={{
+                    backgroundColor: '#1a0d06',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                  }}
+                  onClick={handleCanvasClick}
+                >
+                  {template.regions.map((region, idx) => {
+                    const itemIdx = order[region.order] ?? region.order;
+                    const item = selectedItems[itemIdx];
+                    const imageUrl = item ? loadedImages[item.item.id] : null;
+                    const padding = collageGap / 2;
+                    const isSelected = selectedRegionIndex === idx;
+                    const transform = getTransform(idx);
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`absolute transition-all duration-200 ${
+                          isSelected
+                            ? 'ring-[3px] ring-[#f58b3d] ring-offset-0 z-10'
+                            : ''
+                        } ${!isSelected ? 'hover:ring-2 hover:ring-white/30' : ''}`}
+                        style={{
+                          left: `calc(${region.x * 100}% + ${padding}px)`,
+                          top: `calc(${region.y * 100}% + ${padding}px)`,
+                          width: `calc(${region.w * 100}% - ${collageGap}px)`,
+                          height: `calc(${region.h * 100}% - ${collageGap}px)`,
+                          borderRadius: '4px',
+                          overflow: 'hidden',
+                          background: imageUrl
+                            ? undefined
+                            : PREVIEW_COLORS[idx % PREVIEW_COLORS.length],
+                        }}
+                        onClick={(e) => handleRegionClick(idx, e)}
+                      >
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt=""
+                            className="w-full h-full object-cover pointer-events-none"
+                            style={{ transform, transformOrigin: 'center center' }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <span className="text-white/20 text-sm font-bold select-none">
+                              {region.order + 1}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* 选中指示器 */}
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-[#f58b3d] rounded-full flex items-center justify-center shadow-lg">
+                            <span className="text-[10px] text-white font-bold">
+                              {region.order + 1}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Fallback: no template selected */
+                <div className="w-full aspect-square flex items-center justify-center bg-[#1a0d06] rounded-xl">
+                  <div className="text-center">
+                    <Grid3X3 className="w-10 h-10 text-white/15 mx-auto mb-3" />
+                    <p className="text-white/30 text-sm">未选择模板</p>
+                    <p className="text-white/15 text-xs mt-1">请返回选择拼图模板</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="text-[10px] text-white/30">
+              最终输出：{collageOutputSize}×{collageOutputSize} · JPG {collageQuality}%
+              {' · '}预估 {estimatedSize.label}
+              {template && ` · ${template.name}`}
+            </div>
           </div>
         </div>
 
         {/* Control Sidebar */}
         <div className="collage-sidebar">
-          {/* Layout Selector */}
-          <div className="collage-section">
-            <h4>布局选择</h4>
-            <div className="layout-opts">
-              {['2up', '3up-main', '4grid', '3row'].map((layout) => (
+          {/* ── Region Edit Toolbar (when selected) ── */}
+          {selectedRegionIndex !== null && selectedPhoto && (
+            <div className="collage-section !bg-gradient-to-r !from-[#fef7f0] !to-[#fdf2f2] !border !border-[#f58b3d]/20 !rounded-xl !p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="px-1.5 py-0.5 bg-[#f58b3d]/10 rounded text-[10px] font-bold text-[#f58b3d]">
+                  区域 #{selectedRegionIndex + 1}
+                </div>
+                <span className="text-[11px] text-[#706c63] truncate flex-1">
+                  {('file_name' in selectedPhoto.item
+                    ? (selectedPhoto.item as Photo).file_name
+                    : `视频截帧 #${selectedPhoto.item.id}`)}
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-1.5">
                 <button
-                  key={layout}
-                  onClick={() => handleLayoutChange(layout)}
-                  className={`layout-opt ${
-                    activeLayout === layout ? 'active' : ''
-                  } ${layout === recommendedLayout ? '' : ''}`}
-                  title={LAYOUT_LABELS[layout]}
+                  onClick={() => setShowReplacer(true)}
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-[#e8e6de] text-[11px] text-[#706c63] hover:border-[#f58b3d] hover:text-[#f58b3d] transition-colors"
                 >
-                  <div className={`layout-opt-inner ${
-                    layout === '2up' ? 'lo-2col' :
-                    layout === '3up-main' ? 'lo-3main' :
-                    layout === '4grid' ? 'lo-4grid' : 'lo-3row'
-                  }`}>
-                    {layout === '3up-main' ? (
-                      <>
-                        <div className="lo-cell-main" />
-                        <div className="lo-cell" />
-                        <div className="lo-cell" />
-                      </>
-                    ) : (
-                      Array.from({ length: layout === '3row' ? 3 : layout === '2up' ? 2 : 4 }).map((_, i) => (
-                        <div key={i} className="lo-cell" />
-                      ))
-                    )}
-                  </div>
+                  <RefreshCw className="w-3 h-3" />
+                  替换照片
                 </button>
-              ))}
+                <button
+                  onClick={handleRotate}
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-[#e8e6de] text-[11px] text-[#706c63] hover:border-[#f58b3d] hover:text-[#f58b3d] transition-colors"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  旋转 90°
+                </button>
+                <button
+                  onClick={handleFlipH}
+                  className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] transition-colors ${
+                    (regionTransforms[selectedRegionIndex]?.flipH)
+                      ? 'bg-[#f58b3d]/10 border-[#f58b3d] text-[#f58b3d]'
+                      : 'bg-white border-[#e8e6de] text-[#706c63] hover:border-[#f58b3d] hover:text-[#f58b3d]'
+                  }`}
+                >
+                  <FlipHorizontal className="w-3 h-3" />
+                  水平翻转
+                </button>
+                <button
+                  onClick={handleFlipV}
+                  className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] transition-colors ${
+                    (regionTransforms[selectedRegionIndex]?.flipV)
+                      ? 'bg-[#f58b3d]/10 border-[#f58b3d] text-[#f58b3d]'
+                      : 'bg-white border-[#e8e6de] text-[#706c63] hover:border-[#f58b3d] hover:text-[#f58b3d]'
+                  }`}
+                >
+                  <FlipVertical className="w-3 h-3" />
+                  垂直翻转
+                </button>
+              </div>
+
+              {/* Photo Replacer Mini-panel */}
+              {showReplacer && (
+                <div className="mt-2 border border-[#e8e6de] rounded-lg bg-white overflow-hidden">
+                  <div className="px-2.5 py-1.5 text-[10px] font-semibold text-[#b0aca0] border-b border-[#f5f4f0]">
+                    选择替换照片
+                  </div>
+                  <div className="max-h-[160px] overflow-y-auto p-1.5">
+                    <div className="grid grid-cols-4 gap-1">
+                      {allPhotos.map((photo) => {
+                        const thumbUrl = loadedImages[photo.id];
+                        const isUsed = usedPhotoIds.has(photo.id);
+                        return (
+                          <button
+                            key={photo.id}
+                            onClick={() => handleReplacePhoto(photo.id)}
+                            className={`relative aspect-square rounded overflow-hidden border-2 transition-all ${
+                              isUsed
+                                ? 'border-[#f58b3d]/30 opacity-50'
+                                : 'border-transparent hover:border-[#f58b3d]'
+                            }`}
+                            title={photo.file_name}
+                          >
+                            {thumbUrl ? (
+                              <img
+                                src={thumbUrl}
+                                alt={photo.file_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-[#3a2010] flex items-center justify-center">
+                                <Image className="w-3 h-3 text-white/30" />
+                              </div>
+                            )}
+                            {isUsed && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-[#f58b3d]/20">
+                                <span className="text-[8px] text-white font-bold">已用</span>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            {recommendedLayout !== activeLayout && (
-              <div className="text-[10px] text-[#f0a020] mt-2">
-                💡 推荐：{LAYOUT_LABELS[recommendedLayout]}（适合 {selectedItems.length} 张）
+          )}
+
+          {/* 选中提示（未选中时） */}
+          {selectedRegionIndex === null && template && (
+            <div className="collage-section !bg-gradient-to-r !from-[#f5f4f0] !to-[#fafaf8]">
+              <div className="flex items-center gap-2">
+                <Settings2 className="w-3.5 h-3.5 text-[#b0aca0]" />
+                <span className="text-[11px] text-[#b0aca0]">
+                  点击预览中的区域进行编辑
+                </span>
               </div>
-            )}
-            {recommendedLayout === activeLayout && (
-              <div className="text-[10px] text-[#2d9d5f] mt-2">
-                ✓ 推荐布局（{selectedItems.length} 张照片）
+            </div>
+          )}
+
+          {/* Template Info */}
+          {template && (
+            <div className="collage-section">
+              <h4>当前模板</h4>
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-gradient-to-r from-[#fef7f0] to-[#fdf2f2] border border-[#f58b3d]/20">
+                <Grid3X3 className="w-4 h-4 text-[#f58b3d]" />
+                <div>
+                  <div className="text-xs font-semibold text-[#33312d]">{template.name}</div>
+                  <div className="text-[10px] text-[#b0aca0]">{template.desc}</div>
+                </div>
               </div>
-            )}
-          </div>
+              <p className="text-[10px] text-[#706c63] mt-2 leading-relaxed">{template.tips}</p>
+            </div>
+          )}
 
           {/* Photo Order */}
           <div className="collage-section">
@@ -189,10 +462,32 @@ export default function CollageWorkspace({
               {selectedItems.map((selItem, idx) => {
                 const item = selItem.item;
                 const imageUrl = loadedImages[item.id];
-                const isMain = activeLayout === '3up-main' && idx === 0;
+                // 找到该照片在模板中对应的 region
+                const regionIdx = template?.regions.find(
+                  (r) => r.order === idx
+                );
 
                 return (
-                  <div key={`${selItem.type}-${item.id}`} className="source-item-v2">
+                  <div
+                    key={`${selItem.type}-${item.id}`}
+                    className={`source-item-v2 cursor-pointer transition-colors ${
+                      selectedRegionIndex === regionIdx?.order
+                        ? 'ring-2 ring-[#f58b3d] bg-[#fef7f0]'
+                        : ''
+                    }`}
+                    onClick={() => {
+                      if (regionIdx !== undefined) {
+                        // 找到 region 在 regions 数组中的索引
+                        const rIdx = template?.regions.findIndex(
+                          (r) => r.order === regionIdx.order
+                        );
+                        if (rIdx !== undefined && rIdx >= 0) {
+                          setSelectedRegionIndex(rIdx);
+                          setShowReplacer(false);
+                        }
+                      }
+                    }}
+                  >
                     <GripVertical className="w-3.5 h-3.5 text-[#b0aca0]" />
                     <div
                       className="w-9 h-6 rounded flex-shrink-0 bg-cover bg-center"
@@ -205,22 +500,24 @@ export default function CollageWorkspace({
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-[11px] text-[#706c63] truncate">
-                        {'file_name' in item ? (item as { file_name: string }).file_name : `帧 #${item.id}`}
+                        {'file_name' in item
+                          ? (item as { file_name: string }).file_name
+                          : `帧 #${item.id}`}
                       </div>
                       <div className="text-[9px] text-[#b0aca0]">
                         {selItem.type === 'photo' ? '扫描照片' : '视频截帧'}
+                        {regionIdx !== undefined && (
+                          <span className="ml-1">· 区域 #{idx + 1}</span>
+                        )}
                       </div>
                     </div>
-                    {isMain && (
-                      <span className="text-[9px] text-[#f58b3d] bg-[#fff2e6] px-1.5 py-0.5 rounded font-medium">
-                        主图
-                      </span>
-                    )}
+                    <span className="text-[9px] text-[#f58b3d] bg-[#fff2e6] px-1.5 py-0.5 rounded font-medium">
+                      #{idx + 1}
+                    </span>
                   </div>
                 );
               })}
             </div>
-            <div className="text-[10px] text-[#b0aca0] mt-2">拖拽调整照片在拼图中的位置</div>
           </div>
 
           {/* Gap Control */}
@@ -230,25 +527,129 @@ export default function CollageWorkspace({
               <input
                 type="range"
                 min="0"
-                max="12"
+                max="16"
                 value={collageGap}
-                onChange={handleGapChange}
+                onChange={(e) => setCollageGap(Number(e.target.value))}
                 className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, #f58b3d 0%, #f58b3d ${(collageGap / 12) * 100}%, #f5f4f0 ${(collageGap / 12) * 100}%, #f5f4f0 100%)`,
+                  background: `linear-gradient(to right, #f58b3d 0%, #f58b3d ${(collageGap / 16) * 100}%, #f5f4f0 ${(collageGap / 16) * 100}%, #f5f4f0 100%)`,
                 }}
               />
               <span className="text-[11px] text-[#706c63] min-w-[28px]">{collageGap}px</span>
             </div>
           </div>
 
+          {/* ── Export Settings ── */}
+          <div className="collage-section">
+            <div className="flex items-center justify-between mb-2">
+              <h4>导出设置</h4>
+              <button
+                onClick={() => setShowExportSettings(!showExportSettings)}
+                className="text-[10px] text-[#f58b3d] hover:underline"
+              >
+                {showExportSettings ? '收起' : '展开'}
+              </button>
+            </div>
+
+            {showExportSettings && (
+              <div className="space-y-3">
+                {/* Quality */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-[#706c63]">清晰度</span>
+                    <span className="text-[10px] font-semibold" style={{ color: '#c7516f' }}>
+                      {QUALITY_PRESETS.find((p) => p.value === collageQuality)?.label ?? collageQuality}
+                      {' '}({collageQuality}%)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="60"
+                    max="100"
+                    step="1"
+                    value={collageQuality}
+                    onChange={(e) => setCollageQuality(Number(e.target.value))}
+                    className="w-full h-1 rounded-full appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #f58b3d 0%, #f58b3d ${((collageQuality - 60) / 40) * 100}%, #f5f4f0 ${((collageQuality - 60) / 40) * 100}%, #f5f4f0 100%)`,
+                    }}
+                  />
+                  <div className="flex justify-between mt-0.5">
+                    {QUALITY_PRESETS.map((preset) => (
+                      <button
+                        key={preset.value}
+                        onClick={() => setCollageQuality(preset.value)}
+                        className={`text-[9px] px-1.5 py-0.5 rounded-full transition-colors ${
+                          collageQuality === preset.value
+                            ? 'bg-[#f58b3d] text-white'
+                            : 'text-[#b0aca0] hover:text-[#706c63]'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Output Size */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] text-[#706c63]">输出尺寸</span>
+                    <span className="text-[10px] font-semibold text-[#706c63]">
+                      {collageOutputSize}×{collageOutputSize}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    {OUTPUT_SIZE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.value}
+                        onClick={() => setCollageOutputSize(preset.value)}
+                        className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] text-center border transition-all ${
+                          collageOutputSize === preset.value
+                            ? 'border-[#f58b3d] bg-[#fef7f0] text-[#c7516f] font-semibold'
+                            : 'border-[#e8e6de] bg-white text-[#706c63] hover:border-[#f58b3d]/50'
+                        }`}
+                      >
+                        <div>{preset.label}</div>
+                        <div className="text-[8px] opacity-60">{preset.value}px</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* File Size Estimate */}
+                <div
+                  className="flex items-center justify-between px-3 py-2 rounded-lg"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(245,139,61,0.06), rgba(212,77,104,0.06))',
+                  }}
+                >
+                  <span className="text-[11px] text-[#706c63]">预估文件大小</span>
+                  <span className="text-sm font-bold" style={{ color: '#c7516f' }}>
+                    {estimatedSize.label}
+                  </span>
+                </div>
+
+                <p className="text-[9px] text-[#b0aca0] leading-relaxed">
+                  实际文件大小可能因照片内容而异，以上为经验估算值
+                </p>
+              </div>
+            )}
+
+            {/* Quick display when collapsed */}
+            {!showExportSettings && (
+              <div className="flex items-center gap-3 text-[10px] text-[#706c63]">
+                <span>清晰度: <strong className="text-[#c7516f]">{QUALITY_PRESETS.find((p) => p.value === collageQuality)?.label ?? collageQuality}</strong></span>
+                <span>尺寸: <strong>{collageOutputSize}px</strong></span>
+                <span>预估: <strong className="text-[#f58b3d]">{estimatedSize.label}</strong></span>
+              </div>
+            )}
+          </div>
+
           {/* Footer */}
           <div className="collage-footer">
-            <div className="text-[11px] text-[#b0aca0] mb-2">
-              输出尺寸: <span className="text-[#706c63] font-medium">1080×1080px</span> · 格式: <span className="text-[#706c63] font-medium">JPG 95%</span>
-            </div>
             <button
-              onClick={() => onGenerate(activeLayout, collageGap, order)}
+              onClick={handleGenerate}
               className="btn btn-primary w-full !justify-center !h-[38px]"
             >
               <Sparkles className="w-4 h-4" />

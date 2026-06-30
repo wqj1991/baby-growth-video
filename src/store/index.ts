@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem, PeriodStats, AiSettings } from '../types';
+import type { CollageTemplate, RegionTransform } from '../utils/collageTemplates';
+import { getTemplateById, DEFAULT_TRANSFORM } from '../utils/collageTemplates';
 
 interface AppState {
   // 当前选中的宝宝
@@ -83,12 +85,24 @@ interface AppState {
   // 拼图工作区状态
   collageMode: boolean;
   setCollageMode: (mode: boolean) => void;
-  collageLayout: string; // '2up' | '3up-main' | '4grid' | '3row'
-  setCollageLayout: (layout: string) => void;
+  selectedTemplateId: string | null; // 当前选中的模板 ID
+  setSelectedTemplateId: (id: string | null) => void;
+  selectedTemplate: CollageTemplate | null; // 当前选中的模板对象（派生）
   collageGap: number; // px
   setCollageGap: (gap: number) => void;
   collagePhotoOrder: number[]; // photo IDs in order
   setCollagePhotoOrder: (order: number[]) => void;
+  // 区域编辑
+  selectedRegionIndex: number | null; // 当前选中的区域索引
+  setSelectedRegionIndex: (idx: number | null) => void;
+  regionTransforms: Record<number, RegionTransform>; // key = region index
+  setRegionTransform: (regionIdx: number, tf: Partial<RegionTransform>) => void;
+  resetRegionTransforms: () => void;
+  // 导出设置
+  collageQuality: number; // 60-100
+  setCollageQuality: (q: number) => void;
+  collageOutputSize: number; // e.g. 1080, 2048
+  setCollageOutputSize: (size: number) => void;
 
   // 视频播放器状态
   showVideoPlayer: boolean;
@@ -255,12 +269,36 @@ export const useAppStore = create<AppState>((set) => ({
   // 拼图工作区状态
   collageMode: false,
   setCollageMode: (mode) => set({ collageMode: mode }),
-  collageLayout: '3up-main',
-  setCollageLayout: (layout) => set({ collageLayout: layout }),
+  selectedTemplateId: null,
+  setSelectedTemplateId: (id) => set((state) => ({
+    selectedTemplateId: id,
+    selectedTemplate: id ? getTemplateById(id) ?? state.selectedTemplate : null,
+  })),
+  selectedTemplate: null,
   collageGap: 3,
   setCollageGap: (gap) => set({ collageGap: gap }),
   collagePhotoOrder: [],
   setCollagePhotoOrder: (order) => set({ collagePhotoOrder: order }),
+  // 区域编辑
+  selectedRegionIndex: null,
+  setSelectedRegionIndex: (idx) => set({ selectedRegionIndex: idx }),
+  regionTransforms: {},
+  setRegionTransform: (regionIdx, tf) =>
+    set((state) => ({
+      regionTransforms: {
+        ...state.regionTransforms,
+        [regionIdx]: {
+          ...(state.regionTransforms[regionIdx] || DEFAULT_TRANSFORM),
+          ...tf,
+        },
+      },
+    })),
+  resetRegionTransforms: () => set({ regionTransforms: {}, selectedRegionIndex: null }),
+  // 导出设置
+  collageQuality: 92,
+  setCollageQuality: (q) => set({ collageQuality: q }),
+  collageOutputSize: 1080,
+  setCollageOutputSize: (size) => set({ collageOutputSize: size }),
 
   // 视频播放器状态
   showVideoPlayer: false,

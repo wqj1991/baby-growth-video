@@ -1,4 +1,5 @@
 import { Check, X, Grid3X3, Wand2 } from 'lucide-react';
+import { MIN_PHOTOS, MAX_PHOTOS } from '../utils/collageTemplates';
 import type { SelectableItem, Photo, VideoFrame } from '../types';
 
 interface PendingSelectionPanelProps {
@@ -27,11 +28,7 @@ export default function PendingSelectionPanel({
     return item.item.is_multi_selected;
   }).length;
 
-  const canCollage = multiSelectedCount >= 2 && multiSelectedCount <= 4;
-
-  // Separate into two rows: top row big items (first 2), bottom row smaller (rest)
-  const topRow = selectedItems.slice(0, Math.min(2, selectedItems.length));
-  const bottomRow = selectedItems.slice(2);
+  const canCollage = multiSelectedCount >= MIN_PHOTOS && multiSelectedCount <= MAX_PHOTOS;
 
   const getFileName = (item: SelectableItem): string => {
     if (item.type === 'photo') return (item.item as Photo).file_name;
@@ -71,9 +68,9 @@ export default function PendingSelectionPanel({
           </div>
         ) : (
           <>
-            {/* Top Row - Large Items */}
+            {/* Photo Grid - 3 columns */}
             <div className="stash-compare-grid mb-3">
-              {topRow.map((item) => {
+              {selectedItems.map((item) => {
                 const uniqueKey = `${item.type}-${item.item.id}`;
                 const imageUrl = loadedImages[item.item.id];
                 const selected = isItemSelected(item);
@@ -146,56 +143,6 @@ export default function PendingSelectionPanel({
               })}
             </div>
 
-            {/* Bottom Row - Smaller Items */}
-            {bottomRow.length > 0 && (
-              <div
-                className="grid gap-2 mb-3"
-                style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
-              >
-                {bottomRow.map((item) => {
-                  const uniqueKey = `sm-${item.type}-${item.item.id}`;
-                  const imageUrl = loadedImages[item.item.id];
-                  const selected = isItemSelected(item);
-
-                  return (
-                    <div
-                      key={uniqueKey}
-                      className={`stash-compare-item small ${selected ? 'multi-selected' : ''}`}
-                      onClick={() => onToggleMultiSelect(item)}
-                    >
-                      <div className="stash-compare-thumb" style={{ aspectRatio: '1' }}>
-                        {imageUrl ? (
-                          <img src={imageUrl} alt={getFileName(item)} />
-                        ) : (
-                          <span className="text-2xl opacity-25">📷</span>
-                        )}
-                      </div>
-
-                      {selected ? (
-                        <div className="stash-check-mark">✓</div>
-                      ) : (
-                        <div className="stash-uncheck-mark" />
-                      )}
-
-                      <button
-                        className="stash-remove-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveItem(item);
-                        }}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-
-                      <div className="text-[10px] font-medium text-[#33312d] px-1.5 py-0.5 truncate">
-                        {getFileName(item).substring(0, 12)}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
             {/* Hint */}
             {multiSelectedCount >= 2 && (
               <div className="progress-hint-bar">
@@ -204,8 +151,8 @@ export default function PendingSelectionPanel({
                   <div className="font-medium">已选中 {multiSelectedCount} 张</div>
                   <div className="text-[11px] opacity-80">
                     {canCollage
-                      ? '点击「生成拼图」将合成为一张输出图片'
-                      : '最多可选 4 张进行拼图'}
+                      ? '点击「生成拼图」选择模板后合成一张输出图片'
+                      : `最多可选 ${MAX_PHOTOS} 张进行拼图`}
                   </div>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
@@ -213,7 +160,7 @@ export default function PendingSelectionPanel({
                     <div
                       className="h-full rounded-full"
                       style={{
-                        width: `${(multiSelectedCount / 4) * 100}%`,
+                        width: `${Math.min((multiSelectedCount / MAX_PHOTOS) * 100, 100)}%`,
                         background: 'linear-gradient(90deg, #7c5cbf, #8b6fc7)',
                       }}
                     />
@@ -225,7 +172,7 @@ export default function PendingSelectionPanel({
             {multiSelectedCount === 0 && (
               <div className="progress-hint-bar">
                 <span>💡</span>
-                <span className="text-[11px]">点击照片进行多选，或点击「单独选定」直接确认一张</span>
+                <span className="text-[11px]">点击照片进行多选，选 {MIN_PHOTOS}–{MAX_PHOTOS} 张可启用拼图</span>
               </div>
             )}
           </>
@@ -256,14 +203,14 @@ export default function PendingSelectionPanel({
               生成拼图 {canCollage ? `(${multiSelectedCount}张)` : ''}
             </button>
           </div>
-          {selectedItems.length > 4 && (
+          {selectedItems.length > MAX_PHOTOS && (
             <div className="text-[10px] text-[#d44d68] text-center mt-2">
-              ⚠️ 超过 4 张无法拼图，建议移除部分后再继续
+              ⚠️ 超过 {MAX_PHOTOS} 张无法拼图，建议移除部分后再继续
             </div>
           )}
           {selectedItems.length === 1 && (
             <div className="text-[10px] text-[#b0aca0] text-center mt-2">
-              选 2–4 张照片可启用拼图功能
+              选 {MIN_PHOTOS}–{MAX_PHOTOS} 张照片可启用拼图功能
             </div>
           )}
         </div>

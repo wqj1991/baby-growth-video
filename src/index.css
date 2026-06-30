@@ -826,7 +826,6 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  padding: 16px 20px;
 }
 
 .stash-compare-item {
@@ -848,10 +847,6 @@ body {
 .stash-compare-item.multi-selected {
   border-color: #7c5cbf;
   box-shadow: 0 0 0 3px rgba(124, 92, 191, 0.1), var(--shadow-md);
-}
-
-.stash-compare-item.small {
-  grid-column: span 1;
 }
 
 .stash-compare-thumb {
