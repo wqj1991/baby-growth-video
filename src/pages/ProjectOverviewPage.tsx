@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Baby, Calendar, Image, Clock, Play, Video, History, ChevronRight } from 'lucide-react';
+import { Baby, Calendar, Image, Clock, Video, History } from 'lucide-react';
 import { useAppStore } from '../store';
 import { getPeriods } from '../utils/tauriCommands';
 import type { Period } from '../types';
@@ -31,9 +31,6 @@ export default function ProjectOverviewPage() {
 
   const selectedCount = periods.filter((p) => p.selected_photo_id).length;
   const totalCount = periods.length;
-  const progressPercent =
-    totalCount > 0 ? Math.round((selectedCount / totalCount) * 100) : 0;
-  const remainingCount = totalCount - selectedCount;
 
   if (loading) {
     return (
@@ -46,86 +43,52 @@ export default function ProjectOverviewPage() {
   return (
     <div className="h-full overflow-y-auto p-8">
       {/* 基础信息卡片 */}
-      <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-6 text-white mb-6">
+      <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-6 text-white mb-8">
         <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold mb-1">{currentProject?.name}</h1>
-            <p className="text-primary-100">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold mb-1 truncate">{currentProject?.name}</h1>
+            <p className="text-primary-100 text-sm">
               {currentProject?.description || '暂无描述'}
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-1.5">
+          <div className="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-1.5 ml-4 flex-shrink-0">
             <Baby className="w-4 h-4" />
             <span className="text-sm font-medium">{currentBaby?.name}</span>
           </div>
         </div>
-        <div className="flex gap-6 mt-4 text-sm">
+        <div className="flex flex-wrap items-center gap-5 mt-4 pt-4 border-t border-white/15 text-sm">
           <div className="flex items-center gap-1.5">
             <Calendar className="w-4 h-4 opacity-80" />
-            <span>周期：{currentProject?.period_days}天</span>
+            <span>周期：{currentProject?.period_days} 天</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Clock className="w-4 h-4 opacity-80" />
             <span>创建于 {currentProject?.created_at?.split('T')[0]}</span>
           </div>
-        </div>
-      </div>
-
-      {/* 数据统计卡片 */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-info-bg flex items-center justify-center">
-                <div className="w-5 h-5 text-info-text">📊</div>
-              </div>
-              <span className="text-stone-600">完成进度</span>
-            </div>
-            <p className="text-3xl font-bold text-stone-900 mb-2">
-              {progressPercent}%
-            </p>
-            <div className="w-full bg-stone-200 rounded-full h-2">
-              <div
-                className="bg-info h-2 rounded-full transition-all"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+          <div className="flex items-center gap-1.5">
+            <Image className="w-4 h-4 opacity-80" />
+            <span>
+              已选 {selectedCount}/{totalCount} 张照片
+            </span>
           </div>
-        </div>
-
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-success-bg flex items-center justify-center">
-                <Image className="w-5 h-5 text-success-text" />
+          {totalCount > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="w-24 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-white rounded-full transition-all duration-500"
+                  style={{ width: `${Math.round((selectedCount / totalCount) * 100)}%` }}
+                />
               </div>
-              <span className="text-stone-600">已选照片</span>
-            </div>
-            <p className="text-3xl font-bold text-stone-900">
-              {selectedCount}
-              <span className="text-lg font-normal text-stone-400">
-                {' '}
-                / {totalCount}
+              <span className="text-xs opacity-70">
+                {Math.round((selectedCount / totalCount) * 100)}%
               </span>
-            </p>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-warmth-100 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-warmth-700" />
-              </div>
-              <span className="text-stone-600">剩余周期</span>
             </div>
-            <p className="text-3xl font-bold text-stone-900">{remainingCount}</p>
-          </div>
+          )}
         </div>
       </div>
 
       {/* 快捷操作 */}
-      <div className="card mb-6">
+      <div className="card">
         <div className="card-header">
           <h2 className="text-lg font-semibold">快捷操作</h2>
         </div>
@@ -133,9 +96,9 @@ export default function ProjectOverviewPage() {
           <div className="grid grid-cols-3 gap-4">
             <button
               onClick={() => navigate('periods')}
-              className="p-4 rounded-xl bg-primary-50 hover:bg-primary-100 transition-colors text-left group"
+              className="p-5 rounded-xl bg-primary-50 hover:bg-primary-100 transition-all text-left group border border-transparent hover:border-primary-200"
             >
-              <div className="w-12 h-12 rounded-lg bg-primary-500 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-lg bg-primary-500 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-sm">
                 <Image className="w-6 h-6" />
               </div>
               <h3 className="font-semibold text-stone-900">开始选照片</h3>
@@ -144,9 +107,9 @@ export default function ProjectOverviewPage() {
 
             <button
               onClick={() => navigate('generate')}
-              className="p-4 rounded-xl bg-success-bg hover:bg-success-bg/60 transition-colors text-left group"
+              className="p-5 rounded-xl bg-success-bg hover:bg-success-bg/60 transition-all text-left group border border-transparent hover:border-success-border"
             >
-              <div className="w-12 h-12 rounded-lg bg-success text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-lg bg-success text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-sm">
                 <Video className="w-6 h-6" />
               </div>
               <h3 className="font-semibold text-stone-900">生成视频</h3>
@@ -155,68 +118,15 @@ export default function ProjectOverviewPage() {
 
             <button
               onClick={() => navigate('history')}
-              className="p-4 rounded-xl bg-stash-bg hover:bg-stash-bg/60 transition-colors text-left group"
+              className="p-5 rounded-xl bg-stash-bg hover:bg-stash-bg/60 transition-all text-left group border border-transparent hover:border-stash-border"
             >
-              <div className="w-12 h-12 rounded-lg bg-stash text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-lg bg-stash text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-sm">
                 <History className="w-6 h-6" />
               </div>
               <h3 className="font-semibold text-stone-900">历史记录</h3>
               <p className="text-sm text-stone-500 mt-1">查看已生成的视频</p>
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* 周期概览 */}
-      <div className="card">
-        <div className="card-header flex items-center justify-between">
-          <h2 className="text-lg font-semibold">周期概览</h2>
-          <button
-            onClick={() => navigate('periods')}
-            className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
-          >
-            查看全部
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="card-body">
-          <div className="grid grid-cols-6 gap-3">
-            {periods.slice(0, 12).map((period, index) => {
-              const isSelected = !!period.selected_photo_id;
-              return (
-                <div
-                  key={period.id}
-                  className={`aspect-square rounded-lg flex flex-col items-center justify-center text-center p-2 ${
-                    isSelected
-                      ? 'bg-success-bg border-2 border-success-border'
-                      : 'bg-stone-50 border-2 border-transparent'
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
-                      isSelected
-                        ? 'bg-success text-white'
-                        : 'bg-stone-200 text-stone-500'
-                    }`}
-                  >
-                    {isSelected ? (
-                      <Play className="w-4 h-4" />
-                    ) : (
-                      <span className="text-xs font-medium">{index + 1}</span>
-                    )}
-                  </div>
-                  <span className="text-xs text-stone-600 truncate w-full">
-                    {period.name || `第${index + 1}周`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          {periods.length > 12 && (
-            <p className="text-center text-sm text-stone-400 mt-4">
-              还有 {periods.length - 12} 个周期...
-            </p>
-          )}
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Calendar, RefreshCw, Star, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCreateProjectStore } from '../../store/createProjectStore';
 import { generatePeriods } from '../../utils/tauriCommands';
+import { showToast } from '../../store/toastStore';
 import type { Period } from '../../types';
 
 const specialPeriodNames = ['满月', '百天', '半岁', '一岁', '周岁'];
@@ -32,7 +33,7 @@ export default function Step3GeneratePeriods() {
       setPeriods(result);
     } catch (error) {
       console.error('生成周期失败:', error);
-      alert('生成周期失败，请重试');
+      showToast('error', '生成周期失败', '请重试');
     } finally {
       setIsGeneratingPeriods(false);
     }

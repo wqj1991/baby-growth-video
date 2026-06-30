@@ -436,6 +436,12 @@ export interface RegionTransform {
   flipH: boolean;
   /** 是否垂直翻转 */
   flipV: boolean;
+  /** 水平偏移量（像素，相对于中心） */
+  offsetX: number;
+  /** 垂直偏移量（像素，相对于中心） */
+  offsetY: number;
+  /** 缩放比例 */
+  scale: number;
 }
 
 /** 默认变换（无变换） */
@@ -443,11 +449,20 @@ export const DEFAULT_TRANSFORM: RegionTransform = {
   rotation: 0,
   flipH: false,
   flipV: false,
+  offsetX: 0,
+  offsetY: 0,
+  scale: 1,
 };
 
 /** 生成 CSS transform 字符串 */
 export function toCssTransform(t: RegionTransform): string {
   const parts: string[] = [];
+  if (t.offsetX !== 0 || t.offsetY !== 0) {
+    parts.push(`translate(${t.offsetX}px, ${t.offsetY}px)`);
+  }
+  if (t.scale !== 1) {
+    parts.push(`scale(${t.scale})`);
+  }
   if (t.rotation !== 0) parts.push(`rotate(${t.rotation}deg)`);
   if (t.flipH) parts.push('scaleX(-1)');
   if (t.flipV) parts.push('scaleY(-1)');

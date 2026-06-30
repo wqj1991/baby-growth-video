@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Video, Play, Settings, Download, Music, Image, Sparkles, AlertCircle, ExternalLink, AlertTriangle, CheckCircle2, Loader2, Film, Type, Wand2, Clock } from 'lucide-react';
+import { Video, Play, Settings, Download, Music, Image, Sparkles, AlertCircle, ExternalLink, AlertTriangle, CheckCircle2, Loader2, Film, Type, Wand2, Clock, ChevronRight } from 'lucide-react';
 import { useAppStore, isAiConfigured } from '../store';
 import { saveFile, generateGrowthVideo } from '../utils/tauriCommands';
+import { showToast } from '../store/toastStore';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigate } from 'react-router-dom';
 import type { VideoConfig, PhotoText } from '../types';
@@ -97,12 +98,12 @@ export default function VideoGeneratePage() {
 
   const handleGenerate = async () => {
     if (completedPeriods.length === 0) {
-      alert('请先选择照片');
+      showToast('warning', '请先选择照片', '请至少确认一个周期的最终照片');
       return;
     }
 
     if (!currentProject) {
-      alert('请先选择项目');
+      showToast('warning', '请先选择项目');
       return;
     }
 
@@ -408,13 +409,74 @@ export default function VideoGeneratePage() {
               </h2>
             </div>
             <div className="card-body">
-              <div className="aspect-video bg-stone-900 rounded-lg flex items-center justify-center">
-                <div className="text-center text-stone-500">
-                  <Video className="w-16 h-16 mx-auto mb-3 text-stone-600" />
-                  <p>视频预览</p>
-                  <p className="text-sm mt-1">生成后可在此播放</p>
+              {/* 生成后：视频播放器 */}
+              {completedVideoPath ? (
+                <div className="aspect-video bg-stone-900 rounded-lg overflow-hidden">
+                  <video
+                    src={`https://asset.localhost/${encodeURIComponent(completedVideoPath)}`}
+                    controls
+                    className="w-full h-full object-contain"
+                  >
+                    您的浏览器不支持视频播放
+                  </video>
                 </div>
-              </div>
+              ) : completedPeriods.length > 0 ? (
+                /* 生成前：照片时间线缩略图 */
+                <div>
+                  <p className="text-xs font-medium text-stone-500 mb-3">
+                    📸 已选 {completedPeriods.length} 张照片将按时间线排列
+                  </p>
+                  <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+                    {completedPeriods.map((period, idx) => (
+                      <div
+                        key={period.id}
+                        className="flex-shrink-0 w-28 rounded-xl overflow-hidden border border-stone-200 bg-stone-50 shadow-sm"
+                      >
+                        {/* 缩略图占位 */}
+                        <div className="aspect-[4/3] bg-gradient-to-br from-warmth-100 to-warmth-200 flex items-center justify-center relative">
+                          <Sparkles className="w-5 h-5 text-warmth-400" />
+                          {/* 序号 */}
+                          <span className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-white/90 text-[10px] font-bold text-warmth-500 flex items-center justify-center shadow-sm">
+                            {idx + 1}
+                          </span>
+                          {/* 已确认标记 */}
+                          <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#2d9d5f] flex items-center justify-center">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                          </span>
+                        </div>
+                        {/* 周期名称 */}
+                        <div className="px-2 py-1.5">
+                          <p className="text-[11px] font-semibold text-stone-700 truncate">{period.name}</p>
+                          <p className="text-[10px] text-stone-400">{period.start_date}</p>
+                        </div>
+                        {/* 箭头连接 */}
+                        {idx < completedPeriods.length - 1 && (
+                          <div className="absolute -right-3 top-1/2 -translate-y-1/2 z-10">
+                            <ChevronRight className="w-4 h-4 text-warmth-400" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {/* 转场指示 */}
+                  {completedPeriods.length > 1 && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-stone-400">
+                      <span className="inline-block w-2 h-2 rounded-full bg-[#7c5cbf]" />
+                      {completedPeriods.length - 1} 个转场点 · 
+                      选用 {config.transition === 'fade' ? '淡入淡出' : config.transition === 'slide' ? '滑动' : config.transition === 'zoom' ? '缩放' : '无转场'} 效果
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* 空状态 */
+                <div className="aspect-video bg-stone-100 rounded-lg flex items-center justify-center">
+                  <div className="text-center text-stone-400">
+                    <Video className="w-12 h-12 mx-auto mb-2 text-stone-300" />
+                    <p className="text-sm font-medium">暂无已选照片</p>
+                    <p className="text-xs mt-1">在左侧选择周期的最终照片后，此处将显示照片序列</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -687,8 +749,7 @@ export default function VideoGeneratePage() {
                   <button
                     className="btn btn-success"
                     onClick={() => {
-                      // 视频已保存在用户选择的位置
-                      alert(`视频已保存至:\n${completedVideoPath}`);
+                      showToast('success', '视频已生成', `保存路径: ${completedVideoPath}`, 6000);
                     }}
                   >
                     <Download className="w-4 h-4" />

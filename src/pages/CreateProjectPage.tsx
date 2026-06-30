@@ -3,8 +3,10 @@ import { ArrowLeft, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import WizardSidebar from '../components/WizardSidebar';
 import ErrorBoundary from '../components/ErrorBoundary';
+import ConfirmModal from '../components/ConfirmModal';
 import { useCreateProjectStore } from '../store/createProjectStore';
 import { createProject } from '../utils/tauriCommands';
+import { showToast } from '../store/toastStore';
 import Step1SelectBaby from './create-project/Step1SelectBaby';
 import Step2ProjectInfo from './create-project/Step2ProjectInfo';
 import Step3GeneratePeriods from './create-project/Step3GeneratePeriods';
@@ -25,6 +27,7 @@ export default function CreateProjectPage() {
     currentStep, setCurrentStep, reset, selectedBaby, projectName,
     periodDays, scanResult, periods, setProjectId, projectId } = useCreateProjectStore();
   const [isCreating, setIsCreating] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     console.log('CreateProjectPage 已加载，当前步骤:', currentStep);
@@ -47,7 +50,7 @@ export default function CreateProjectPage() {
         setCurrentStep(3);
       } catch (error) {
         console.error('创建项目失败:', error);
-        alert('创建项目失败，请重试');
+        showToast('error', '创建失败', '创建项目失败，请重试');
       } finally {
         setIsCreating(false);
       }
@@ -63,10 +66,12 @@ export default function CreateProjectPage() {
   };
 
   const handleCancel = () => {
-    if (window.confirm('确定要取消创建吗？已填写的信息将会丢失。')) {
-      reset();
-      navigate('/');
-    }
+    setShowCancelConfirm(true);
+  };
+
+  const confirmCancel = () => {
+    reset();
+    navigate('/');
   };
 
   const handleStepClick = (stepNumber: number) => {
@@ -100,7 +105,8 @@ export default function CreateProjectPage() {
   const currentStepTitle = steps.find(s => s.number === currentStep)?.title || '';
 
   return (
-    <ErrorBoundary>
+    <>
+      <ErrorBoundary>
       <div className="w-full h-screen flex flex-col bg-stone-50/50">
         {/* === 顶部导航栏 === */}
         <div className="glass-strong flex items-center justify-between px-6 py-3.5 border-b border-white/40 flex-shrink-0 z-10">
@@ -224,5 +230,16 @@ export default function CreateProjectPage() {
         </div>
       </div>
     </ErrorBoundary>
+
+    <ConfirmModal
+      open={showCancelConfirm}
+      title="取消创建"
+      message="确定要取消创建吗？已填写的信息将会丢失。"
+      confirmText="确认取消"
+      variant="danger"
+      onConfirm={confirmCancel}
+      onCancel={() => setShowCancelConfirm(false)}
+    />
+  </>
   );
 }

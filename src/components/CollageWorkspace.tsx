@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import {
   ArrowLeft,
   GripVertical,
@@ -11,11 +11,14 @@ import {
   RefreshCw,
   Image,
   Settings2,
+  Move,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import type { SelectableItem } from '../types';
 import { PREVIEW_COLORS } from './TemplateSelector';
-import { toCssTransform, estimateFileSize, QUALITY_PRESETS, OUTPUT_SIZE_PRESETS } from '../utils/collageTemplates';
+import { estimateFileSize, QUALITY_PRESETS, OUTPUT_SIZE_PRESETS, DEFAULT_TRANSFORM } from '../utils/collageTemplates';
 
 interface CollageWorkspaceProps {
   selectedItems: SelectableItem[];
@@ -69,6 +72,26 @@ export default function CollageWorkspace({
   const [showReplacer, setShowReplacer] = useState(false);
   // 导出设置面板
   const [showExportSettings, setShowExportSettings] = useState(false);
+  // 拖拽状态
+  const dragState = useRef<{
+    isDragging: boolean;
+    regionIndex: number | null;
+    startX: number;
+    startY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+  }>({
+    isDragging: false,
+    regionIndex: null,
+    startX: 0,
+    startY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
+  });
+  // 区域元素引用（用于计算尺寸）
+  const regionRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  // 图片尺寸缓存
+  const imageSizes = useRef<Record<number, { width: number; height: number }>>({});
 
   // 默认按区域 order 排序的顺序
   const order = useMemo(() => {
@@ -79,12 +102,6 @@ export default function CollageWorkspace({
   const template = selectedTemplate;
 
   // ── 帮助函数 ──
-
-  /** 获取指定区域的变换 CSS */
-  const getTransform = (regionIndex: number) => {
-    const tf = regionTransforms[regionIndex];
-    return tf ? toCssTransform(tf) : 'none';
-  };
 
   /** 处理区域点击 */
   const handleRegionClick = (regionIndex: number, e: React.MouseEvent) => {
@@ -120,6 +137,126 @@ export default function CollageWorkspace({
     const current = regionTransforms[selectedRegionIndex];
     setRegionTransform(selectedRegionIndex, { flipV: !(current?.flipV ?? false) });
   };
+
+  /** 缩放照片 */
+  const handleZoom = (delta: number) => {
+    if (selectedRegionIndex === null) return;
+    const current = regionTransforms[selectedRegionIndex] ?? DEFAULT_TRANSFORM;
+    const newScale = Math.max(0.5, Math.min(3, current.scale + delta));
+    setRegionTransform(selectedRegionIndex, { scale: newScale });
+  };
+
+  /** 重置位置和缩放 */
+  const handleResetTransform = () => {
+    if (selectedRegionIndex === null) return;
+    setRegionTransform(selectedRegionIndex, {
+      offsetX: 0,
+      offsetY: 0,
+      scale: 1,
+    });
+  };
+
+  /** 开始拖拽 */
+  const handleDragStart = (regionIndex: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const current = regionTransforms[regionIndex] ?? DEFAULT_TRANSFORM;
+    dragState.current = {
+      isDragging: true,
+      regionIndex,
+      startX: e.clientX,
+      startY: e.clientY,
+      startOffsetX: current.offsetX,
+      startOffsetY: current.offsetY,
+    };
+  };
+
+  /** 拖拽移动 */
+  const handleDragMove = (e: MouseEvent) => {
+    if (!dragState.current.isDragging || dragState.current.regionIndex === null) return;
+    const { regionIndex, startX, startY, startOffsetX, startOffsetY } = dragState.current;
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+    
+    const regionEl = regionRefs.current[regionIndex];
+    if (!regionEl) {
+      setRegionTransform(regionIndex, {
+        offsetX: startOffsetX + deltaX,
+        offsetY: startOffsetY + deltaY,
+      });
+      return;
+    }
+
+    const current = regionTransforms[regionIndex] ?? DEFAULT_TRANSFORM;
+    const itemIdx = order[template?.regions[regionIndex]?.order ?? regionIndex];
+    const item = selectedItems[itemIdx];
+    const imgSize = item ? imageSizes.current[item.item.id] : null;
+    
+    if (imgSize && imgSize.width > 0 && imgSize.height > 0) {
+      const regionWidth = regionEl.offsetWidth;
+      const regionHeight = regionEl.offsetHeight;
+      const scale = current.scale;
+      
+      const imgRatio = imgSize.width / imgSize.height;
+      const regionRatio = regionWidth / regionHeight;
+      
+      let scaledImgWidth: number;
+      let scaledImgHeight: number;
+      
+      if (imgRatio > regionRatio) {
+        scaledImgHeight = regionHeight * scale;
+        scaledImgWidth = scaledImgHeight * imgRatio;
+      } else {
+        scaledImgWidth = regionWidth * scale;
+        scaledImgHeight = scaledImgWidth / imgRatio;
+      }
+      
+      const maxOffsetX = Math.max(0, (scaledImgWidth - regionWidth) / 2);
+      const maxOffsetY = Math.max(0, (scaledImgHeight - regionHeight) / 2);
+      
+      const newOffsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, startOffsetX + deltaX));
+      const newOffsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, startOffsetY + deltaY));
+      
+      setRegionTransform(regionIndex, {
+        offsetX: newOffsetX,
+        offsetY: newOffsetY,
+      });
+    } else {
+      setRegionTransform(regionIndex, {
+        offsetX: startOffsetX + deltaX,
+        offsetY: startOffsetY + deltaY,
+      });
+    }
+  };
+
+  /** 结束拖拽 */
+  const handleDragEnd = () => {
+    dragState.current.isDragging = false;
+    dragState.current.regionIndex = null;
+  };
+
+  /** 图片加载完成时记录尺寸 */
+  const handleImageLoad = (itemId: number, e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    imageSizes.current[itemId] = {
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+    };
+  };
+
+  // 全局鼠标事件监听
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => handleDragMove(e);
+    const onMouseUp = () => handleDragEnd();
+    
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   /** 替换照片：从待选区 pendingItems 中选择 */
   const handleReplacePhoto = (pendingItem: SelectableItem) => {
@@ -262,11 +399,13 @@ export default function CollageWorkspace({
                     const imageUrl = item ? loadedImages[item.item.id] : null;
                     const padding = collageGap / 2;
                     const isSelected = selectedRegionIndex === idx;
-                    const transform = getTransform(idx);
+                    const currentTf = regionTransforms[idx] ?? DEFAULT_TRANSFORM;
+                    const hasTransform = currentTf.offsetX !== 0 || currentTf.offsetY !== 0 || currentTf.scale !== 1;
 
                     return (
                       <div
                         key={idx}
+                        ref={(el) => { regionRefs.current[idx] = el; }}
                         className={`absolute transition-all duration-200 ${
                           isSelected
                             ? 'ring-[3px] ring-warmth-500 ring-offset-0 z-10'
@@ -282,16 +421,40 @@ export default function CollageWorkspace({
                           background: imageUrl
                             ? undefined
                             : PREVIEW_COLORS[idx % PREVIEW_COLORS.length],
+                          cursor: imageUrl && isSelected ? 'grab' : 'pointer',
                         }}
                         onClick={(e) => handleRegionClick(idx, e)}
+                        onMouseDown={(e) => {
+                          if (imageUrl && isSelected) {
+                            handleDragStart(idx, e);
+                          }
+                        }}
                       >
                         {imageUrl ? (
-                          <img
-                            src={imageUrl}
-                            alt=""
-                            className="w-full h-full object-cover pointer-events-none"
-                            style={{ transform, transformOrigin: 'center center' }}
-                          />
+                          <div className="w-full h-full relative overflow-hidden">
+                            <img
+                              src={imageUrl}
+                              alt=""
+                              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none"
+                              style={{
+                                minWidth: '100%',
+                                minHeight: '100%',
+                                maxWidth: 'none',
+                                maxHeight: 'none',
+                                objectFit: 'cover',
+                                width: hasTransform ? 'auto' : '100%',
+                                height: hasTransform ? '100%' : '100%',
+                                transform: hasTransform
+                                  ? `translate(calc(-50% + ${currentTf.offsetX}px), calc(-50% + ${currentTf.offsetY}px)) scale(${currentTf.scale})`
+                                  : 'translate(-50%, -50%)',
+                                transformOrigin: 'center center',
+                                userSelect: 'none',
+                                pointerEvents: 'none',
+                              }}
+                              onLoad={(e) => handleImageLoad(item.item.id, e)}
+                              draggable={false}
+                            />
+                          </div>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <span className="text-white/20 text-sm font-bold select-none">
@@ -302,10 +465,17 @@ export default function CollageWorkspace({
 
                         {/* 选中指示器 */}
                         {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-warmth-500 rounded-full flex items-center justify-center shadow-lg">
+                          <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-warmth-500 rounded-full flex items-center justify-center shadow-lg z-10">
                             <span className="text-[10px] text-white font-bold">
                               {region.order + 1}
                             </span>
+                          </div>
+                        )}
+
+                        {/* 拖拽提示 */}
+                        {isSelected && imageUrl && (
+                          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/60 rounded text-[9px] text-white/80 pointer-events-none z-10">
+                            拖拽调整位置
                           </div>
                         )}
                       </div>
@@ -385,6 +555,42 @@ export default function CollageWorkspace({
                   <FlipVertical className="w-3 h-3" />
                   垂直翻转
                 </button>
+              </div>
+
+              {/* 缩放和位置控制 */}
+              <div className="mt-2 pt-2 border-t border-stone-200/60">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] text-stone-500 flex items-center gap-1">
+                    <Move className="w-3 h-3" />
+                    位置 & 缩放
+                  </span>
+                  <button
+                    onClick={handleResetTransform}
+                    className="text-[10px] text-warmth-500 hover:underline"
+                  >
+                    重置
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handleZoom(-0.1)}
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-stone-200 text-stone-600 hover:border-warmth-500 hover:text-warmth-500 transition-colors"
+                  >
+                    <ZoomOut className="w-3 h-3" />
+                  </button>
+                  <span className="text-[10px] text-stone-500 min-w-[40px] text-center font-medium">
+                    {Math.round((regionTransforms[selectedRegionIndex]?.scale ?? 1) * 100)}%
+                  </span>
+                  <button
+                    onClick={() => handleZoom(0.1)}
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-stone-200 text-stone-600 hover:border-warmth-500 hover:text-warmth-500 transition-colors"
+                  >
+                    <ZoomIn className="w-3 h-3" />
+                  </button>
+                </div>
+                <p className="text-[9px] text-stone-400 mt-1 text-center">
+                  选中照片后可拖拽调整位置
+                </p>
               </div>
 
               {/* Photo Replacer Mini-panel */}
@@ -527,7 +733,7 @@ export default function CollageWorkspace({
                         )}
                       </div>
                     </div>
-                    <span className="text-[9px] text-warmth-500 bg-warmth-100 px-1.5 py-0.5 rounded font-medium">
+                    <span className="text-[10px] font-semibold text-warmth-800 bg-warmth-100 border border-warmth-200 px-2 py-0.5 rounded">
                       #{idx + 1}
                     </span>
                   </div>

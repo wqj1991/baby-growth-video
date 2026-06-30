@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Baby, Save, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { getBabies, createBaby, updateBaby, deleteBaby } from '../utils/tauriCommands';
+import { showToast } from '../store/toastStore';
+import ConfirmModal from '../components/ConfirmModal';
 import type { Baby as BabyType } from '../types';
 
 export default function BabySetupPage() {
@@ -17,6 +19,7 @@ export default function BabySetupPage() {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   useEffect(() => {
     loadBabies();
@@ -58,7 +61,7 @@ export default function BabySetupPage() {
 
   const handleSave = async () => {
     if (!editingBaby.name || !editingBaby.birth_date) {
-      alert('请填写宝宝姓名和出生日期');
+      showToast('warning', '请填写完整信息', '请填写宝宝姓名和出生日期');
       return;
     }
 
@@ -79,16 +82,20 @@ export default function BabySetupPage() {
       setIsEditing(false);
     } catch (error) {
       console.error('保存失败:', error);
-      alert('保存失败，请重试');
+      showToast('error', '保存失败', '请重试');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (babyId: number) => {
-    if (!confirm('确定要删除这个宝宝的信息吗？相关的项目和数据也会被删除。')) {
-      return;
-    }
+    setDeleteConfirmId(babyId);
+  };
+
+  const confirmDelete = async () => {
+    const babyId = deleteConfirmId;
+    if (!babyId) return;
+    setDeleteConfirmId(null);
 
     try {
       await deleteBaby(babyId);
@@ -98,11 +105,12 @@ export default function BabySetupPage() {
       }
     } catch (error) {
       console.error('删除失败:', error);
-      alert('删除失败，请重试');
+      showToast('error', '删除失败', '请重试');
     }
   };
 
   return (
+    <>
     <div className="p-8">
       {/* 页面标题 */}
       <div className="mb-8">
@@ -301,5 +309,16 @@ export default function BabySetupPage() {
         </div>
       </div>
     </div>
+
+    <ConfirmModal
+      open={deleteConfirmId !== null}
+      title="删除宝宝信息"
+      message="确定要删除这个宝宝的信息吗？相关的项目和数据也会被删除。此操作不可恢复。"
+      confirmText="确认删除"
+      variant="danger"
+      onConfirm={confirmDelete}
+      onCancel={() => setDeleteConfirmId(null)}
+    />
+  </>
   );
 }

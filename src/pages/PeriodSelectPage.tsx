@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAppStore } from '../store';
+import { showToast } from '../store/toastStore';
 import {
   getPeriods,
   generatePeriods,
@@ -30,6 +31,7 @@ import {
   setFinalVideoFrame,
   getVideoThumbnail,
   getPeriodStats,
+  generateCollage,
 } from '../utils/tauriCommands';
 import type { Photo, Video, VideoFrame, SelectableItem } from '../types';
 import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
@@ -319,7 +321,7 @@ export default function PeriodSelectPage() {
       await loadPeriodMedia(currentPeriod.id);
       const stats = await getPeriodStats(parseInt(projectId));
       setPeriodStats(stats);
-    } catch (error) { alert('扫描文件夹失败'); }
+    } catch (error) { showToast('error', '扫描失败', '扫描文件夹失败，请重试'); }
     finally { setIsScanning(false); }
   };
 
@@ -420,7 +422,7 @@ export default function PeriodSelectPage() {
       setCurrentVideoFrames(frames);
       setVideoFrameCounts(prev => ({ ...prev, [currentVideoForFrames!.id]: frames.length }));
       setShowFrameViewer(true);
-    } catch (error) { alert('抽帧失败，请重试'); }
+    } catch (error) { showToast('error', '抽帧失败', '请重试'); }
     finally { setIsExtractingFrames(false); }
   };
 
@@ -565,7 +567,7 @@ export default function PeriodSelectPage() {
     // Build region definitions from the template
     const template = getTemplateById(templateId);
     if (!template) {
-      alert('未找到模板');
+      showToast('error', '模板错误', '未找到模板，请重试');
       return;
     }
 
@@ -590,24 +592,46 @@ export default function PeriodSelectPage() {
 
     console.log('拼图生成请求:', collagePayload);
 
-    // TODO: Call Rust backend to generate collage
-    // const outputPath = await generateCollage(collagePayload);
-    // Then add to pending selection:
-    // if (outputPath) {
-    //   const newPhoto = await addCollagePhoto(currentPeriod!.id, outputPath);
-    //   addToSelectedItems({ type: 'photo', item: { ...newPhoto, is_multi_selected: false } });
-    // }
+    if (!projectId) {
+      showToast('error', '项目错误', '项目ID无效');
+      return;
+    }
 
-    alert(
-      `拼图生成参数已就绪：\n` +
-      `模板: ${template.name}\n` +
-      `输出尺寸: ${outputSize}×${outputSize}\n` +
-      `JPEG质量: ${quality}%\n` +
-      `间距: ${gap}px\n` +
-      `照片数: ${photoPaths.length}\n` +
-      `含变换区域: ${Object.values(transforms).filter(t => t.rotation !== 0 || t.flipH || t.flipV).length}\n\n` +
-      `后端接口集成后将自动生成并放入待选区`
-    );
+    try {
+      const result = await generateCollage(collagePayload, parseInt(projectId));
+      console.log('拼图生成成功:', result);
+
+      const fileName = `collage_${Date.now()}.jpg`;
+      const fileSize = (await fetch(result.output_path).then(r => r.blob())).size;
+
+      const newPhoto = {
+        id: -1,
+        period_id: currentPeriod?.id ?? 0,
+        file_path: result.output_path,
+        file_name: fileName,
+        file_size: fileSize,
+        width: outputSize,
+        height: outputSize,
+        taken_at: new Date().toISOString().split('T')[0],
+        description: `拼图 (${template.name})`,
+        is_selected: true,
+        is_final: false,
+        is_multi_selected: false,
+        created_at: new Date().toISOString(),
+      };
+
+      addToSelectedItems({ type: 'photo', item: newPhoto });
+
+      showToast(
+        'success',
+        '拼图生成成功',
+        `已生成 ${outputSize}×${outputSize} 拼图，已放入待选区`
+      );
+    } catch (error) {
+      console.error('拼图生成失败:', error);
+      showToast('error', '拼图生成失败', String(error));
+    }
+
     setCollageMode(false);
   };
 
@@ -914,14 +938,14 @@ export default function PeriodSelectPage() {
                               <div className="flex gap-1.5 mt-2">
                                 <button
                                   onClick={() => handleExtractFrames(video)}
-                                  className="btn btn-outline btn-sm flex-1 text-[11px]"
+                                  className="btn btn-primary btn-sm flex-1 text-[11px]"
                                   disabled={isExtractingFrames}
                                 >
                                   {isExtractingFrames ? '抽帧中...' : videoFrameCounts[video.id] > 0 ? `查看(${videoFrameCounts[video.id]})` : '截取画面'}
                                 </button>
                                 <button
                                   onClick={() => handleOpenInlinePlayer(video)}
-                                  className="btn btn-ghost btn-sm flex-1 text-[11px]"
+                                  className="btn btn-secondary btn-sm flex-1 text-[11px]"
                                 >
                                   播放
                                 </button>

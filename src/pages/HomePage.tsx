@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Baby, Plus, Video, Clock, ChevronRight, Trash2, Sparkles, Calendar, Play } from 'lucide-react';
 import { useAppStore } from '../store';
 import { getBabies, getProjects, deleteProject } from '../utils/tauriCommands';
+import { showToast } from '../store/toastStore';
+import ConfirmModal from '../components/ConfirmModal';
 import type { Baby as BabyType, Project } from '../types';
 
 export default function HomePage() {
@@ -12,6 +14,7 @@ export default function HomePage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedBaby, setSelectedBaby] = useState<BabyType | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<Project | null>(null);
 
   useEffect(() => {
     loadBabies();
@@ -65,17 +68,22 @@ export default function HomePage() {
 
   const handleDeleteProject = async (e: React.MouseEvent, project: Project) => {
     e.stopPropagation();
-    if (!window.confirm(`确定要删除项目「${project.name}」吗？此操作不可恢复。`)) {
-      return;
-    }
+    setDeleteConfirm(project);
+  };
+
+  const confirmDeleteProject = async () => {
+    const project = deleteConfirm;
+    if (!project) return;
+    setDeleteConfirm(null);
     try {
       await deleteProject(project.id);
       if (selectedBaby) {
         loadProjects(selectedBaby.id);
       }
+      showToast('success', '删除成功', `项目「${project.name}」已删除`);
     } catch (error) {
       console.error('删除项目失败:', error);
-      alert('删除项目失败，请重试');
+      showToast('error', '删除失败', '请重试');
     }
   };
 
@@ -373,6 +381,16 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={!!deleteConfirm}
+        title="删除项目"
+        message={`确定要删除项目「${deleteConfirm?.name ?? ''}」吗？此操作不可恢复。`}
+        confirmText="删除"
+        variant="danger"
+        onConfirm={confirmDeleteProject}
+        onCancel={() => setDeleteConfirm(null)}
+      />
     </div>
   );
 }

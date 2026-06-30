@@ -5,6 +5,7 @@ import { scanMediaFolder, selectFolder, onScanLog, getScanLog } from '../../util
 import { downloadJson } from '../../utils/download';
 import type { ScanResult, ScanLog } from '../../types';
 import ScanLogPanel from '../../components/ScanLogPanel';
+import { showToast } from '../../store/toastStore';
 
 export default function Step4SelectFolder() {
   const {
@@ -80,7 +81,7 @@ export default function Step4SelectFolder() {
       setScanProgress(null);  // 扫描完成,清除进度
     } catch (error) {
       console.error('扫描失败:', error);
-      alert('扫描文件夹失败，请重试');
+      showToast('error', '扫描失败', '扫描文件夹失败，请重试');
     } finally {
       setIsScanning(false);
       if (flushTimerRef.current) {

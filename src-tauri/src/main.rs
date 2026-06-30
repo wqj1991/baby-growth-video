@@ -5,6 +5,7 @@ mod media;
 mod video;
 mod ai;
 mod agnes;
+mod collage;
 
 use db::Database;
 use std::sync::{Arc, Mutex};
@@ -417,6 +418,16 @@ fn get_export_records(
     db.get_export_records(project_id).map_err(|e| e.to_string())
 }
 
+// ==================== 拼图生成 ====================
+
+#[tauri::command]
+fn generate_collage(
+    req: collage::CollageRequest,
+    project_id: i64,
+) -> Result<collage::CollageResult, String> {
+    collage::generate_collage(req, project_id)
+}
+
 // ==================== 设置相关 ====================
 
 #[tauri::command]
@@ -535,6 +546,7 @@ pub fn run() {
             get_generation_progress,
             get_export_records,
             get_image_base64,
+            generate_collage,
             get_settings,
             save_settings,
             get_ai_settings,

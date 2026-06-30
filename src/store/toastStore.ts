@@ -1,5 +1,15 @@
 import { create } from 'zustand';
-import type { Toast, ToastType } from '../types';
+
+// Toast types — defined here to avoid isolatedModules bundler issues
+export type ToastType = 'success' | 'warning' | 'error' | 'info';
+
+export interface Toast {
+  id: string;
+  type: ToastType;
+  title: string;
+  message?: string;
+  duration?: number; // ms, 默认 4000
+}
 
 interface ToastState {
   toasts: Toast[];

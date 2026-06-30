@@ -10,6 +10,7 @@ import HistoryPage from './pages/HistoryPage';
 import CreateProjectPage from './pages/CreateProjectPage';
 import ProjectOverviewPage from './pages/ProjectOverviewPage';
 import SettingsPage from './pages/SettingsPage';
+import ToastContainer from './components/ToastContainer';
 import { initDatabase } from './utils/tauriCommands';
 
 function App() {
@@ -19,24 +20,27 @@ function App() {
   }, []);
 
   return (
-    <Routes>
-      {/* 独立页面（无侧边栏） */}
-      <Route path="/create-project" element={<CreateProjectPage />} />
+    <>
+      <Routes>
+        {/* 独立页面（无侧边栏） */}
+        <Route path="/create-project" element={<CreateProjectPage />} />
 
-      {/* 带侧边栏的主布局 */}
-      <Route path="/" element={<Layout />}>
-        <Route index element={<HomePage />} />
-        <Route path="baby-setup" element={<BabySetupPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="project/:projectId" element={<ProjectPage />}>
-          <Route index element={<Navigate to="overview" replace />} />
-          <Route path="overview" element={<ProjectOverviewPage />} />
-          <Route path="periods" element={<PeriodSelectPage />} />
-          <Route path="generate" element={<VideoGeneratePage />} />
-          <Route path="history" element={<HistoryPage />} />
+        {/* 带侧边栏的主布局 */}
+        <Route path="/" element={<Layout />}>
+          <Route index element={<HomePage />} />
+          <Route path="baby-setup" element={<BabySetupPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="project/:projectId" element={<ProjectPage />}>
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<ProjectOverviewPage />} />
+            <Route path="periods" element={<PeriodSelectPage />} />
+            <Route path="generate" element={<VideoGeneratePage />} />
+            <Route path="history" element={<HistoryPage />} />
+          </Route>
         </Route>
-      </Route>
-    </Routes>
+      </Routes>
+      <ToastContainer />
+    </>
   );
 }
 

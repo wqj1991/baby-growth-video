@@ -110,7 +110,7 @@ export default function PendingSelectionPanel({
                         {getFileName(item)}
                       </div>
                       <div className="flex items-center gap-1 mt-0.5">
-                        <span className={`text-[8px] px-1.5 py-0.5 rounded ${item.type === 'photo' ? 'bg-info-bg text-info-text' : 'bg-warmth-100 text-warmth-700'}`}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${item.type === 'photo' ? 'bg-indigo-600 text-white' : 'bg-warmth-600 text-white'}`}>
                           {item.type === 'photo' ? '扫描' : '截帧'}
                         </span>
                       </div>

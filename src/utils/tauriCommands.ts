@@ -304,6 +304,40 @@ export async function saveFile(defaultName: string): Promise<string | null> {
   return result;
 }
 
+// ==================== 拼图生成 ====================
+
+export interface CollageRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  order: number;
+  rotation: number;
+  flip_h: boolean;
+  flip_v: boolean;
+}
+
+export interface CollageRequest {
+  template_id: string;
+  output_width: number;
+  output_height: number;
+  gap_px: number;
+  jpeg_quality: number;
+  photo_paths: string[];
+  regions: CollageRegion[];
+}
+
+export interface CollageResult {
+  output_path: string;
+}
+
+export async function generateCollage(
+  req: CollageRequest,
+  projectId: number,
+): Promise<CollageResult> {
+  return invoke('generate_collage', { req, projectId });
+}
+
 // ==================== 设置相关 ====================
 
 // 获取所有设置
