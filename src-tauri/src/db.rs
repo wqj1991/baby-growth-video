@@ -1086,17 +1086,6 @@ impl Database {
 
     // ==================== 设置操作 ====================
 
-    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
-        let conn = self.get_conn();
-        let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
-        let result = stmt.query_row(params![key], |row| row.get::<_, String>(0));
-        match result {
-            Ok(value) => Ok(Some(value)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
-
     pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
         let conn = self.get_conn();
         let now = Self::now();

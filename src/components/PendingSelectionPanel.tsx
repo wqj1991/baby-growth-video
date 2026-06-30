@@ -8,6 +8,7 @@ interface PendingSelectionPanelProps {
   onToggleMultiSelect: (item: SelectableItem) => void;
   onRemoveItem: (item: SelectableItem) => void;
   onSelectSingle: (item: SelectableItem) => void;
+  onCancelFinal?: (item: SelectableItem) => void;
   onGenerateCollage: () => void;
   onPreview?: (item: SelectableItem) => void;
   loading?: boolean;
@@ -19,6 +20,7 @@ export default function PendingSelectionPanel({
   onToggleMultiSelect,
   onRemoveItem,
   onSelectSingle,
+  onCancelFinal,
   onGenerateCollage,
   onPreview,
   loading = false,
@@ -73,7 +75,7 @@ export default function PendingSelectionPanel({
                 return (
                   <div
                     key={uniqueKey}
-                    className={`stash-compare-item relative cursor-pointer ${multiSelected ? 'ring-2 ring-stash-600' : ''} ${final ? 'ring-2 ring-success' : ''}`}
+                    className={`stash-compare-item relative cursor-pointer ${final ? 'ring-2 ring-success' : multiSelected ? 'ring-2 ring-stash-600' : ''}`}
                     onClick={() => onToggleMultiSelect(item)}
                     onDoubleClick={() => onPreview?.(item)}
                   >
@@ -102,9 +104,16 @@ export default function PendingSelectionPanel({
                     )}
 
                     {final && (
-                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-success flex items-center justify-center">
+                      <button
+                        className="absolute top-1 left-1 w-5 h-5 rounded-full bg-success hover:bg-error flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCancelFinal?.(item);
+                        }}
+                        title="点击取消最终"
+                      >
                         <Check className="w-3 h-3 text-white" />
-                      </div>
+                      </button>
                     )}
 
                     <div className="mt-1.5 px-1">
@@ -119,20 +128,34 @@ export default function PendingSelectionPanel({
                     </div>
 
                     <div
-                      className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 hover:opacity-100 transition-opacity flex justify-center"
+                      className={`absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent flex justify-center transition-opacity ${final ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
                       style={{ pointerEvents: 'none' }}
                     >
-                      <button
-                        className="bg-white/90 text-stone-900 text-[10px] font-medium px-2.5 py-1 rounded-md hover:bg-white transition-colors"
-                        style={{ pointerEvents: 'auto' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectSingle(item);
-                        }}
-                      >
-                        <Check className="w-3 h-3 inline mr-1" />
-                        设为最终
-                      </button>
+                      {!final ? (
+                        <button
+                          className="bg-success hover:bg-success-dark text-white text-[10px] font-semibold px-2.5 py-1 rounded-md transition-colors shadow-sm"
+                          style={{ pointerEvents: 'auto' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectSingle(item);
+                          }}
+                        >
+                          <Check className="w-3 h-3 inline mr-1" />
+                          设为最终
+                        </button>
+                      ) : (
+                        <button
+                          className="bg-error hover:bg-error/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-md transition-colors shadow-sm"
+                          style={{ pointerEvents: 'auto' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCancelFinal?.(item);
+                          }}
+                        >
+                          <X className="w-3 h-3 inline mr-1" />
+                          取消最终
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

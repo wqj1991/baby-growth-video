@@ -138,6 +138,7 @@ export default {
         },
         success: {
           DEFAULT: 'var(--color-success)',
+          dark:    'var(--color-success-dark)',
           bg:      'var(--color-success-bg)',
           text:    'var(--color-success-text)',
           border:  'var(--color-success-border)',

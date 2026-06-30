@@ -63,12 +63,6 @@ lazy_static::lazy_static! {
     static ref PROGRESS_MAP: Mutex<HashMap<String, i32>> = Mutex::new(HashMap::new());
 }
 
-pub fn set_progress(task_id: &str, progress: i32) {
-    if let Ok(mut map) = PROGRESS_MAP.lock() {
-        map.insert(task_id.to_string(), progress);
-    }
-}
-
 pub fn get_progress(task_id: &str) -> i32 {
     if let Ok(map) = PROGRESS_MAP.lock() {
         map.get(task_id).copied().unwrap_or(0)

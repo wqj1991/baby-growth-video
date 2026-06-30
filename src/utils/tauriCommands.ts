@@ -335,7 +335,7 @@ export async function generateCollage(
   req: CollageRequest,
   projectId: number,
 ): Promise<CollageResult> {
-  return invoke('generate_collage', { req, project_id: projectId });
+  return invoke('generate_collage', { req, projectId });
 }
 
 // ==================== 设置相关 ====================

@@ -34,6 +34,7 @@ interface CollageWorkspaceProps {
     quality: number,
     outputSize: number,
   ) => void;
+  generating: boolean;
 }
 
 /**
@@ -48,6 +49,7 @@ export default function CollageWorkspace({
   pendingItems,
   onBack,
   onGenerate,
+  generating,
 }: CollageWorkspaceProps) {
   const {
     selectedTemplate,
@@ -366,9 +368,19 @@ export default function CollageWorkspace({
           <button
             onClick={handleGenerate}
             className="btn btn-primary btn-sm"
+            disabled={generating}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            生成拼图
+            {generating ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                生成中...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5" />
+                生成拼图
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -873,9 +885,19 @@ export default function CollageWorkspace({
             <button
               onClick={handleGenerate}
               className="btn btn-primary w-full !justify-center !h-[38px]"
+              disabled={generating}
             >
-              <Sparkles className="w-4 h-4" />
-              生成拼图
+              {generating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  生成拼图
+                </>
+              )}
             </button>
             <button className="btn btn-ghost btn-sm w-full !justify-center mt-1.5">
               <Eye className="w-3.5 h-3.5" />

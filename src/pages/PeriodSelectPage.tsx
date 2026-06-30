@@ -637,9 +637,10 @@ export default function PeriodSelectPage() {
 
       const fileName = `collage_${Date.now()}.jpg`;
       const fileSize = estimateFileSize(outputSize * outputSize, quality).bytes;
+      const tempId = -Date.now();
 
       const newPhoto = {
-        id: -1,
+        id: tempId,
         period_id: currentPeriod?.id ?? 0,
         file_path: result.output_path,
         file_name: fileName,
@@ -655,6 +656,14 @@ export default function PeriodSelectPage() {
       };
 
       addToSelectedItems({ type: 'photo', item: newPhoto });
+
+      try {
+        const base64 = await getImageBase64(result.output_path);
+        loadedImageIds.current.add(tempId);
+        setLoadedImages(prev => ({ ...prev, [tempId]: base64 }));
+      } catch (loadError) {
+        console.error('加载拼图图片失败:', loadError);
+      }
 
       showToast(
         'success',
@@ -707,6 +716,7 @@ export default function PeriodSelectPage() {
           pendingItems={selectedItems}
           onBack={handleExitCollage}
           onGenerate={handleGenerateCollage}
+          generating={generatingCollage}
         />
       </div>
     );
@@ -848,6 +858,7 @@ export default function PeriodSelectPage() {
             onToggleMultiSelect={handleToggleMultiSelect}
             onRemoveItem={handleRemoveFromStash}
             onSelectSingle={handleSelectSingle}
+            onCancelFinal={() => handleCancelFinalPhoto()}
             onGenerateCollage={handleEnterCollage}
             onPreview={(item) => {
               if (item.type === 'photo') {
