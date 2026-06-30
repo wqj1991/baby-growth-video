@@ -26,23 +26,23 @@ interface ScanLogPanelProps {
 const levelConfig = {
   success: {
     icon: CheckCircle,
-    color: 'text-green-500',
-    bgColor: 'bg-green-50',
+    color: 'text-success',
+    bgColor: 'bg-success-bg',
   },
   warn: {
     icon: AlertTriangle,
-    color: 'text-yellow-500',
-    bgColor: 'bg-yellow-50',
+    color: 'text-warning',
+    bgColor: 'bg-warning-bg',
   },
   error: {
     icon: XCircle,
-    color: 'text-red-500',
-    bgColor: 'bg-red-50',
+    color: 'text-error',
+    bgColor: 'bg-error-bg',
   },
   info: {
     icon: Info,
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-50',
+    color: 'text-info',
+    bgColor: 'bg-info-bg',
   },
 };
 
@@ -100,16 +100,16 @@ export default function ScanLogPanel({
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+    <div className="border border-stone-200 rounded-lg overflow-hidden bg-white">
       {/* 工具栏 - 展开时显示 */}
       {isExpanded && (
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-2 bg-stone-50 border-b border-stone-200">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
+            <Filter className="w-4 h-4 text-stone-500" />
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as LogLevel | 'all')}
-              className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
+              className="text-sm border border-stone-300 rounded px-2 py-1 bg-white"
             >
               <option value="all">全部</option>
               <option value="success">成功</option>
@@ -120,7 +120,7 @@ export default function ScanLogPanel({
           </div>
 
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer">
+            <label className="flex items-center gap-1 text-sm text-stone-600 cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoScroll}
@@ -132,7 +132,7 @@ export default function ScanLogPanel({
             {onDownload && (
               <button
                 onClick={onDownload}
-                className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+                className="flex items-center gap-1 text-sm text-stone-600 hover:text-stone-900"
                 title="下载日志"
               >
                 <Download className="w-4 h-4" />
@@ -141,7 +141,7 @@ export default function ScanLogPanel({
             )}
             <button
               onClick={handleCopyAll}
-              className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-1 text-sm text-stone-600 hover:text-stone-900"
               title="复制全部日志"
             >
               <Copy className="w-4 h-4" />
@@ -159,7 +159,7 @@ export default function ScanLogPanel({
         }`}
       >
         {displayLogs.length === 0 ? (
-          <div className="p-4 text-center text-gray-400">
+          <div className="p-4 text-center text-stone-400">
             暂无日志
           </div>
         ) : (
@@ -169,14 +169,14 @@ export default function ScanLogPanel({
             return (
               <div
                 key={log.id}
-                className={`flex items-start gap-2 px-4 py-1.5 hover:bg-gray-50 ${config.bgColor}`}
+                className={`flex items-start gap-2 px-4 py-1.5 hover:bg-stone-50 ${config.bgColor}`}
                 title={log.fileName}
               >
                 <Icon className={`w-4 h-4 flex-shrink-0 mt-0.5 ${config.color}`} />
-                <span className="flex-1 text-gray-700 break-all">
+                <span className="flex-1 text-stone-700 break-all">
                   {log.message}
                 </span>
-                <span className="text-gray-400 text-xs flex-shrink-0">
+                <span className="text-stone-400 text-xs flex-shrink-0">
                   {formatTime(log.timestamp)}
                 </span>
               </div>
@@ -186,9 +186,9 @@ export default function ScanLogPanel({
       </div>
 
       {/* 底部 */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-200">
+      <div className="flex items-center justify-between px-4 py-2 bg-stone-50 border-t border-stone-200">
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-stone-500">
             共 {logs.length} 条日志
             {filter !== 'all' && ` (显示 ${filteredLogs.length} 条)`}
           </span>

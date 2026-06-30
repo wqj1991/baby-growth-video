@@ -164,6 +164,12 @@ fn get_video_frames(video_id: i64, state: State<AppState>) -> Result<Vec<db::Vid
 }
 
 #[tauri::command]
+fn get_period_video_frames(period_id: i64, state: State<AppState>) -> Result<Vec<db::VideoFrame>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_period_video_frames(period_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn generate_video_frames(
     video_id: i64,
     count: i64,
@@ -516,6 +522,7 @@ pub fn run() {
             cancel_final_photo,
             get_period_videos,
             get_video_frames,
+            get_period_video_frames,
             generate_video_frames,
             set_final_video_frame,
             update_video_frame,

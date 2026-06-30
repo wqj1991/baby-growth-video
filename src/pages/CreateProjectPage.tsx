@@ -7,8 +7,8 @@ import { useCreateProjectStore } from '../store/createProjectStore';
 import { createProject } from '../utils/tauriCommands';
 import Step1SelectBaby from './create-project/Step1SelectBaby';
 import Step2ProjectInfo from './create-project/Step2ProjectInfo';
-import Step3GeneratePeriods from './create-project/Step4GeneratePeriods';
-import Step4SelectFolder from './create-project/Step3SelectFolder';
+import Step3GeneratePeriods from './create-project/Step3GeneratePeriods';
+import Step4SelectFolder from './create-project/Step4SelectFolder';
 import Step5Complete from './create-project/Step5Complete';
 
 const steps = [
@@ -131,7 +131,7 @@ export default function CreateProjectPage() {
                   <div
                     className={`w-2 h-2 rounded-full transition-all duration-300 ${
                       s.number < currentStep
-                        ? 'bg-emerald-400 shadow-sm shadow-emerald-300/40'
+                        ? 'bg-success shadow-sm shadow-success/30'
                         : s.number === currentStep
                         ? 'bg-warmth-400 w-3 h-3 shadow-sm shadow-warmth-300/40'
                         : 'bg-stone-300'

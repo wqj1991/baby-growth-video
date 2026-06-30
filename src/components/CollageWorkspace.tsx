@@ -193,24 +193,24 @@ export default function CollageWorkspace({
   return (
     <div className="flex flex-col h-full">
       {/* ── Top Bar ── */}
-      <div className="h-[52px] flex items-center gap-3 px-5 border-b border-[#e8e6de] bg-white flex-shrink-0">
+      <div className="h-[52px] flex items-center gap-3 px-5 border-b border-stone-200 bg-white flex-shrink-0">
         <button
           onClick={() => {
             resetRegionTransforms();
             onBack();
           }}
-          className="flex items-center gap-1.5 text-sm text-[#706c63] hover:text-[#33312d] transition-colors"
+          className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-stone-900 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           返回待选区
         </button>
-        <span className="text-[#e8e6de]">|</span>
-        <span className="text-sm font-medium text-[#706c63]">拼图工作区</span>
+        <span className="text-stone-200">|</span>
+        <span className="text-sm font-medium text-stone-600">拼图工作区</span>
         <span className="badge badge-primary ml-2 text-xs">
           {selectedItems.length} 张照片
         </span>
         {template && (
-          <span className="text-[11px] text-[#b0aca0] ml-1">
+          <span className="text-[11px] text-stone-400 ml-1">
             · {template.name}
           </span>
         )}
@@ -244,7 +244,7 @@ export default function CollageWorkspace({
             <div className="text-[11px] text-white/40">
               点击区域选中 · 实时编辑预览
               {selectedRegionIndex !== null && (
-                <span className="ml-2 text-[#f58b3d]">
+                <span className="ml-2 text-warmth-500">
                   已选中区域 #{selectedRegionIndex + 1}
                 </span>
               )}
@@ -253,12 +253,7 @@ export default function CollageWorkspace({
               {template ? (
                 /* Template-Driven Layout */
                 <div
-                  className="relative w-full aspect-square cursor-pointer"
-                  style={{
-                    backgroundColor: '#1a0d06',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                  }}
+                  className="relative w-full aspect-square cursor-pointer bg-warmth-950 rounded-xl overflow-hidden"
                   onClick={handleCanvasClick}
                 >
                   {template.regions.map((region, idx) => {
@@ -274,7 +269,7 @@ export default function CollageWorkspace({
                         key={idx}
                         className={`absolute transition-all duration-200 ${
                           isSelected
-                            ? 'ring-[3px] ring-[#f58b3d] ring-offset-0 z-10'
+                            ? 'ring-[3px] ring-warmth-500 ring-offset-0 z-10'
                             : ''
                         } ${!isSelected ? 'hover:ring-2 hover:ring-white/30' : ''}`}
                         style={{
@@ -307,7 +302,7 @@ export default function CollageWorkspace({
 
                         {/* 选中指示器 */}
                         {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-[#f58b3d] rounded-full flex items-center justify-center shadow-lg">
+                          <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-warmth-500 rounded-full flex items-center justify-center shadow-lg">
                             <span className="text-[10px] text-white font-bold">
                               {region.order + 1}
                             </span>
@@ -319,7 +314,7 @@ export default function CollageWorkspace({
                 </div>
               ) : (
                 /* Fallback: no template selected */
-                <div className="w-full aspect-square flex items-center justify-center bg-[#1a0d06] rounded-xl">
+                <div className="w-full aspect-square flex items-center justify-center bg-warmth-950 rounded-xl">
                   <div className="text-center">
                     <Grid3X3 className="w-10 h-10 text-white/15 mx-auto mb-3" />
                     <p className="text-white/30 text-sm">未选择模板</p>
@@ -340,12 +335,12 @@ export default function CollageWorkspace({
         <div className="collage-sidebar">
           {/* ── Region Edit Toolbar (when selected) ── */}
           {selectedRegionIndex !== null && selectedPhoto && (
-            <div className="collage-section !bg-gradient-to-r !from-[#fef7f0] !to-[#fdf2f2] !border !border-[#f58b3d]/20 !rounded-xl !p-3">
+            <div className="collage-section !bg-gradient-to-r !from-warmth-50 !to-rose-50 !border !border-warmth-500/20 !rounded-xl !p-3">
               <div className="flex items-center gap-2 mb-2">
-                <div className="px-1.5 py-0.5 bg-[#f58b3d]/10 rounded text-[10px] font-bold text-[#f58b3d]">
+                <div className="px-1.5 py-0.5 bg-warmth-500/10 rounded text-[10px] font-bold text-warmth-500">
                   区域 #{selectedRegionIndex + 1}
                 </div>
-                <span className="text-[11px] text-[#706c63] truncate flex-1">
+                <span className="text-[11px] text-stone-600 truncate flex-1">
                   {('file_name' in selectedPhoto.item
                     ? (selectedPhoto.item as { file_name: string }).file_name
                     : `视频截帧 #${selectedPhoto.item.id}`)}
@@ -356,14 +351,14 @@ export default function CollageWorkspace({
               <div className="grid grid-cols-2 gap-1.5">
                 <button
                   onClick={() => setShowReplacer(true)}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-[#e8e6de] text-[11px] text-[#706c63] hover:border-[#f58b3d] hover:text-[#f58b3d] transition-colors"
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-stone-200 text-[11px] text-stone-600 hover:border-warmth-500 hover:text-warmth-500 transition-colors"
                 >
                   <RefreshCw className="w-3 h-3" />
                   替换照片
                 </button>
                 <button
                   onClick={handleRotate}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-[#e8e6de] text-[11px] text-[#706c63] hover:border-[#f58b3d] hover:text-[#f58b3d] transition-colors"
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-white border border-stone-200 text-[11px] text-stone-600 hover:border-warmth-500 hover:text-warmth-500 transition-colors"
                 >
                   <RotateCw className="w-3 h-3" />
                   旋转 90°
@@ -372,8 +367,8 @@ export default function CollageWorkspace({
                   onClick={handleFlipH}
                   className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] transition-colors ${
                     (regionTransforms[selectedRegionIndex]?.flipH)
-                      ? 'bg-[#f58b3d]/10 border-[#f58b3d] text-[#f58b3d]'
-                      : 'bg-white border-[#e8e6de] text-[#706c63] hover:border-[#f58b3d] hover:text-[#f58b3d]'
+                      ? 'bg-warmth-500/10 border-warmth-500 text-warmth-500'
+                      : 'bg-white border-stone-200 text-stone-600 hover:border-warmth-500 hover:text-warmth-500'
                   }`}
                 >
                   <FlipHorizontal className="w-3 h-3" />
@@ -383,8 +378,8 @@ export default function CollageWorkspace({
                   onClick={handleFlipV}
                   className={`flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] transition-colors ${
                     (regionTransforms[selectedRegionIndex]?.flipV)
-                      ? 'bg-[#f58b3d]/10 border-[#f58b3d] text-[#f58b3d]'
-                      : 'bg-white border-[#e8e6de] text-[#706c63] hover:border-[#f58b3d] hover:text-[#f58b3d]'
+                      ? 'bg-warmth-500/10 border-warmth-500 text-warmth-500'
+                      : 'bg-white border-stone-200 text-stone-600 hover:border-warmth-500 hover:text-warmth-500'
                   }`}
                 >
                   <FlipVertical className="w-3 h-3" />
@@ -394,8 +389,8 @@ export default function CollageWorkspace({
 
               {/* Photo Replacer Mini-panel */}
               {showReplacer && (
-                <div className="mt-2 border border-[#e8e6de] rounded-lg bg-white overflow-hidden">
-                  <div className="px-2.5 py-1.5 text-[10px] font-semibold text-[#b0aca0] border-b border-[#f5f4f0]">
+                <div className="mt-2 border border-stone-200 rounded-lg bg-white overflow-hidden">
+                  <div className="px-2.5 py-1.5 text-[10px] font-semibold text-stone-400 border-b border-stone-100">
                     从待选区选择替换照片
                   </div>
                   <div className="max-h-[160px] overflow-y-auto p-1.5">
@@ -413,8 +408,8 @@ export default function CollageWorkspace({
                             onClick={() => handleReplacePhoto(pendingItem)}
                             className={`relative aspect-square rounded overflow-hidden border-2 transition-all ${
                               isUsed
-                                ? 'border-[#f58b3d]/30 opacity-50'
-                                : 'border-transparent hover:border-[#f58b3d]'
+                                ? 'border-warmth-500/30 opacity-50'
+                                : 'border-transparent hover:border-warmth-500'
                             }`}
                             title={displayName}
                           >
@@ -425,12 +420,12 @@ export default function CollageWorkspace({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div className="w-full h-full bg-[#3a2010] flex items-center justify-center">
+                              <div className="w-full h-full bg-warmth-950 flex items-center justify-center">
                                 <Image className="w-3 h-3 text-white/30" />
                               </div>
                             )}
                             {isUsed && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-[#f58b3d]/20">
+                              <div className="absolute inset-0 flex items-center justify-center bg-warmth-500/20">
                                 <span className="text-[8px] text-white font-bold">已用</span>
                               </div>
                             )}
@@ -439,7 +434,7 @@ export default function CollageWorkspace({
                       })}
                     </div>
                     {pendingItems.length === 0 && (
-                      <p className="text-[10px] text-[#b0aca0] text-center py-4">
+                      <p className="text-[10px] text-stone-400 text-center py-4">
                         待选区暂无照片
                       </p>
                     )}
@@ -451,10 +446,10 @@ export default function CollageWorkspace({
 
           {/* 选中提示（未选中时） */}
           {selectedRegionIndex === null && template && (
-            <div className="collage-section !bg-gradient-to-r !from-[#f5f4f0] !to-[#fafaf8]">
+            <div className="collage-section !bg-gradient-to-r !from-stone-100 !to-stone-50">
               <div className="flex items-center gap-2">
-                <Settings2 className="w-3.5 h-3.5 text-[#b0aca0]" />
-                <span className="text-[11px] text-[#b0aca0]">
+                <Settings2 className="w-3.5 h-3.5 text-stone-400" />
+                <span className="text-[11px] text-stone-400">
                   点击预览中的区域进行编辑
                 </span>
               </div>
@@ -465,14 +460,14 @@ export default function CollageWorkspace({
           {template && (
             <div className="collage-section">
               <h4>当前模板</h4>
-              <div className="flex items-center gap-2 p-2 rounded-lg bg-gradient-to-r from-[#fef7f0] to-[#fdf2f2] border border-[#f58b3d]/20">
-                <Grid3X3 className="w-4 h-4 text-[#f58b3d]" />
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-gradient-to-r from-warmth-50 to-rose-50 border border-warmth-500/20">
+                <Grid3X3 className="w-4 h-4 text-warmth-500" />
                 <div>
-                  <div className="text-xs font-semibold text-[#33312d]">{template.name}</div>
-                  <div className="text-[10px] text-[#b0aca0]">{template.desc}</div>
+                  <div className="text-xs font-semibold text-stone-900">{template.name}</div>
+                  <div className="text-[10px] text-stone-400">{template.desc}</div>
                 </div>
               </div>
-              <p className="text-[10px] text-[#706c63] mt-2 leading-relaxed">{template.tips}</p>
+              <p className="text-[10px] text-stone-600 mt-2 leading-relaxed">{template.tips}</p>
             </div>
           )}
 
@@ -493,7 +488,7 @@ export default function CollageWorkspace({
                     key={`${selItem.type}-${item.id}`}
                     className={`source-item-v2 cursor-pointer transition-colors ${
                       selectedRegionIndex === regionIdx?.order
-                        ? 'ring-2 ring-[#f58b3d] bg-[#fef7f0]'
+                        ? 'ring-2 ring-warmth-500 bg-warmth-50'
                         : ''
                     }`}
                     onClick={() => {
@@ -509,30 +504,30 @@ export default function CollageWorkspace({
                       }
                     }}
                   >
-                    <GripVertical className="w-3.5 h-3.5 text-[#b0aca0]" />
+                    <GripVertical className="w-3.5 h-3.5 text-stone-400" />
                     <div
                       className="w-9 h-6 rounded flex-shrink-0 bg-cover bg-center"
                       style={{
                         backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
                         background: !imageUrl
-                          ? 'linear-gradient(135deg, #3d2414 0%, #1c0d06 100%)'
+                          ? 'var(--color-warmth-950)'
                           : undefined,
                       }}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[11px] text-[#706c63] truncate">
+                      <div className="text-[11px] text-stone-600 truncate">
                         {'file_name' in item
                           ? (item as { file_name: string }).file_name
                           : `帧 #${item.id}`}
                       </div>
-                      <div className="text-[9px] text-[#b0aca0]">
+                      <div className="text-[9px] text-stone-400">
                         {selItem.type === 'photo' ? '扫描照片' : '视频截帧'}
                         {regionIdx !== undefined && (
                           <span className="ml-1">· 区域 #{idx + 1}</span>
                         )}
                       </div>
                     </div>
-                    <span className="text-[9px] text-[#f58b3d] bg-[#fff2e6] px-1.5 py-0.5 rounded font-medium">
+                    <span className="text-[9px] text-warmth-500 bg-warmth-100 px-1.5 py-0.5 rounded font-medium">
                       #{idx + 1}
                     </span>
                   </div>
@@ -553,10 +548,10 @@ export default function CollageWorkspace({
                 onChange={(e) => setCollageGap(Number(e.target.value))}
                 className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, #f58b3d 0%, #f58b3d ${(collageGap / 16) * 100}%, #f5f4f0 ${(collageGap / 16) * 100}%, #f5f4f0 100%)`,
+                  background: `linear-gradient(to right, var(--color-brand) 0%, var(--color-brand) ${(collageGap / 16) * 100}%, var(--color-stone-100) ${(collageGap / 16) * 100}%, var(--color-stone-100) 100%)`,
                 }}
               />
-              <span className="text-[11px] text-[#706c63] min-w-[28px]">{collageGap}px</span>
+              <span className="text-[11px] text-stone-600 min-w-[28px]">{collageGap}px</span>
             </div>
           </div>
 
@@ -566,7 +561,7 @@ export default function CollageWorkspace({
               <h4>导出设置</h4>
               <button
                 onClick={() => setShowExportSettings(!showExportSettings)}
-                className="text-[10px] text-[#f58b3d] hover:underline"
+                className="text-[10px] text-warmth-500 hover:underline"
               >
                 {showExportSettings ? '收起' : '展开'}
               </button>
@@ -577,8 +572,8 @@ export default function CollageWorkspace({
                 {/* Quality */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-[#706c63]">清晰度</span>
-                    <span className="text-[10px] font-semibold" style={{ color: '#c7516f' }}>
+                    <span className="text-[11px] text-stone-600">清晰度</span>
+                    <span className="text-[10px] font-semibold text-rose-500">
                       {QUALITY_PRESETS.find((p) => p.value === collageQuality)?.label ?? collageQuality}
                       {' '}({collageQuality}%)
                     </span>
@@ -592,7 +587,7 @@ export default function CollageWorkspace({
                     onChange={(e) => setCollageQuality(Number(e.target.value))}
                     className="w-full h-1 rounded-full appearance-none cursor-pointer"
                     style={{
-                      background: `linear-gradient(to right, #f58b3d 0%, #f58b3d ${((collageQuality - 60) / 40) * 100}%, #f5f4f0 ${((collageQuality - 60) / 40) * 100}%, #f5f4f0 100%)`,
+                      background: `linear-gradient(to right, var(--color-brand) 0%, var(--color-brand) ${((collageQuality - 60) / 40) * 100}%, var(--color-stone-100) ${((collageQuality - 60) / 40) * 100}%, var(--color-stone-100) 100%)`,
                     }}
                   />
                   <div className="flex justify-between mt-0.5">
@@ -602,8 +597,8 @@ export default function CollageWorkspace({
                         onClick={() => setCollageQuality(preset.value)}
                         className={`text-[9px] px-1.5 py-0.5 rounded-full transition-colors ${
                           collageQuality === preset.value
-                            ? 'bg-[#f58b3d] text-white'
-                            : 'text-[#b0aca0] hover:text-[#706c63]'
+                            ? 'bg-warmth-500 text-white'
+                            : 'text-stone-400 hover:text-stone-600'
                         }`}
                       >
                         {preset.label}
@@ -615,8 +610,8 @@ export default function CollageWorkspace({
                 {/* Output Size */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] text-[#706c63]">输出尺寸</span>
-                    <span className="text-[10px] font-semibold text-[#706c63]">
+                    <span className="text-[11px] text-stone-600">输出尺寸</span>
+                    <span className="text-[10px] font-semibold text-stone-600">
                       {collageOutputSize}×{collageOutputSize}
                     </span>
                   </div>
@@ -627,8 +622,8 @@ export default function CollageWorkspace({
                         onClick={() => setCollageOutputSize(preset.value)}
                         className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] text-center border transition-all ${
                           collageOutputSize === preset.value
-                            ? 'border-[#f58b3d] bg-[#fef7f0] text-[#c7516f] font-semibold'
-                            : 'border-[#e8e6de] bg-white text-[#706c63] hover:border-[#f58b3d]/50'
+                            ? 'border-warmth-500 bg-warmth-50 text-rose-500 font-semibold'
+                            : 'border-stone-200 bg-white text-stone-600 hover:border-warmth-500/50'
                         }`}
                       >
                         <div>{preset.label}</div>
@@ -645,13 +640,13 @@ export default function CollageWorkspace({
                     background: 'linear-gradient(135deg, rgba(245,139,61,0.06), rgba(212,77,104,0.06))',
                   }}
                 >
-                  <span className="text-[11px] text-[#706c63]">预估文件大小</span>
-                  <span className="text-sm font-bold" style={{ color: '#c7516f' }}>
+                  <span className="text-[11px] text-stone-600">预估文件大小</span>
+                  <span className="text-sm font-bold text-rose-500">
                     {estimatedSize.label}
                   </span>
                 </div>
 
-                <p className="text-[9px] text-[#b0aca0] leading-relaxed">
+                <p className="text-[9px] text-stone-400 leading-relaxed">
                   实际文件大小可能因照片内容而异，以上为经验估算值
                 </p>
               </div>
@@ -659,10 +654,10 @@ export default function CollageWorkspace({
 
             {/* Quick display when collapsed */}
             {!showExportSettings && (
-              <div className="flex items-center gap-3 text-[10px] text-[#706c63]">
-                <span>清晰度: <strong className="text-[#c7516f]">{QUALITY_PRESETS.find((p) => p.value === collageQuality)?.label ?? collageQuality}</strong></span>
+              <div className="flex items-center gap-3 text-[10px] text-stone-600">
+                <span>清晰度: <strong className="text-rose-500">{QUALITY_PRESETS.find((p) => p.value === collageQuality)?.label ?? collageQuality}</strong></span>
                 <span>尺寸: <strong>{collageOutputSize}px</strong></span>
-                <span>预估: <strong className="text-[#f58b3d]">{estimatedSize.label}</strong></span>
+                <span>预估: <strong className="text-warmth-500">{estimatedSize.label}</strong></span>
               </div>
             )}
           </div>

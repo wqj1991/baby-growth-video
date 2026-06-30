@@ -168,3 +168,14 @@ export interface PeriodStats {
   pending_count: number;
   has_final: boolean;
 }
+
+// Toast 通知
+export type ToastType = 'success' | 'warning' | 'error' | 'info';
+
+export interface Toast {
+  id: string;
+  type: ToastType;
+  title: string;
+  message?: string;
+  duration?: number; // ms, 默认 4000
+}

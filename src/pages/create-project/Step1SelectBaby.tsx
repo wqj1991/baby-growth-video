@@ -42,17 +42,17 @@ export default function Step1SelectBaby() {
       case 'boy':
         return {
           bg: 'from-blue-400/10 to-indigo-400/10',
-          icon: 'text-blue-500',
+          icon: 'text-info',
           avatar: 'from-blue-400 to-indigo-500',
-          badge: 'bg-blue-50 text-blue-600 border-blue-200/60',
+          badge: 'bg-info-bg text-info-text border-info-border/60',
           ring: 'ring-blue-300/30',
         };
       case 'girl':
         return {
           bg: 'from-rose-400/10 to-pink-400/10',
-          icon: 'text-rose-500',
+          icon: 'text-error',
           avatar: 'from-rose-400 to-pink-500',
-          badge: 'bg-rose-50 text-rose-600 border-rose-200/60',
+          badge: 'bg-error-bg text-error-text border-error-border/60',
           ring: 'ring-rose-300/30',
         };
       default:

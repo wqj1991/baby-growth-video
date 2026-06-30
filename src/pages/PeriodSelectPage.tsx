@@ -33,7 +33,6 @@ import {
 } from '../utils/tauriCommands';
 import type { Photo, Video, VideoFrame, SelectableItem } from '../types';
 import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
-import PhotoContextMenu from '../components/PhotoContextMenu';
 import VideoFrameSettingsModal from '../components/VideoFrameSettingsModal';
 import VideoFrameViewerModal from '../components/VideoFrameViewerModal';
 import PeriodTimeline from '../components/PeriodTimeline';
@@ -81,17 +80,11 @@ export default function PeriodSelectPage() {
   const [showAddPeriod, setShowAddPeriod] = useState(false);
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newPeriodDate, setNewPeriodDate] = useState('');
-  const [selectedTab, setSelectedTab] = useState<'photos' | 'videos'>('photos');
+  const [selectedTab, setSelectedTab] = useState<'photos' | 'videos' | 'pending'>('photos');
   const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
   const loadedImageIds = useRef<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
-
-  const [contextMenu, setContextMenu] = useState<{
-    visible: boolean;
-    position: { x: number; y: number };
-    photo: Photo | null;
-  }>({ visible: false, position: { x: 0, y: 0 }, photo: null });
 
   const [currentVideoForFrames, setCurrentVideoForFrames] = useState<Video | null>(null);
   const [showFrameSettings, setShowFrameSettings] = useState(false);
@@ -146,7 +139,6 @@ export default function PeriodSelectPage() {
       loadPeriodMedia(currentPeriod.id);
       setShowPreview(false);
       setPreviewIndex(0);
-      handleCloseContextMenu();
       setShowFrameSettings(false);
       setShowFrameViewer(false);
       setShowInlinePlayer(false);
@@ -285,12 +277,17 @@ export default function PeriodSelectPage() {
         .filter(p => p.is_selected)
         .map(p => ({ type: 'photo' as const, item: { ...p, is_multi_selected: false } }));
       
-      const frames = await getPeriodVideoFrames(periodId);
-      setCurrentVideoFrames(frames);
-      
-      const pendingFrames: SelectableItem[] = frames
-        .filter(f => f.is_selected)
-        .map(f => ({ type: 'video_frame' as const, item: { ...f, is_multi_selected: false } }));
+      let pendingFrames: SelectableItem[] = [];
+      try {
+        const frames = await getPeriodVideoFrames(periodId);
+        setCurrentVideoFrames(frames);
+        pendingFrames = frames
+          .filter(f => f.is_selected)
+          .map(f => ({ type: 'video_frame' as const, item: { ...f, is_multi_selected: false } }));
+      } catch (frameError) {
+        console.error('加载视频帧失败:', frameError);
+        setCurrentVideoFrames([]);
+      }
       
       const allPending = [...pendingPhotos, ...pendingFrames];
       if (allPending.length > 0) setSelectedItems(allPending);
@@ -467,19 +464,6 @@ export default function PeriodSelectPage() {
   };
 
 
-
-  // ============================
-  // CONTEXT MENU
-  // ============================
-
-  const handlePhotoContextMenu = (e: React.MouseEvent, photo: Photo) => {
-    e.preventDefault();
-    setContextMenu({ visible: true, position: { x: e.clientX, y: e.clientY }, photo });
-  };
-
-  const handleCloseContextMenu = () => {
-    setContextMenu({ visible: false, position: { x: 0, y: 0 }, photo: null });
-  };
 
   // ============================
   // PREVIEW
@@ -698,7 +682,7 @@ export default function PeriodSelectPage() {
   return (
     <div className="flex h-full flex-col min-h-0">
       {/* ---- Top Toolbar ---- */}
-      <div className="h-[52px] flex items-center justify-between px-5 border-b border-[#e8e6de] bg-white flex-shrink-0">
+      <div className="h-[52px] flex items-center justify-between px-5 border-b border-stone-200 bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={handleScanFolder}
@@ -716,9 +700,9 @@ export default function PeriodSelectPage() {
             </button>
           )}
 
-          <button
+            <button
             onClick={() => setShowAddPeriod(true)}
-            className="btn btn-ghost btn-sm text-[#706c63]"
+            className="btn btn-ghost btn-sm text-stone-600"
           >
             <Plus className="w-3.5 h-3.5" />
             添加周期
@@ -727,7 +711,7 @@ export default function PeriodSelectPage() {
 
         <div className="flex items-center gap-3">
           {currentPeriod && (
-            <span className="text-xs text-[#b0aca0]">
+            <span className="text-xs text-stone-400">
               {completedCount}/{periods.length} 已完成
             </span>
           )}
@@ -746,7 +730,7 @@ export default function PeriodSelectPage() {
 
         {/* ---- Add Period Form ---- */}
         {showAddPeriod && (
-          <div className="p-4 border-b border-[#e8e6de] bg-[#fafaf8]">
+          <div className="p-4 border-b border-stone-200 bg-stone-50">
             <div className="flex items-end gap-3 max-w-xl">
               <div className="form-group flex-1 !mb-0">
                 <label className="form-label">周期名称</label>
@@ -783,7 +767,7 @@ export default function PeriodSelectPage() {
       <div className="flex-1 flex min-h-0">
         {/* 左侧待选区面板 */}
         <div 
-          className="flex-shrink-0 border-r border-[#e8e6de] bg-white flex flex-col"
+          className="flex-shrink-0 border-r border-stone-200 bg-white flex flex-col"
           style={{ width: pendingPanelWidth }}
         >
           <PendingSelectionPanel
@@ -804,17 +788,17 @@ export default function PeriodSelectPage() {
         
         {/* 拖拽分割条 */}
         <div 
-          className={`w-1 cursor-col-resize bg-[#e8e6de] hover:bg-[#d4d1c7] transition-colors flex-shrink-0 flex items-center justify-center ${isDragging ? 'bg-[#7c5cbf]' : ''}`}
+          className={`w-1 cursor-col-resize bg-stone-200 hover:bg-stone-300 transition-colors flex-shrink-0 flex items-center justify-center ${isDragging ? 'bg-stash-600' : ''}`}
           onMouseDown={handleMouseDown}
         >
-          <div className="w-3 h-8 bg-[#c4c0b6] rounded-full" />
+          <div className="w-3 h-8 bg-stone-300 rounded-full" />
         </div>
         
         {/* 右侧内容区 */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!currentPeriod ? (
             <div className="empty-state-v2 flex-1">
-              <Calendar className="w-16 h-16 text-[#d4d1c7] mb-4" />
+              <Calendar className="w-16 h-16 text-stone-300 mb-4" />
               <h4>选择一个周期开始</h4>
               <p>在上方周期进度条中选择一个周期，或通过「扫描文件夹」导入照片</p>
             </div>
@@ -823,7 +807,7 @@ export default function PeriodSelectPage() {
               {/* 标签页 */}
               <div className="tab-bar-v2">
                 <button
-                  onClick={() => { setSelectedTab('photos'); handleCloseContextMenu(); }}
+                  onClick={() => { setSelectedTab('photos'); }}
                   className={`tab-item-v2 ${selectedTab === 'photos' ? 'active' : ''}`}
                 >
                   <Image className="w-4 h-4" />
@@ -831,7 +815,7 @@ export default function PeriodSelectPage() {
                   <span className="tab-count-v2">{currentPhotos.length}</span>
                 </button>
                 <button
-                  onClick={() => { setSelectedTab('videos'); handleCloseContextMenu(); }}
+                  onClick={() => { setSelectedTab('videos'); }}
                   className={`tab-item-v2 ${selectedTab === 'videos' ? 'active' : ''}`}
                 >
                   <VideoIcon className="w-4 h-4" />
@@ -846,17 +830,17 @@ export default function PeriodSelectPage() {
                   <div className="h-full overflow-y-auto">
                     {currentPhotos.length === 0 ? (
                       <div className="empty-state-v2 flex-1 h-full flex flex-col items-center justify-center">
-                        <Image className="w-16 h-16 text-[#d4d1c7] mb-4" />
+                        <Image className="w-16 h-16 text-stone-300 mb-4" />
                         <h4>暂无照片</h4>
                         <p>点击「扫描文件夹」导入照片，或从视频中截取画面</p>
                       </div>
                     ) : (
                       <>
                         <div className="flex items-center justify-between px-5 py-3">
-                          <span className="text-xs text-[#706c63]">
-                            显示 <strong className="text-[#33312d]">{currentPhotos.length}</strong> 张照片
+                          <span className="text-xs text-stone-600">
+                            显示 <strong className="text-stone-900">{currentPhotos.length}</strong> 张照片
                             {currentPeriod && (
-                              <span className="ml-2 text-[#b0aca0]">
+                              <span className="ml-2 text-stone-400">
                                 · {currentPeriod.start_date} ~ {currentPeriod.end_date}
                               </span>
                             )}
@@ -869,7 +853,6 @@ export default function PeriodSelectPage() {
                           <VirtualPhotoGrid
                             photos={currentPhotos}
                             loadedImages={loadedImages}
-                            onContextMenu={handlePhotoContextMenu}
                             onDoubleClick={(photo) => {
                               const index = currentPhotos.findIndex(p => p.id === photo.id);
                               if (index !== -1) handleOpenPreview(index);
@@ -888,7 +871,7 @@ export default function PeriodSelectPage() {
                   <div className="h-full overflow-y-auto p-5">
                     {currentVideos.length === 0 ? (
                       <div className="empty-state-v2">
-                        <VideoIcon className="w-16 h-16 text-[#d4d1c7] mb-4" />
+                        <VideoIcon className="w-16 h-16 text-stone-300 mb-4" />
                         <h4>暂无视频</h4>
                         <p>点击「扫描文件夹」导入视频，然后从中截取画面</p>
                       </div>
@@ -897,11 +880,11 @@ export default function PeriodSelectPage() {
                         {currentVideos.map((video) => (
                           <div
                             key={video.id}
-                            className="cursor-pointer rounded-xl overflow-hidden bg-white border border-[#e8e6de] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                            className="cursor-pointer rounded-xl overflow-hidden bg-white border border-stone-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                           >
                             {/* Thumbnail */}
                             <div
-                              className="aspect-video bg-[#3a2010] relative overflow-hidden"
+                              className="aspect-video bg-warmth-950 relative overflow-hidden"
                               onClick={() => handleOpenInlinePlayer(video)}
                             >
                               {videoThumbnails[video.id] ? (
@@ -924,8 +907,8 @@ export default function PeriodSelectPage() {
 
                             {/* Info */}
                             <div className="p-3">
-                              <p className="text-xs font-medium text-[#33312d] truncate">{video.file_name}</p>
-                              <p className="text-[10px] text-[#b0aca0] mt-0.5">
+                              <p className="text-xs font-medium text-stone-900 truncate">{video.file_name}</p>
+                              <p className="text-[10px] text-stone-400 mt-0.5">
                                 {video.width}×{video.height}
                               </p>
                               <div className="flex gap-1.5 mt-2">
@@ -955,21 +938,21 @@ export default function PeriodSelectPage() {
           )}
           
           {/* 底部统计栏 */}
-          <div className="flex-shrink-0 border-t border-[#e8e6de] bg-white px-5 py-2.5 flex items-center justify-between">
+          <div className="flex-shrink-0 border-t border-stone-200 bg-white px-5 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-[#7c5cbf] flex items-center justify-center">
+                <div className="w-4 h-4 rounded-full bg-stash-600 flex items-center justify-center">
                   <Plus className="w-2.5 h-2.5 text-white" />
                 </div>
-                <span className="text-xs text-[#706c63]">待选区 <strong className="text-[#7c5cbf]">{selectedItems.length}</strong></span>
+                <span className="text-xs text-stone-600">待选区 <strong className="text-stash-600">{selectedItems.length}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Image className="w-4 h-4 text-[#f58b3d]" />
-                <span className="text-xs text-[#706c63]">照片 <strong className="text-[#33312d]">{currentPhotos.length}</strong></span>
+                <Image className="w-4 h-4 text-warmth-500" />
+                <span className="text-xs text-stone-600">照片 <strong className="text-stone-900">{currentPhotos.length}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
-                <VideoIcon className="w-4 h-4 text-[#10b981]" />
-                <span className="text-xs text-[#706c63]">视频 <strong className="text-[#33312d]">{currentVideos.length}</strong></span>
+                <VideoIcon className="w-4 h-4 text-success" />
+                <span className="text-xs text-stone-600">视频 <strong className="text-stone-900">{currentVideos.length}</strong></span>
               </div>
             </div>
           </div>
@@ -1019,24 +1002,8 @@ export default function PeriodSelectPage() {
         </div>
       )}
 
-      {/* ===== CONTEXT MENU ===== */}
-      <PhotoContextMenu
-        visible={contextMenu.visible}
-        position={contextMenu.position}
-        photo={contextMenu.photo}
-        onAddToPending={(p) => { handleTogglePhotoSelect(p); handleCloseContextMenu(); }}
-        onRemoveFromPending={(p) => { handleTogglePhotoSelect(p); handleCloseContextMenu(); }}
-        onSetFinal={(p) => { handleSetFinalPhoto(p); handleCloseContextMenu(); }}
-        onCancelFinal={() => { handleCancelFinalPhoto(); handleCloseContextMenu(); }}
-        onPreview={(p) => {
-          handleCloseContextMenu();
-          const idx = currentPhotos.findIndex(ph => ph.id === p.id);
-          if (idx !== -1) handleOpenPreview(idx);
-        }}
-        onClose={handleCloseContextMenu}
-      />
 
-      {/* ===== TEMPLATE SELECTOR MODAL ===== */}
+      {/* ===== GLOBAL MODALS ===== */}      {/* ===== TEMPLATE SELECTOR MODAL ===== */}
       {showTemplateSelector && (
         <TemplateSelector
           photoCount={

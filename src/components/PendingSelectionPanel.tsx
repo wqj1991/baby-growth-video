@@ -43,13 +43,13 @@ export default function PendingSelectionPanel({
 
   return (
     <div className="stash-panel-v2 flex flex-col h-full">
-      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#e8e6de]">
-        <Grid3X3 className="w-4 h-4 text-[#7c5cbf]" />
-        <h3 className="text-sm font-semibold text-[#33312d]">候选照片</h3>
-        <span className="text-[11px] font-bold text-[#7c5cbf] bg-[#f3f0fb] px-2 py-0.5 rounded-full">
+      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-stone-200">
+        <Grid3X3 className="w-4 h-4 text-stash-600" />
+        <h3 className="text-sm font-semibold text-stone-900">候选照片</h3>
+        <span className="text-[11px] font-bold text-stash-600 bg-stash-100 px-2 py-0.5 rounded-full">
           {selectedItems.length} 张
         </span>
-        <span className="ml-auto text-[11px] text-[#b0aca0]">单击选择 · 双击预览</span>
+        <span className="ml-auto text-[11px] text-stone-400">单击选择 · 双击预览</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
@@ -71,7 +71,7 @@ export default function PendingSelectionPanel({
                 return (
                   <div
                     key={uniqueKey}
-                    className={`stash-compare-item relative cursor-pointer ${multiSelected ? 'ring-2 ring-[#7c5cbf]' : ''} ${final ? 'ring-2 ring-[#22c55e]' : ''}`}
+                    className={`stash-compare-item relative cursor-pointer ${multiSelected ? 'ring-2 ring-stash-600' : ''} ${final ? 'ring-2 ring-success' : ''}`}
                     onClick={() => onToggleMultiSelect(item)}
                     onDoubleClick={() => onPreview?.(item)}
                   >
@@ -94,23 +94,23 @@ export default function PendingSelectionPanel({
                     </button>
 
                     {multiSelected && !final && (
-                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[#7c5cbf] flex items-center justify-center">
+                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-stash-600 flex items-center justify-center">
                         <Check className="w-3 h-3 text-white" />
                       </div>
                     )}
 
                     {final && (
-                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[#22c55e] flex items-center justify-center">
+                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-success flex items-center justify-center">
                         <Check className="w-3 h-3 text-white" />
                       </div>
                     )}
 
                     <div className="mt-1.5 px-1">
-                      <div className="text-[10px] font-medium text-[#33312d] truncate">
+                      <div className="text-[10px] font-medium text-stone-900 truncate">
                         {getFileName(item)}
                       </div>
                       <div className="flex items-center gap-1 mt-0.5">
-                        <span className={`text-[8px] px-1.5 py-0.5 rounded ${item.type === 'photo' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                        <span className={`text-[8px] px-1.5 py-0.5 rounded ${item.type === 'photo' ? 'bg-info-bg text-info-text' : 'bg-warmth-100 text-warmth-700'}`}>
                           {item.type === 'photo' ? '扫描' : '截帧'}
                         </span>
                       </div>
@@ -121,7 +121,7 @@ export default function PendingSelectionPanel({
                       style={{ pointerEvents: 'none' }}
                     >
                       <button
-                        className="bg-white/90 text-[#33312d] text-[10px] font-medium px-2.5 py-1 rounded-md hover:bg-white transition-colors"
+                        className="bg-white/90 text-stone-900 text-[10px] font-medium px-2.5 py-1 rounded-md hover:bg-white transition-colors"
                         style={{ pointerEvents: 'auto' }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -149,12 +149,12 @@ export default function PendingSelectionPanel({
                   </div>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
-                  <div className="h-1.5 w-20 bg-[#e4e7f6] rounded-full overflow-hidden">
+                  <div className="h-1.5 w-20 bg-indigo-100 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
                       style={{
                         width: `${Math.min((multiSelectedCount / MAX_PHOTOS) * 100, 100)}%`,
-                        background: 'linear-gradient(90deg, #7c5cbf, #8b6fc7)',
+                        background: 'linear-gradient(90deg, var(--color-stash-600), var(--color-stash-500))',
                       }}
                     />
                   </div>
@@ -173,7 +173,7 @@ export default function PendingSelectionPanel({
       </div>
 
       {selectedItems.length > 0 && (
-        <div className="p-3 border-t border-[#e8e6de] bg-white">
+        <div className="p-3 border-t border-stone-200 bg-white">
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => {

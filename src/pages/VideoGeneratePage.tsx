@@ -214,7 +214,7 @@ export default function VideoGeneratePage() {
                       className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                         config.resolution === res
                           ? 'bg-primary-500 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
                       }`}
                     >
                       {res.toUpperCase()}
@@ -285,14 +285,14 @@ export default function VideoGeneratePage() {
               {/* ===== AI 智能过渡 (仅标准模式) ===== */}
               {videoMode === 'standard' && (
               <div className="form-group">
-                <div className="p-4 rounded-xl" style={{ background: 'linear-gradient(135deg, #f4f5fb 0%, #f8f6fc 50%, #fffaf5 100%)', border: '1px solid #e4e7f6' }}>
+                <div className="p-4 rounded-xl border-indigo-100" style={{ background: 'linear-gradient(135deg, var(--color-indigo-50, #f4f5fb) 0%, var(--color-stone-50, #f8f6fc) 50%, var(--color-warmth-50, #fffaf5) 100%)' }}>
                   {/* Header */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5" style={{ color: '#5b66c0' }} />
+                      <Sparkles className="w-5 h-5 text-indigo-500" />
                       <div>
-                        <label className="text-sm font-semibold" style={{ color: '#2b2e58' }}>AI 智能过渡</label>
-                        <p className="text-xs mt-0.5" style={{ color: '#7785d1' }}>
+                        <label className="text-sm font-semibold text-indigo-900">AI 智能过渡</label>
+                        <p className="text-xs mt-0.5 text-indigo-300">
                           在照片之间生成 AI 装饰性过渡帧
                         </p>
                       </div>
@@ -310,8 +310,7 @@ export default function VideoGeneratePage() {
                     ) : (
                       <button
                         onClick={() => navigate('/settings')}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-                        style={{ color: '#5b66c0', background: '#e4e7f6' }}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors text-indigo-500 bg-indigo-100"
                       >
                         去配置
                         <ExternalLink className="w-3 h-3" />
@@ -320,14 +319,13 @@ export default function VideoGeneratePage() {
                   </div>
 
                   {!aiConfigured && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg" style={{ background: '#fff9e0', border: '1px solid #fff2b8' }}>
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#8f6600' }} />
-                      <p className="text-xs" style={{ color: '#6b4d00' }}>
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-warning-bg border-warning-border">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 text-warning-text" />
+                      <p className="text-xs text-warning-text">
                         尚未配置 AI 模型，请在
                         <button
                           onClick={() => navigate('/settings')}
-                          className="font-medium underline mx-1"
-                          style={{ color: '#b38000' }}
+                          className="font-medium underline mx-1 text-warning"
                         >
                           设置
                         </button>
@@ -337,14 +335,14 @@ export default function VideoGeneratePage() {
                   )}
 
                   {aiEnabled && aiConfigured && (
-                    <div className="mt-3 pt-3 border-t" style={{ borderColor: '#d4d1c7' }}>
+                    <div className="mt-3 pt-3 border-t border-stone-300">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg gradient-indigo flex items-center justify-center">
                           <Sparkles className="w-4 h-4 text-white" />
                         </div>
                         <div>
-                          <p className="text-xs font-medium" style={{ color: '#33312d' }}>AI 过渡帧已启用</p>
-                          <p className="text-xs" style={{ color: '#8f8b80' }}>
+                          <p className="text-xs font-medium text-stone-900">AI 过渡帧已启用</p>
+                          <p className="text-xs text-stone-500">
                             将在 {completedPeriods.length > 1 ? `${completedPeriods.length - 1} 个转场点` : '转场点'} 生成 AI 帧
                           </p>
                         </div>
@@ -387,7 +385,7 @@ export default function VideoGeneratePage() {
                       className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                         config.output_format === format
                           ? 'bg-primary-500 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
                       }`}
                     >
                       {format.toUpperCase()}
@@ -410,9 +408,9 @@ export default function VideoGeneratePage() {
               </h2>
             </div>
             <div className="card-body">
-              <div className="aspect-video bg-gray-900 rounded-lg flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <Video className="w-16 h-16 mx-auto mb-3 text-gray-600" />
+              <div className="aspect-video bg-stone-900 rounded-lg flex items-center justify-center">
+                <div className="text-center text-stone-500">
+                  <Video className="w-16 h-16 mx-auto mb-3 text-stone-600" />
                   <p>视频预览</p>
                   <p className="text-sm mt-1">生成后可在此播放</p>
                 </div>
@@ -430,8 +428,8 @@ export default function VideoGeneratePage() {
             </div>
             <div className="card-body">
               {completedPeriods.length === 0 ? (
-                <div className="text-center py-6 text-gray-500">
-                  <Image className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                <div className="text-center py-6 text-stone-500">
+                  <Image className="w-10 h-10 mx-auto mb-2 text-stone-300" />
                   <p className="text-sm">还没有选择照片</p>
                   <p className="text-xs mt-1">请先在"周期选择"中选择照片</p>
                 </div>
@@ -442,10 +440,10 @@ export default function VideoGeneratePage() {
                       key={period.id}
                       className="flex-shrink-0 w-20"
                     >
-                      <div className="aspect-square bg-gray-200 rounded-lg mb-1 flex items-center justify-center">
-                        <Image className="w-6 h-6 text-gray-400" />
+                      <div className="aspect-square bg-stone-200 rounded-lg mb-1 flex items-center justify-center">
+                        <Image className="w-6 h-6 text-stone-400" />
                       </div>
-                      <p className="text-xs text-center text-gray-600 truncate">
+                      <p className="text-xs text-center text-stone-600 truncate">
                         {period.name}
                       </p>
                     </div>
@@ -459,10 +457,10 @@ export default function VideoGeneratePage() {
           <div className="card mb-6">
             <div className="card-body">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <Wand2 className="w-4 h-4" style={{ color: '#7c3aed' }} />
+                <Wand2 className="w-4 h-4 text-stash" />
                 生成模式
               </h3>
-              <div className="flex rounded-xl p-1" style={{ background: '#f5f4f0' }}>
+              <div className="flex rounded-xl p-1 bg-stone-100">
                 <button
                   onClick={() => {
                     setVideoMode('standard');
@@ -470,8 +468,8 @@ export default function VideoGeneratePage() {
                   }}
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
                     videoMode === 'standard'
-                      ? 'bg-white shadow-sm text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
+                      ? 'bg-white shadow-sm text-stone-900'
+                      : 'text-stone-500 hover:text-stone-700'
                   }`}
                 >
                   <Film className="w-4 h-4" />
@@ -489,7 +487,7 @@ export default function VideoGeneratePage() {
                   className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
                     videoMode === 'agnes'
                       ? 'bg-white shadow-sm text-purple-700'
-                      : aiConfigured ? 'text-gray-500 hover:text-gray-700' : 'text-gray-400 cursor-not-allowed'
+                      : aiConfigured ? 'text-stone-500 hover:text-stone-700' : 'text-stone-400 cursor-not-allowed'
                   }`}
                 >
                   <Sparkles className="w-4 h-4" />
@@ -498,14 +496,14 @@ export default function VideoGeneratePage() {
                 </button>
               </div>
               {videoMode === 'agnes' && !aiConfigured && (
-                <p className="text-xs mt-2 text-amber-600">
+                <p className="text-xs mt-2 text-warning-text">
                   需要先在设置中配置 AI Provider 和 API Key
                 </p>
               )}
               {videoMode === 'agnes' && aiConfigured && (
-                <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg" style={{ background: '#f5f0ff', border: '1px solid #e4d6ff' }}>
-                  <Clock className="w-4 h-4 flex-shrink-0" style={{ color: '#7c3aed' }} />
-                  <p className="text-xs" style={{ color: '#6b47b5' }}>
+                <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-stash-bg border-stash-200">
+                  <Clock className="w-4 h-4 flex-shrink-0 text-stash" />
+                  <p className="text-xs text-stash-text">
                     Agnes AI 将照片生成一段完整的动态视频，约需 2-5 分钟
                   </p>
                 </div>
@@ -528,7 +526,7 @@ export default function VideoGeneratePage() {
                     onChange={(e) => setOverallPrompt(e.target.value)}
                     placeholder="描述你想要的效果，例如：温馨的家庭成长记录，柔和的暖色调，自然过渡..."
                   />
-                  <p className="text-xs mt-1" style={{ color: '#b0aca0' }}>
+                  <p className="text-xs mt-1 text-stone-400">
                     留空将使用默认风格描述
                   </p>
                 </div>
@@ -538,10 +536,10 @@ export default function VideoGeneratePage() {
                   <label className="form-label flex items-center gap-2">
                     <Type className="w-4 h-4 text-purple-500" />
                     照片标注
-                    <span className="text-xs font-normal text-gray-400">（可选，在照片底部添加文字）</span>
+                    <span className="text-xs font-normal text-stone-400">（可选，在照片底部添加文字）</span>
                   </label>
                   {completedPeriods.length === 0 ? (
-                    <p className="text-xs text-gray-400">暂无已选照片</p>
+                    <p className="text-xs text-stone-400">暂无已选照片</p>
                   ) : (
                     <div className="space-y-2 max-h-[200px] overflow-y-auto">
                       {completedPeriods.map((period) => {
@@ -549,7 +547,7 @@ export default function VideoGeneratePage() {
                         const isEditing = editingTextFor === period.id;
                         return (
                           <div key={period.id} className="flex items-center gap-2">
-                            <span className="text-xs font-medium w-20 truncate text-gray-600">{period.name}</span>
+                            <span className="text-xs font-medium w-20 truncate text-stone-600">{period.name}</span>
                             {isEditing ? (
                               <input
                                 className="form-input flex-1 text-xs py-1.5"
@@ -573,8 +571,8 @@ export default function VideoGeneratePage() {
                                 onClick={() => setEditingTextFor(period.id)}
                                 className={`flex-1 text-left text-xs py-1.5 px-2.5 rounded-lg border transition-colors ${
                                   existingText
-                                    ? 'border-purple-200 bg-purple-50 text-purple-700'
-                                    : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'
+                                    ? 'border-stash-200 bg-stash-bg text-stash-text'
+                                    : 'border-stone-200 text-stone-400 hover:border-stone-300 hover:text-stone-600'
                                 }`}
                               >
                                 {existingText || '点击添加文字...'}
@@ -596,7 +594,7 @@ export default function VideoGeneratePage() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="font-semibold">生成视频</h3>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-stone-500 mt-1">
                     预计时长：约 {(() => {
                       if (videoMode === 'agnes') return '动态生成';
                       const baseDuration = completedPeriods.length * config.photo_duration + (completedPeriods.length - 1) * config.transition_duration;
@@ -606,12 +604,12 @@ export default function VideoGeneratePage() {
                       return (baseDuration + aiTransitionTime).toFixed(1);
                     })()}{videoMode === 'agnes' ? '' : ' 秒'}
                     {aiEnabled && aiConfigured && videoMode !== 'agnes' && (
-                      <span className="text-xs ml-2" style={{ color: '#5b66c0' }}>
+                      <span className="text-xs ml-2 text-indigo-500">
                         (含 AI 过渡帧)
                       </span>
                     )}
                     {videoMode === 'agnes' && (
-                      <span className="text-xs ml-2" style={{ color: '#7c3aed' }}>
+                      <span className="text-xs ml-2 text-stash">
                         (Agnes AI 生成)
                       </span>
                     )}
@@ -641,19 +639,19 @@ export default function VideoGeneratePage() {
                   {/* 阶段指示器 */}
                   <div className="flex items-center gap-2">
                     <StageIcon stage={generationStage} />
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-stone-700">
                       {getStageLabel(generationStage)}
                     </span>
                   </div>
 
                   {/* 降级通知 */}
                   {generationFallback && (
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
-                      <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-warning-bg border-warning-border">
+                      <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0" />
                       <div>
-                        <p className="text-sm font-medium text-amber-800">AI 过渡帧生成失败，已回退到标准转场</p>
+                        <p className="text-sm font-medium text-warning-text">AI 过渡帧生成失败，已回退到标准转场</p>
                         {fallbackReason && (
-                          <p className="text-xs text-amber-600 mt-0.5">{fallbackReason}</p>
+                          <p className="text-xs text-warning-text mt-0.5">{fallbackReason}</p>
                         )}
                       </div>
                     </div>
@@ -667,7 +665,7 @@ export default function VideoGeneratePage() {
                         style={{ width: `${generationProgress}%` }}
                       />
                     </div>
-                    <p className="text-sm text-gray-500 mt-2 text-center">
+                    <p className="text-sm text-stone-500 mt-2 text-center">
                       {generationProgress}% - {generationMessage}
                     </p>
                   </div>
@@ -676,14 +674,14 @@ export default function VideoGeneratePage() {
 
               {/* 成功完成 */}
               {generationStage === 'complete' && !isGenerating && completedVideoPath && (
-                <div className="mt-4 p-4 bg-green-50 rounded-lg flex items-center justify-between border border-green-200">
+                <div className="mt-4 p-4 bg-success-bg rounded-lg flex items-center justify-between border-success-border">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <div className="w-10 h-10 rounded-full bg-success-bg flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-success" />
                     </div>
                     <div>
-                      <p className="font-medium text-green-800">视频生成完成！</p>
-                      <p className="text-xs text-green-600 truncate max-w-[280px]">{completedVideoPath}</p>
+                      <p className="font-medium text-success-text">视频生成完成！</p>
+                      <p className="text-xs text-success truncate max-w-[280px]">{completedVideoPath}</p>
                     </div>
                   </div>
                   <button
@@ -701,12 +699,12 @@ export default function VideoGeneratePage() {
 
               {/* 生成失败 */}
               {generationStage === 'error' && !isGenerating && generationError && (
-                <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
+                <div className="mt-4 p-4 bg-error-bg rounded-lg border-error-border">
                   <div className="flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-error flex-shrink-0" />
                     <div>
-                      <p className="font-medium text-red-800">生成失败</p>
-                      <p className="text-sm text-red-600 mt-1">{generationError}</p>
+                      <p className="font-medium text-error-text">生成失败</p>
+                      <p className="text-sm text-error mt-1">{generationError}</p>
                     </div>
                   </div>
                 </div>
@@ -725,25 +723,25 @@ function StageIcon({ stage }: { stage: string }) {
   switch (stage) {
     case 'preparing':
     case 'preprocessing':
-      return <Image className={`${baseClass} text-blue-500`} />;
+      return <Image className={`${baseClass} text-info`} />;
     case 'ai_generation':
       return <Sparkles className={`${baseClass} text-indigo-500 animate-pulse`} />;
     case 'ai_fallback':
     case 'agnes_fallback':
-      return <AlertTriangle className={`${baseClass} text-amber-500`} />;
+      return <AlertTriangle className={`${baseClass} text-warning`} />;
     case 'ffmpeg_encoding':
-      return <Film className={`${baseClass} text-green-500 animate-pulse`} />;
+      return <Film className={`${baseClass} text-success animate-pulse`} />;
     case 'agnes_creating':
-      return <Wand2 className={`${baseClass} text-purple-500 animate-pulse`} />;
+      return <Wand2 className={`${baseClass} text-stash animate-pulse`} />;
     case 'agnes_encoding':
-      return <Sparkles className={`${baseClass} text-purple-500 animate-pulse`} />;
+      return <Sparkles className={`${baseClass} text-stash animate-pulse`} />;
     case 'agnes_downloading':
-      return <Download className={`${baseClass} text-purple-500 animate-pulse`} />;
+      return <Download className={`${baseClass} text-stash animate-pulse`} />;
     case 'complete':
-      return <CheckCircle2 className={`${baseClass} text-green-500`} />;
+      return <CheckCircle2 className={`${baseClass} text-success`} />;
     case 'error':
-      return <AlertCircle className={`${baseClass} text-red-500`} />;
+      return <AlertCircle className={`${baseClass} text-error`} />;
     default:
-      return <Loader2 className={`${baseClass} text-gray-400 animate-spin`} />;
+      return <Loader2 className={`${baseClass} text-stone-400 animate-spin`} />;
   }
 }

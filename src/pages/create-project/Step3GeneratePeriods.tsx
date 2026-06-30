@@ -6,7 +6,7 @@ import type { Period } from '../../types';
 
 const specialPeriodNames = ['满月', '百天', '半岁', '一岁', '周岁'];
 
-export default function Step4GeneratePeriods() {
+export default function Step3GeneratePeriods() {
   const {
     selectedBaby,
     periodDays,
@@ -80,8 +80,8 @@ export default function Step4GeneratePeriods() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
-              <Star className="w-4 h-4 text-amber-500" />
+            <div className="w-9 h-9 rounded-xl bg-warning-bg flex items-center justify-center">
+              <Star className="w-4 h-4 text-warning" />
             </div>
             <div>
               <p className="text-xs text-stone-400">特殊日期</p>
@@ -117,11 +117,11 @@ export default function Step4GeneratePeriods() {
       {/* 周期列表 */}
       {periods.length > 0 && (
         <div className="card p-0 overflow-hidden">
-          <div className="p-6 bg-gradient-to-r from-emerald-50/60 to-transparent">
+          <div className="p-6 bg-gradient-to-r from-success-bg/60 to-transparent">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-emerald-500" />
+                <div className="w-10 h-10 rounded-xl bg-success-bg flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <h3 className="font-bold text-stone-800">生成完成</h3>
@@ -163,7 +163,7 @@ export default function Step4GeneratePeriods() {
                     <div
                       key={period.id || index}
                       className={`px-6 py-3.5 flex items-center justify-between border-t border-stone-50 transition-colors hover:bg-stone-50/30 ${
-                        isSpecial ? 'bg-amber-50/40' : ''
+                        isSpecial ? 'bg-warning-bg/40' : ''
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -180,8 +180,8 @@ export default function Step4GeneratePeriods() {
                           {period.name || `第${index + 1}周期`}
                         </span>
                         {isSpecial && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-medium">
-                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning-bg text-warning-text text-[11px] font-medium">
+                            <Star className="w-3 h-3 fill-warning text-warning" />
                             特殊
                           </span>
                         )}

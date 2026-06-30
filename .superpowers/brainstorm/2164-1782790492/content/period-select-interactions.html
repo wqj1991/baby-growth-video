@@ -1,0 +1,147 @@
+<h2>📋 PeriodSelectPage — 交互全景分析</h2>
+<p class="subtitle">这是整个应用最复杂的页面，包含 3 面板布局 + 5 种模态框 + 2 种子模式</p>
+
+<div class="section">
+  <h3>🏗️ 页面布局结构</h3>
+  <div class="mockup">
+    <div class="mockup-header">三栏布局</div>
+    <div class="mockup-body" style="padding: 0; font-size: 12px;">
+      <div style="background: #fafaf8; padding: 8px 16px; border-bottom: 1px solid #e8e6de; display:flex; align-items:center; gap: 8px;">
+        <span class="mock-button" style="font-size: 11px; padding: 4px 10px;">📂 扫描文件夹</span>
+        <span class="mock-button" style="font-size: 11px; padding: 4px 10px;">📅 自动生成周期</span>
+        <span class="mock-button" style="font-size: 11px; padding: 4px 10px;">➕ 添加周期</span>
+        <span style="margin-left: auto; color: #b0aca0;">5/52 已完成</span>
+      </div>
+      
+      <!-- Period Timeline -->
+      <div style="padding: 8px 16px; border-bottom: 1px solid #e8e6de; background: white; display: flex; gap: 4px; overflow-x: auto;">
+        <div style="min-width: 48px; height: 32px; background: #d1fae5; border-radius: 4px; display:flex; align-items:center; justify-content:center; font-size: 10px; border: 2px solid #10b981;">✓ 1周</div>
+        <div style="min-width: 48px; height: 32px; background: #f5f4f0; border-radius: 4px; display:flex; align-items:center; justify-content:center; font-size: 10px;">2周</div>
+        <div style="min-width: 48px; height: 32px; background: #f5f4f0; border-radius: 4px; display:flex; align-items:center; justify-content:center; font-size: 10px; border: 2px solid #f58b3d;">3周</div>
+        <div style="min-width: 48px; height: 32px; background: #f5f4f0; border-radius: 4px; display:flex; align-items:center; justify-content:center; font-size: 10px;">4周</div>
+        <div style="min-width: 48px; height: 32px; background: #f5f4f0; border-radius: 4px; display:flex; align-items:center; justify-content:center; font-size: 10px;">...</div>
+      </div>
+
+      <!-- Tab bar -->
+      <div style="padding: 4px 16px; border-bottom: 1px solid #e8e6de; background: white; display:flex; gap: 0;">
+        <div style="padding: 4px 12px; border-bottom: 2px solid #f58b3d; color: #b85218; font-weight:600; font-size:11px;">🖼️ 全部照片 128</div>
+        <div style="padding: 4px 12px; color: #706c63; font-size:11px;">🎬 视频 8</div>
+      </div>
+
+      <!-- Content + Pending Panel -->
+      <div style="display:flex; height: 300px;">
+        <!-- Pending Panel -->
+        <div style="width:280px; border-right: 1px solid #e8e6de; background: white; overflow-y: auto; flex-shrink:0;">
+          <div style="padding:8px 12px; border-bottom:1px solid #e8e6de; font-weight:600; font-size:11px; color:#7c5cbf;">
+            🧩 候选照片 <span style="background:#f3f0fb; padding:1px 6px; border-radius:8px; color:#7c5cbf;">12 张</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 8px;">
+            <div class="placeholder" style="aspect-ratio:4/3; background:#f5f4f0; border-radius:4px;"></div>
+            <div class="placeholder" style="aspect-ratio:4/3; background:#f5f4f0; border-radius:4px;"></div>
+            <div class="placeholder" style="aspect-ratio:4/3; background:#f5f4f0; border-radius:4px; border:2px solid #7c5cbf;"></div>
+            <div class="placeholder" style="aspect-ratio:4/3; background:#d1fae5; border-radius:4px; border:2px solid #22c55e;"></div>
+          </div>
+          <div style="padding:8px; border-top:1px solid #e8e6de;">
+            <div style="display:flex; gap:4px;">
+              <div class="mock-button" style="flex:1; font-size:10px; text-align:center;">✅ 单独选定</div>
+              <div class="mock-button" style="flex:1; font-size:10px; text-align:center; background:#7c5cbf; color:white;">✨ 生成拼图(3张)</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Drag handle -->
+        <div style="width:4px; background:#e8e6de; cursor:col-resize; flex-shrink:0;"></div>
+
+        <!-- Photo Grid -->
+        <div style="flex:1; overflow-y:auto; background:#fafaf8; padding:8px;">
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
+            <div class="placeholder" style="aspect-ratio:4/3; position:relative;">
+              <div style="position:absolute; top: 2px; left:2px; background:#7c5cbf; color:white; border-radius:50%; width:14px; height:14px; font-size:8px; display:flex;align-items:center;justify-content:center;">✓</div>
+            </div>
+            <div class="placeholder" style="aspect-ratio:4/3;"></div>
+            <div class="placeholder" style="aspect-ratio:4/3; border:2px solid #f58b3d;"></div>
+            <div class="placeholder" style="aspect-ratio:4/3;"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Bottom stats bar -->
+      <div style="padding:6px 16px; border-top:1px solid #e8e6de; background:white; font-size:10px; color:#706c63; display:flex; gap:16px;">
+        <span>📋 待选区 <strong style="color:#7c5cbf">12</strong></span>
+        <span>📷 照片 <strong style="color:#33312d">128</strong></span>
+        <span>🎬 视频 <strong style="color:#33312d">8</strong></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🖱️ 照片交互方式（同一张照片上有 4 种操作路径）</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 16px; font-size: 13px;">
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <tr style="background:#f5f4f0;">
+          <th style="padding:8px; text-align:left; border-bottom:1px solid #e8e6de;">交互方式</th>
+          <th style="padding:8px; text-align:left; border-bottom:1px solid #e8e6de;">触发</th>
+          <th style="padding:8px; text-align:left; border-bottom:1px solid #e8e6de;">效果</th>
+          <th style="padding:8px; text-align:left; border-bottom:1px solid #e8e6de;">用户感知</th>
+        </tr>
+        <tr>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">1. 右键菜单</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">右键点击</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">弹出上下文菜单（加入待选区/确认选择/预览）</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de; color:#f59e0b;">⚠️ 桌面习惯，移动端不可用</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">2. Hover按钮</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">鼠标悬停</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">显示"加入待选区"/"设为最终"按钮</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">✅ 直观但需发现</td>
+        </tr>
+        <tr>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">3. 双击</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">双击照片</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">打开全屏预览（支持左右键切换）</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">✅ 自然直观</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">4. 待选区点击</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">在待选区单击</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">切换多选状态（紫色边框）</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de; color:#f59e0b;">⚠️ 与"候选"概念混淆</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🎯 待选区概念映射</h3>
+  <div class="mockup">
+    <div class="mockup-header">照片的三种状态标记</div>
+    <div class="mockup-body" style="padding: 16px;">
+      <div style="display:flex; gap: 12px; font-size: 12px;">
+        <div style="flex:1; background: #fafaf8; padding: 12px; border-radius: 8px; border: 1px solid #e8e6de; text-align:center;">
+          <div style="width:24px; height:24px; background:#f5f4f0; border-radius:50%; margin:0 auto 6px;"></div>
+          <strong>普通</strong>
+          <p style="color:#b0aca0; margin-top:4px;">is_selected: false<br>is_multi_selected: false<br>is_final: false</p>
+        </div>
+        <div style="text-align:center; align-self:center; font-size:20px; color:#d4d1c7;">→</div>
+        <div style="flex:1; background: #f3f0fb; padding: 12px; border-radius: 8px; border: 2px solid #7c5cbf; text-align:center;">
+          <div style="width:24px; height:24px; background:#7c5cbf; border-radius:50%; margin:0 auto 6px; color:white;">✓</div>
+          <strong>候选</strong>
+          <p style="color:#6b47b5; margin-top:4px;">is_selected: true<br>is_multi_selected: true/false</p>
+        </div>
+        <div style="text-align:center; align-self:center; font-size:20px; color:#d4d1c7;">→</div>
+        <div style="flex:1; background: #d1fae5; padding: 12px; border-radius: 8px; border: 2px solid #22c55e; text-align:center;">
+          <div style="width:24px; height:24px; background:#22c55e; border-radius:50%; margin:0 auto 6px; color:white;">✓</div>
+          <strong>最终选定</strong>
+          <p style="color:#166534; margin-top:4px;">is_final: true<br>→ period.selected_photo_id</p>
+        </div>
+      </div>
+      <div style="margin-top: 12px; padding: 8px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; font-size: 12px;">
+        🤔 <strong>概念问题：</strong>"加入待选区"(is_selected) 和 "多选"(is_multi_selected) 是两个独立 flag，但用户需要理解：先加入待选区 → 再在待选区多选 → 才能拼图。这个两步操作在某些场景下不够直观。
+      </div>
+    </div>
+  </div>
+</div>

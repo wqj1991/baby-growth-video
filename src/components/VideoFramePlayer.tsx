@@ -86,16 +86,16 @@ export default function VideoFramePlayer({
   return (
     <div className="flex flex-col h-full">
       {/* Top Bar */}
-      <div className="h-[52px] flex items-center gap-3 px-5 border-b border-[#e8e6de] bg-white flex-shrink-0">
+      <div className="h-[52px] flex items-center gap-3 px-5 border-b border-stone-200 bg-white flex-shrink-0">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-[#706c63] hover:text-[#33312d] transition-colors"
+          className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-stone-900 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           返回照片库
         </button>
-        <span className="text-[#e8e6de]">|</span>
-        <span className="text-sm font-medium text-[#706c63] truncate max-w-[300px]">
+        <span className="text-stone-200">|</span>
+        <span className="text-sm font-medium text-stone-600 truncate max-w-[300px]">
           {video.file_name}
         </span>
         <div className="ml-auto">
@@ -164,7 +164,7 @@ export default function VideoFramePlayer({
                 onClick={() => setProgress(Math.max(0, Math.min(100, progress + f.offset)))}
               >
                 {f.isBlur && (
-                  <div className="absolute top-0.5 right-0.5 bg-[#f0a020] text-white text-[8px] px-1 py-px rounded">
+                  <div className="absolute top-0.5 right-0.5 bg-warning text-white text-[8px] px-1 py-px rounded">
                     ⚠️
                   </div>
                 )}
@@ -176,7 +176,7 @@ export default function VideoFramePlayer({
         {/* Capture Result Actions */}
         <div className="capture-result-bar">
           <div className="cr-thumb" style={{
-            background: 'linear-gradient(135deg, #3d2414 0%, #1c0d06 100%)',
+            background: 'var(--color-warmth-950)',
           }} />
           <div className="cr-info">
             <div className="cr-title">截帧预览 · {currentTime}</div>
@@ -190,21 +190,21 @@ export default function VideoFramePlayer({
 
         {/* Already Captured Frames */}
         {capturedFrames.length > 0 && (
-          <div className="p-3 px-4 bg-[#fafaf8] border-t border-[#e8e6de]">
-            <div className="text-[11px] text-[#b0aca0] mb-2">已截取 ({capturedFrames.length})</div>
+          <div className="p-3 px-4 bg-stone-50 border-t border-stone-200">
+            <div className="text-[11px] text-stone-400 mb-2">已截取 ({capturedFrames.length})</div>
             <div className="flex gap-2 overflow-x-auto">
               {capturedFrames.map((frame) => (
                 <div key={frame.id} className="relative flex-shrink-0">
                   <div
-                    className="w-14 h-9 rounded border-2 border-[#2d9d5f]"
+                    className="w-14 h-9 rounded border-2 border-success"
                     style={{
                       backgroundImage: loadedImages[frame.id] ? `url(${loadedImages[frame.id]})` : undefined,
                       background: loadedImages[frame.id]
                         ? 'center/cover'
-                        : 'linear-gradient(135deg, #3d2414, #1c0d06)',
+                        : 'var(--color-warmth-950)',
                     }}
                   />
-                  <span className="absolute -top-1 -right-1 bg-[#7c5cbf] text-white text-[8px] px-1 py-0.5 rounded">
+                  <span className="absolute -top-1 -right-1 bg-stash-600 text-white text-[8px] px-1 py-0.5 rounded">
                     待选区
                   </span>
                 </div>

@@ -38,7 +38,7 @@ export default function ProjectOverviewPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <div className="text-center py-12 text-gray-500">加载中...</div>
+        <div className="text-center py-12 text-stone-500">加载中...</div>
       </div>
     );
   }
@@ -76,17 +76,17 @@ export default function ProjectOverviewPage() {
         <div className="card">
           <div className="card-body">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <div className="w-5 h-5 text-blue-600">📊</div>
+              <div className="w-10 h-10 rounded-lg bg-info-bg flex items-center justify-center">
+                <div className="w-5 h-5 text-info-text">📊</div>
               </div>
-              <span className="text-gray-600">完成进度</span>
+              <span className="text-stone-600">完成进度</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900 mb-2">
+            <p className="text-3xl font-bold text-stone-900 mb-2">
               {progressPercent}%
             </p>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-stone-200 rounded-full h-2">
               <div
-                className="bg-blue-500 h-2 rounded-full transition-all"
+                className="bg-info h-2 rounded-full transition-all"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -96,14 +96,14 @@ export default function ProjectOverviewPage() {
         <div className="card">
           <div className="card-body">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <Image className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 rounded-lg bg-success-bg flex items-center justify-center">
+                <Image className="w-5 h-5 text-success-text" />
               </div>
-              <span className="text-gray-600">已选照片</span>
+              <span className="text-stone-600">已选照片</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">
+            <p className="text-3xl font-bold text-stone-900">
               {selectedCount}
-              <span className="text-lg font-normal text-gray-400">
+              <span className="text-lg font-normal text-stone-400">
                 {' '}
                 / {totalCount}
               </span>
@@ -114,12 +114,12 @@ export default function ProjectOverviewPage() {
         <div className="card">
           <div className="card-body">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-orange-600" />
+              <div className="w-10 h-10 rounded-lg bg-warmth-100 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-warmth-700" />
               </div>
-              <span className="text-gray-600">剩余周期</span>
+              <span className="text-stone-600">剩余周期</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{remainingCount}</p>
+            <p className="text-3xl font-bold text-stone-900">{remainingCount}</p>
           </div>
         </div>
       </div>
@@ -138,30 +138,30 @@ export default function ProjectOverviewPage() {
               <div className="w-12 h-12 rounded-lg bg-primary-500 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                 <Image className="w-6 h-6" />
               </div>
-              <h3 className="font-semibold text-gray-900">开始选照片</h3>
-              <p className="text-sm text-gray-500 mt-1">为每个周期选择代表照片</p>
+              <h3 className="font-semibold text-stone-900">开始选照片</h3>
+              <p className="text-sm text-stone-500 mt-1">为每个周期选择代表照片</p>
             </button>
 
             <button
               onClick={() => navigate('generate')}
-              className="p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors text-left group"
+              className="p-4 rounded-xl bg-success-bg hover:bg-success-bg/60 transition-colors text-left group"
             >
-              <div className="w-12 h-12 rounded-lg bg-green-500 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-lg bg-success text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                 <Video className="w-6 h-6" />
               </div>
-              <h3 className="font-semibold text-gray-900">生成视频</h3>
-              <p className="text-sm text-gray-500 mt-1">配置并生成成长视频</p>
+              <h3 className="font-semibold text-stone-900">生成视频</h3>
+              <p className="text-sm text-stone-500 mt-1">配置并生成成长视频</p>
             </button>
 
             <button
               onClick={() => navigate('history')}
-              className="p-4 rounded-xl bg-purple-50 hover:bg-purple-100 transition-colors text-left group"
+              className="p-4 rounded-xl bg-stash-bg hover:bg-stash-bg/60 transition-colors text-left group"
             >
-              <div className="w-12 h-12 rounded-lg bg-purple-500 text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+              <div className="w-12 h-12 rounded-lg bg-stash text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                 <History className="w-6 h-6" />
               </div>
-              <h3 className="font-semibold text-gray-900">历史记录</h3>
-              <p className="text-sm text-gray-500 mt-1">查看已生成的视频</p>
+              <h3 className="font-semibold text-stone-900">历史记录</h3>
+              <p className="text-sm text-stone-500 mt-1">查看已生成的视频</p>
             </button>
           </div>
         </div>
@@ -188,15 +188,15 @@ export default function ProjectOverviewPage() {
                   key={period.id}
                   className={`aspect-square rounded-lg flex flex-col items-center justify-center text-center p-2 ${
                     isSelected
-                      ? 'bg-green-50 border-2 border-green-200'
-                      : 'bg-gray-50 border-2 border-transparent'
+                      ? 'bg-success-bg border-2 border-success-border'
+                      : 'bg-stone-50 border-2 border-transparent'
                   }`}
                 >
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
                       isSelected
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-500'
+                        ? 'bg-success text-white'
+                        : 'bg-stone-200 text-stone-500'
                     }`}
                   >
                     {isSelected ? (
@@ -205,7 +205,7 @@ export default function ProjectOverviewPage() {
                       <span className="text-xs font-medium">{index + 1}</span>
                     )}
                   </div>
-                  <span className="text-xs text-gray-600 truncate w-full">
+                  <span className="text-xs text-stone-600 truncate w-full">
                     {period.name || `第${index + 1}周`}
                   </span>
                 </div>
@@ -213,7 +213,7 @@ export default function ProjectOverviewPage() {
             })}
           </div>
           {periods.length > 12 && (
-            <p className="text-center text-sm text-gray-400 mt-4">
+            <p className="text-center text-sm text-stone-400 mt-4">
               还有 {periods.length - 12} 个周期...
             </p>
           )}

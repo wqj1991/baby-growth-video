@@ -4,7 +4,6 @@ import PhotoCard from './PhotoCard';
 interface VirtualPhotoGridProps {
   photos: Photo[];
   loadedImages: Record<number, string>;
-  onContextMenu?: (e: React.MouseEvent, photo: Photo) => void;
   onDoubleClick?: (photo: Photo) => void;
   onToggleSelect?: (photo: Photo) => void;
   onSetFinal?: (photo: Photo) => void;
@@ -17,7 +16,6 @@ interface VirtualPhotoGridProps {
 export default function VirtualPhotoGrid({
   photos,
   loadedImages,
-  onContextMenu,
   onDoubleClick,
   onToggleSelect,
   onSetFinal,
@@ -35,7 +33,6 @@ export default function VirtualPhotoGrid({
             key={photo.id}
             photo={photo}
             imageUrl={imageUrl}
-            onContextMenu={onContextMenu}
             onDoubleClick={onDoubleClick ? () => onDoubleClick(photo) : undefined}
             onToggleSelect={onToggleSelect}
             onSetFinal={onSetFinal}

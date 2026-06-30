@@ -27,9 +27,9 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="w-full h-screen flex flex-col items-center justify-center bg-white p-8">
-          <h1 className="text-xl font-bold text-red-600 mb-4">页面出错了</h1>
-          <p className="text-gray-600 mb-4">{this.state.error?.message}</p>
-          <pre className="bg-gray-100 p-4 rounded-lg text-sm overflow-auto max-w-full">
+          <h1 className="text-xl font-bold text-error-text mb-4">页面出错了</h1>
+          <p className="text-stone-600 mb-4">{this.state.error?.message}</p>
+          <pre className="bg-stone-100 p-4 rounded-lg text-sm overflow-auto max-w-full">
             {this.state.error?.stack}
           </pre>
           <button

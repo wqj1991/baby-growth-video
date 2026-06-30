@@ -10,7 +10,7 @@ interface PeriodTimelineProps {
 
 /**
  * 水平步骤式周期进度条
- * 周期状态统一为两种：未开始 / 完成
+ * 周期状态统一为两种：未开始 / 完成（只有设置最终选择后才显示完成）
  */
 export default function PeriodTimeline({
   periods,
@@ -34,14 +34,14 @@ export default function PeriodTimeline({
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
-      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+      return `${d.getMonth() + 1}月${d.getDate()}日`;
     } catch {
       return dateStr;
     }
   };
 
   return (
-    <div className="border-b border-[#e8e6de] bg-white">
+    <div className="border-b border-stone-200 bg-white">
       <div className="period-timeline-h">
         {periods.map((period, idx) => {
           const isLast = idx === periods.length - 1;
@@ -49,7 +49,7 @@ export default function PeriodTimeline({
           const pendingCount = stats?.pending_count || 0;
           const photoCount = stats?.photo_count || 0;
           const videoCount = stats?.video_count || 0;
-          const hasFinal = period.selected_photo_id !== undefined;
+          const hasFinal = period.selected_photo_id != null;
           const isCurrent = period.id === currentPeriod?.id;
           const status: PeriodStatus = hasFinal ? 'confirmed' : 'not_started';
 
@@ -63,12 +63,16 @@ export default function PeriodTimeline({
                 )}
               </div>
               <div className="period-step-info">
-                <div className="ps-name">{period.name}</div>
-                <div className={`ps-status ${status}`}>
-                  {getStatusText(status)}
-                  <span className="ps-date">
-                    {formatDate(period.start_date)} ~ {formatDate(period.end_date)}
+                <div className="ps-header">
+                  <span className="ps-name">{period.name}</span>
+                  <span className={`ps-status-badge ${status}`}>
+                    {getStatusText(status)}
                   </span>
+                </div>
+                <div className="ps-dates">
+                  <span className="ps-date-start">{formatDate(period.start_date)}</span>
+                  <span className="ps-date-separator">~</span>
+                  <span className="ps-date-end">{formatDate(period.end_date)}</span>
                 </div>
                 {(photoCount > 0 || videoCount > 0) && (
                   <div className="ps-stats">

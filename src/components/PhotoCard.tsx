@@ -4,7 +4,6 @@ import type { Photo } from '../types';
 interface PhotoCardProps {
   photo: Photo;
   imageUrl: string;
-  onContextMenu?: (e: React.MouseEvent, photo: Photo) => void;
   onDoubleClick?: (photo: Photo) => void;
   onToggleSelect?: (photo: Photo) => void;
   onSetFinal?: (photo: Photo) => void;
@@ -19,7 +18,6 @@ interface PhotoCardProps {
 export default function PhotoCard({
   photo,
   imageUrl,
-  onContextMenu,
   onDoubleClick,
   onToggleSelect,
   onSetFinal,
@@ -34,8 +32,7 @@ export default function PhotoCard({
   const actualSetFinal = onSetFinal ?? onSelect;
   return (
     <div
-      className={`photo-card relative group ${isFinal ? 'ring-2 ring-[#7c5cbf]' : ''}`}
-      onContextMenu={(e) => onContextMenu?.(e, photo)}
+      className={`photo-card relative group ${isFinal ? 'ring-2 ring-stash-600' : ''}`}
       onDoubleClick={() => onDoubleClick?.(photo)}
       onClick={onClick}
     >
@@ -43,8 +40,8 @@ export default function PhotoCard({
         {imageUrl ? (
           <img src={imageUrl} alt={photo.file_name} className="w-full h-full object-cover" loading="lazy" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#f5f4f0] to-[#e8e6de]">
-            <Camera className="w-6 h-6 text-[#d4d1c7]" />
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-stone-100 to-stone-200">
+            <Camera className="w-6 h-6 text-stone-300" />
           </div>
         )}
       </div>
@@ -70,7 +67,7 @@ export default function PhotoCard({
 
         {!isFinal ? (
           <button
-            className="photo-action-btn bg-[#7c5cbf] hover:bg-[#6a4eb5] text-white text-xs px-2 py-1 rounded"
+            className="photo-action-btn bg-stash-600 hover:bg-stash-700 text-white text-xs px-2 py-1 rounded"
             onClick={(e) => { e.stopPropagation(); actualSetFinal?.(photo); }}
           >
             <Check className="w-3 h-3 inline mr-1" />
@@ -78,7 +75,7 @@ export default function PhotoCard({
           </button>
         ) : (
           <button
-            className="photo-action-btn bg-[#d44d68] hover:bg-[#b84259] text-white text-xs px-2 py-1 rounded"
+            className="photo-action-btn bg-rose-500 hover:bg-rose-600 text-white text-xs px-2 py-1 rounded"
             onClick={(e) => { e.stopPropagation(); onCancelFinal?.(photo); }}
           >
             <X className="w-3 h-3 inline mr-1" />
@@ -89,10 +86,10 @@ export default function PhotoCard({
 
       <div className="photo-status absolute bottom-1.5 right-1.5 flex gap-1">
         {isInPending && !isFinal && (
-          <div className="w-2 h-2 rounded-full bg-yellow-400" />
+          <div className="w-2 h-2 rounded-full bg-warning" />
         )}
         {isFinal && (
-          <div className="w-5 h-5 rounded-full bg-[#7c5cbf] flex items-center justify-center">
+          <div className="w-5 h-5 rounded-full bg-stash-600 flex items-center justify-center">
             <Check className="w-3 h-3 text-white" />
           </div>
         )}

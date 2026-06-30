@@ -36,15 +36,15 @@ export default function WizardSidebar({ steps, currentStep, onStepClick }: Wizar
                     className="absolute inset-0 transition-all duration-500"
                     style={{
                       background: isCompleted
-                        ? 'linear-gradient(180deg, #f58b3d 0%, #e06a1e 50%, #f58b3d 100%)'
-                        : 'linear-gradient(180deg, #e8e6de 0%, #e8e6de 100%)',
+                        ? 'linear-gradient(180deg, var(--color-warmth-500) 0%, var(--color-warmth-600) 50%, var(--color-warmth-500) 100%)'
+                        : 'linear-gradient(180deg, var(--color-stone-200) 0%, var(--color-stone-200) 100%)',
                     }}
                   />
                   {isCurrent && (
                     <div
                       className="absolute inset-0 transition-all duration-700"
                       style={{
-                        background: 'linear-gradient(180deg, #f58b3d 0%, #e06a1e 50%, #e8e6de 100%)',
+                        background: 'linear-gradient(180deg, var(--color-warmth-500) 0%, var(--color-warmth-600) 50%, var(--color-stone-200) 100%)',
                       }}
                     />
                   )}
@@ -69,7 +69,7 @@ export default function WizardSidebar({ steps, currentStep, onStepClick }: Wizar
                     isCurrent
                       ? 'bg-gradient-to-br from-warmth-400 to-warmth-500 text-white shadow-lg shadow-warmth-400/25 scale-105'
                       : isCompleted
-                      ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 text-white shadow-md shadow-emerald-400/20'
+                      ? 'bg-gradient-to-br from-success to-success/90 text-white shadow-md shadow-success/20'
                       : 'bg-stone-100 text-stone-400'
                   } ${
                     isClickable ? 'group-hover:scale-105 group-hover:shadow-lg' : ''

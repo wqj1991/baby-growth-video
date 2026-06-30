@@ -33,8 +33,8 @@ export default function ProjectPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-2 text-[#b0aca0]">
-          <div className="w-4 h-4 border-2 border-[#f58b3d] border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center gap-2 text-stone-400">
+          <div className="w-4 h-4 border-2 border-warmth-500 border-t-transparent rounded-full animate-spin" />
           加载中...
         </div>
       </div>
@@ -51,27 +51,27 @@ export default function ProjectPage() {
   return (
     <div className="h-full w-full flex flex-col">
       {/* ===== Top Header ===== */}
-      <div className="bg-white border-b border-[#e8e6de] px-6 py-4">
+      <div className="bg-white border-b border-stone-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/')}
-              className="p-2 text-[#8f8b80] hover:text-[#33312d] hover:bg-[#f5f4f0] rounded-lg transition-colors"
+              className="p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-[#33312d]">
+              <h1 className="text-xl font-bold text-stone-900">
                 {currentProject?.name || '成长视频项目'}
               </h1>
               {currentProject?.description && (
-                <p className="text-sm text-[#8f8b80]">{currentProject.description}</p>
+                <p className="text-sm text-stone-500">{currentProject.description}</p>
               )}
             </div>
           </div>
 
           {currentProject && (
-            <span className="text-xs text-[#b0aca0]">
+            <span className="text-xs text-stone-400">
               {currentProject.status === 'completed' ? (
                 <span className="badge badge-success">已完成</span>
               ) : (
@@ -90,8 +90,8 @@ export default function ProjectPage() {
               className={({ isActive }) =>
                 `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-[#fff2e6] text-[#b85218] shadow-sm'
-                    : 'text-[#706c63] hover:bg-[#fafaf8] hover:text-[#33312d]'
+                    ? 'bg-warmth-100 text-warmth-700 shadow-sm'
+                    : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900'
                 }`
               }
             >

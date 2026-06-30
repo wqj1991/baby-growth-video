@@ -99,7 +99,7 @@ export default function Step2ProjectInfo() {
           }`}
         >
           <label className="flex items-center gap-2 text-sm font-semibold text-stone-700 mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+            <span className="w-1.5 h-1.5 rounded-full bg-error" />
             项目名称
           </label>
           <div className="relative">
@@ -116,7 +116,7 @@ export default function Step2ProjectInfo() {
             <div className="absolute right-0 bottom-3">
               <span
                 className={`text-xs font-mono transition-colors duration-300 ${
-                  localName.length >= 45 ? 'text-rose-400' : 'text-stone-300'
+                  localName.length >= 45 ? 'text-error' : 'text-stone-300'
                 }`}
               >
                 {localName.length}/50
@@ -152,7 +152,7 @@ export default function Step2ProjectInfo() {
         {/* ============ 周期天数 ============ */}
         <div className="card p-6 hover:shadow-md transition-all duration-300">
           <label className="flex items-center gap-2 text-sm font-semibold text-stone-700 mb-5">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span className="w-1.5 h-1.5 rounded-full bg-warning" />
             周期天数
           </label>
 
@@ -201,7 +201,7 @@ export default function Step2ProjectInfo() {
                 type="number"
                 value={localPeriodDays}
                 onChange={(e) => handlePeriodDaysChange(parseInt(e.target.value) || 1)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-stone-50 border-2 border-stone-200 text-stone-700 font-mono text-sm focus:border-amber-300/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/30 transition-all duration-300"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-stone-50 border-2 border-stone-200 text-stone-700 font-mono text-sm focus:border-warning/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-warning/30 transition-all duration-300"
                 min={1}
                 max={365}
               />
@@ -239,7 +239,7 @@ export default function Step2ProjectInfo() {
               <div className="flex items-center gap-2 mb-1">
                 <Star
                   className={`w-4 h-4 transition-colors duration-300 ${
-                    localIncludeSpecial ? 'text-amber-400 fill-amber-400' : 'text-stone-300'
+                    localIncludeSpecial ? 'text-warning fill-warning' : 'text-stone-300'
                   }`}
                 />
                 <span

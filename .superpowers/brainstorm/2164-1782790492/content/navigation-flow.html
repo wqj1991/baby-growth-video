@@ -1,0 +1,169 @@
+<h2>📊 项目当前 UX 导航架构</h2>
+<p class="subtitle">包含 2 个独立页面 + 1 个主布局(4个子页面) + 1 个向导流(5步骤)</p>
+
+<div class="section">
+  <h3>🏠 页面导航全景</h3>
+  <div class="mockup">
+    <div class="mockup-header">App 路由结构</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 13px; line-height: 2; padding: 16px;">
+      <div style="display:flex; gap: 16px;">
+        <!-- 独立页面 -->
+        <div style="flex:1; border: 2px dashed #e4e7f6; border-radius: 12px; padding: 12px; background: #f8f6fc;">
+          <div style="font-weight:700; color: #7c3aed; margin-bottom: 8px;">🔹 独立页面（无侧边栏）</div>
+          <div style="background: #f3f0fb; padding: 6px 10px; border-radius: 6px; margin: 4px 0;">
+            <span style="color: #7c3aed;">/create-project</span> → 5步向导
+          </div>
+        </div>
+        <!-- 主布局 -->
+        <div style="flex:2; border: 2px solid #e8e6de; border-radius: 12px; padding: 12px; background: #fafaf8;">
+          <div style="font-weight:700; color: #f58b3d; margin-bottom: 8px;">🔸 主布局（含侧边栏）</div>
+          <div style="background: #fffaf5; padding: 6px 10px; border-radius: 6px; margin: 4px 0;">
+            <span style="color: #f58b3d;">/ (index)</span> → 首页 HomePage
+          </div>
+          <div style="background: #fffaf5; padding: 6px 10px; border-radius: 6px; margin: 4px 0;">
+            <span style="color: #f58b3d;">/baby-setup</span> → 宝宝信息
+          </div>
+          <div style="background: #fffaf5; padding: 6px 10px; border-radius: 6px; margin: 4px 0;">
+            <span style="color: #f58b3d;">/settings</span> → 设置
+          </div>
+          <div style="background: #fffaf5; padding: 6px 10px; border-radius: 6px; margin: 4px 0;">
+            <span style="color: #f58b3d;">/project/:projectId</span> → 项目页
+            <div style="margin-left: 16px; margin-top: 4px;">
+              <div style="background: #f5f4f0; padding: 4px 8px; border-radius: 4px; margin: 2px 0; font-size: 12px;">
+                ├─ <span style="color: #b85218;">overview</span> 项目概览
+              </div>
+              <div style="background: #f5f4f0; padding: 4px 8px; border-radius: 4px; margin: 2px 0; font-size: 12px;">
+                ├─ <span style="color: #b85218;">periods</span> 周期选择 ⭐核心
+              </div>
+              <div style="background: #f5f4f0; padding: 4px 8px; border-radius: 4px; margin: 2px 0; font-size: 12px;">
+                ├─ <span style="color: #b85218;">generate</span> 生成视频
+              </div>
+              <div style="background: #f5f4f0; padding: 4px 8px; border-radius: 4px; margin: 2px 0; font-size: 12px;">
+                └─ <span style="color: #b85218;">history</span> 历史记录
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🧭 5步创建向导流程</h3>
+  <div class="mockup">
+    <div class="mockup-header">CreateProjectPage — 线性向导</div>
+    <div class="mockup-body" style="padding: 16px; font-size: 14px;">
+      <div style="display:flex; align-items:center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+        <div style="text-align:center; flex:1; min-width: 100px; padding: 12px 8px; background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-radius: 12px; border: 2px solid #10b981;">
+          <div style="width: 32px; height: 32px; background: #10b981; color: white; border-radius: 8px; display:flex; align-items:center; justify-content:center; margin: 0 auto 4px; font-weight: bold;">1</div>
+          <div style="font-weight: 600; font-size: 13px;">选择宝宝</div>
+          <div style="font-size: 11px; color: #6b7280;">Step1SelectBaby</div>
+        </div>
+        <div style="color: #d4d1c7; font-size: 20px;">→</div>
+        <div style="text-align:center; flex:1; min-width: 100px; padding: 12px 8px; background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-radius: 12px; border: 2px solid #10b981;">
+          <div style="width: 32px; height: 32px; background: #10b981; color: white; border-radius: 8px; display:flex; align-items:center; justify-content:center; margin: 0 auto 4px; font-weight: bold;">2</div>
+          <div style="font-weight: 600; font-size: 13px;">项目信息</div>
+          <div style="font-size: 11px; color: #6b7280;">Step2ProjectInfo</div>
+        </div>
+        <div style="color: #d4d1c7; font-size: 20px;">→</div>
+        <div style="text-align:center; flex:1; min-width: 100px; padding: 12px 8px; background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-radius: 12px; border: 2px solid #10b981;">
+          <div style="width: 32px; height: 32px; background: #10b981; color: white; border-radius: 8px; display:flex; align-items:center; justify-content:center; margin: 0 auto 4px; font-weight: bold;">3</div>
+          <div style="font-weight: 600; font-size: 13px;">生成周期</div>
+          <div style="font-size: 11px; color: #6b7280;">Step4GeneratePeriods</div>
+        </div>
+        <div style="color: #d4d1c7; font-size: 20px;">→</div>
+        <div style="text-align:center; flex:1; min-width: 100px; padding: 12px 8px; background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-radius: 12px; border: 2px solid #10b981;">
+          <div style="width: 32px; height: 32px; background: #10b981; color: white; border-radius: 8px; display:flex; align-items:center; justify-content:center; margin: 0 auto 4px; font-weight: bold;">4</div>
+          <div style="font-weight: 600; font-size: 13px;">选择照片</div>
+          <div style="font-size: 11px; color: #6b7280;">Step3SelectFolder</div>
+        </div>
+        <div style="color: #d4d1c7; font-size: 20px;">→</div>
+        <div style="text-align:center; flex:1; min-width: 100px; padding: 12px 8px; background: linear-gradient(135deg, #dbeafe, #bfdbfe); border-radius: 12px; border: 2px solid #3b82f6;">
+          <div style="width: 32px; height: 32px; background: #3b82f6; color: white; border-radius: 8px; display:flex; align-items:center; justify-content:center; margin: 0 auto 4px; font-weight: bold;">5</div>
+          <div style="font-weight: 600; font-size: 13px;">完成</div>
+          <div style="font-size: 11px; color: #6b7280;">Step5Complete</div>
+        </div>
+      </div>
+      <div style="margin-top: 12px; padding: 10px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; font-size: 13px;">
+        ⚠️ <strong>发现：</strong>Step3 和 Step4 的组件文件名与步骤编号不一致 — Step3SelectFolder 实际是步骤4, Step4GeneratePeriods 实际是步骤3
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔀 核心交互路径</h3>
+  <div class="mockup">
+    <div class="mockup-header">用户典型操作流</div>
+    <div class="mockup-body" style="padding: 16px; font-size: 14px; line-height: 2;">
+      <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 6px;">
+        <span style="background: #f58b3d; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">新建项目</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">选择宝宝</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">项目信息</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">生成周期</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">扫描照片</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #d1fae5; padding: 2px 8px; border-radius: 4px; font-size: 12px;">项目概览</span>
+      </div>
+      <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 6px;">
+        <span style="background: #7c3aed; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">选照片</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">选择周期</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">扫描文件夹</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">加入待选区</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">设为最终</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #d1fae5; padding: 2px 8px; border-radius: 4px; font-size: 12px;">下一周期...</span>
+      </div>
+      <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 6px;">
+        <span style="background: #ef4444; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">生成视频</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">配置参数</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">选择输出路径</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #f3f0fb; padding: 2px 8px; border-radius: 4px; font-size: 12px;">后端生成 (进度条)</span>
+        <span style="color: #d4d1c7;">→</span>
+        <span style="background: #d1fae5; padding: 2px 8px; border-radius: 4px; font-size: 12px;">查看/下载</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🗂️ 状态管理架构</h3>
+  <div style="display:flex; gap: 16px;">
+    <div class="mockup" style="flex:1;">
+      <div class="mockup-header">useAppStore (全局)</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 13px; line-height: 1.8;">
+        <div style="color: #f58b3d; font-weight:600;">👶 宝宝/项目/周期</div>
+        <div style="color: #3b82f6; font-weight:600;">📷 照片/视频/截帧</div>
+        <div style="color: #8b5cf6; font-weight:600;">🎨 拼图工作区</div>
+        <div style="color: #ef4444; font-weight:600;">▶️ 视频播放器</div>
+        <div style="color: #f59e0b; font-weight:600;">📊 扫描/生成进度</div>
+        <div style="color: #10b981; font-weight:600;">📋 待选区选择</div>
+        <div style="color: #6366f1; font-weight:600;">🤖 AI 设置</div>
+      </div>
+    </div>
+    <div class="mockup" style="flex:1;">
+      <div class="mockup-header">useCreateProjectStore (向导)</div>
+      <div class="mockup-body" style="padding: 12px; font-size: 13px; line-height: 1.8;">
+        <div style="color: #f58b3d; font-weight:600;">📌 当前步骤 (1-5)</div>
+        <div style="color: #3b82f6; font-weight:600;">👶 选择宝宝</div>
+        <div style="color: #8b5cf6; font-weight:600;">📝 项目信息</div>
+        <div style="color: #ef4444; font-weight:600;">📂 文件夹+扫描</div>
+        <div style="color: #f59e0b; font-weight:600;">📊 扫描日志+进度</div>
+        <div style="color: #10b981; font-weight:600;">📅 周期列表</div>
+        <div style="color: #6366f1; font-weight:600;">🔄 reset() 重置</div>
+      </div>
+    </div>
+  </div>
+</div>

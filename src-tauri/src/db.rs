@@ -928,6 +928,26 @@ impl Database {
         frames.collect()
     }
 
+    pub fn get_period_video_frames(&self, period_id: i64) -> Result<Vec<VideoFrame>> {
+        let conn = self.get_conn();
+        let mut stmt = conn.prepare(
+            "SELECT * FROM video_frames WHERE period_id = ?1 ORDER BY time_seconds ASC",
+        )?;
+        let frames = stmt.query_map(params![period_id], |row| {
+            Ok(VideoFrame {
+                id: row.get(0)?,
+                video_id: row.get(1)?,
+                period_id: row.get(2)?,
+                file_path: row.get(3)?,
+                time_seconds: row.get(4)?,
+                is_selected: row.get::<_, i64>(5)? != 0,
+                is_final: row.get::<_, i64>(6)? != 0,
+                created_at: row.get(7)?,
+            })
+        })?;
+        frames.collect()
+    }
+
     pub fn set_final_video_frame(&self, period_id: i64, frame_id: i64) -> Result<()> {
         let conn = self.get_conn();
         // 先取消该周期所有截图的final状态

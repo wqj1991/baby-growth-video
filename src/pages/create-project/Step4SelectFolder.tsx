@@ -6,7 +6,7 @@ import { downloadJson } from '../../utils/download';
 import type { ScanResult, ScanLog } from '../../types';
 import ScanLogPanel from '../../components/ScanLogPanel';
 
-export default function Step3SelectFolder() {
+export default function Step4SelectFolder() {
   const {
     folderPath,
     scanResult,
@@ -215,8 +215,8 @@ export default function Step3SelectFolder() {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-emerald-500" />
+              <div className="w-9 h-9 rounded-xl bg-success-bg flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-success" />
               </div>
               <h3 className="font-bold text-stone-800">扫描完成</h3>
             </div>
@@ -232,19 +232,19 @@ export default function Step3SelectFolder() {
           <div className="grid grid-cols-3 gap-3">
             <StatCard icon={Image} label="照片总数" value={scanResult.total_photos} color="stone" />
             <StatCard icon={Film} label="视频总数" value={scanResult.total_videos} color="stone" />
-            <StatCard icon={CheckCircle} label="已识别总数" value={(scanResult.recognized_photos || 0) + (scanResult.recognized_videos || 0)} color="emerald" />
-            <StatCard icon={Image} label="已识别照片" value={scanResult.recognized_photos || 0} color="emerald" />
-            <StatCard icon={Film} label="已识别视频" value={scanResult.recognized_videos || 0} color="emerald" />
-            <StatCard icon={AlertCircle} label="重复照片" value={scanResult.skipped_duplicate_photos || 0} color="amber" />
-            <StatCard icon={AlertCircle} label="重复视频" value={scanResult.skipped_duplicate_videos || 0} color="amber" />
-            <StatCard icon={AlertCircle} label="日期不匹配照片" value={scanResult.skipped_no_period_photos || 0} color="orange" />
-            <StatCard icon={AlertCircle} label="日期不匹配视频" value={scanResult.skipped_no_period_videos || 0} color="orange" />
-            <StatCard icon={AlertCircle} label="未识别日期照片" value={scanResult.skipped_no_date_photos || 0} color="rose" />
-            <StatCard icon={AlertCircle} label="未识别日期视频" value={scanResult.skipped_no_date_videos || 0} color="rose" />
+            <StatCard icon={CheckCircle} label="已识别总数" value={(scanResult.recognized_photos || 0) + (scanResult.recognized_videos || 0)} color="success" />
+            <StatCard icon={Image} label="已识别照片" value={scanResult.recognized_photos || 0} color="success" />
+            <StatCard icon={Film} label="已识别视频" value={scanResult.recognized_videos || 0} color="success" />
+            <StatCard icon={AlertCircle} label="重复照片" value={scanResult.skipped_duplicate_photos || 0} color="warning" />
+            <StatCard icon={AlertCircle} label="重复视频" value={scanResult.skipped_duplicate_videos || 0} color="warning" />
+            <StatCard icon={AlertCircle} label="日期不匹配照片" value={scanResult.skipped_no_period_photos || 0} color="brand" />
+            <StatCard icon={AlertCircle} label="日期不匹配视频" value={scanResult.skipped_no_period_videos || 0} color="brand" />
+            <StatCard icon={AlertCircle} label="未识别日期照片" value={scanResult.skipped_no_date_photos || 0} color="error" />
+            <StatCard icon={AlertCircle} label="未识别日期视频" value={scanResult.skipped_no_date_videos || 0} color="error" />
           </div>
 
           {scanResult.total_photos === 0 && (
-            <div className="mt-4 p-4 rounded-xl bg-amber-50 border border-amber-200/60 text-sm text-amber-700 flex items-center gap-2">
+            <div className="mt-4 p-4 rounded-xl bg-warning-bg border border-warning-border/60 text-sm text-warning-text flex items-center gap-2">
               <span className="text-lg">⚠️</span>
               未找到任何照片，你可以继续创建项目，后续再添加照片
             </div>
@@ -259,14 +259,14 @@ function StatCard({ icon: Icon, label, value, color }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
-  color: 'stone' | 'emerald' | 'amber' | 'orange' | 'rose';
+  color: 'stone' | 'success' | 'warning' | 'brand' | 'error';
 }) {
   const colorMap = {
     stone: { bg: 'bg-stone-100', text: 'text-stone-600', value: 'text-stone-800' },
-    emerald: { bg: 'bg-emerald-100', text: 'text-emerald-600', value: 'text-emerald-700' },
-    amber: { bg: 'bg-amber-100', text: 'text-amber-600', value: 'text-amber-700' },
-    orange: { bg: 'bg-orange-100', text: 'text-orange-600', value: 'text-orange-700' },
-    rose: { bg: 'bg-rose-100', text: 'text-rose-600', value: 'text-rose-700' },
+    success: { bg: 'bg-success-bg', text: 'text-success-text', value: 'text-success-text' },
+    warning: { bg: 'bg-warning-bg', text: 'text-warning-text', value: 'text-warning-text' },
+    brand: { bg: 'bg-warmth-100', text: 'text-warmth-700', value: 'text-warmth-700' },
+    error: { bg: 'bg-error-bg', text: 'text-error-text', value: 'text-error-text' },
   };
   const c = colorMap[color];
   return (

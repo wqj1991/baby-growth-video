@@ -53,7 +53,7 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex h-screen" style={{ background: 'linear-gradient(135deg, #fafaf8 0%, #f5f4f0 50%, #fffaf5 100%)' }}>
+    <div className="flex h-screen" style={{ background: 'linear-gradient(135deg, var(--color-stone-50) 0%, var(--color-stone-100) 50%, var(--color-warmth-50) 100%)' }}>
       {/* ========== 侧边栏 ========== */}
       <aside className="w-64 flex flex-col relative z-10">
         {/* 侧边栏背景 — 玻璃拟态 */}
@@ -67,10 +67,10 @@ export default function Layout() {
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight" style={{ color: '#33312d' }}>
+                <h1 className="text-lg font-bold tracking-tight text-stone-900">
                   成长视频
                 </h1>
-                <p className="text-xs font-medium" style={{ color: '#b0aca0' }}>记录宝宝每一刻</p>
+                <p className="text-xs font-medium text-stone-400">记录宝宝每一刻</p>
               </div>
             </div>
           </div>
@@ -79,10 +79,9 @@ export default function Layout() {
           {currentBaby ? (
             <div className="px-3 mb-5">
               <div
-                className="relative overflow-hidden rounded-2xl p-4 cursor-pointer group transition-all duration-300 hover:shadow-medium"
+                className="relative overflow-hidden rounded-2xl p-4 cursor-pointer group transition-all duration-300 hover:shadow-medium border border-warmth-200"
                 style={{
-                  background: 'linear-gradient(135deg, #fffaf5 0%, #fff2e6 50%, #ffffff 100%)',
-                  border: '1px solid #ffe4cc',
+                  background: 'linear-gradient(135deg, var(--color-warmth-50) 0%, var(--color-warmth-100) 50%, #ffffff 100%)',
                 }}
                 onClick={() => navigate('/baby-setup')}
               >
@@ -91,17 +90,17 @@ export default function Layout() {
                     <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${getBabyColor(currentBaby.gender)} flex items-center justify-center text-xl shadow-sm`}>
                       {getBabyEmoji(currentBaby.gender)}
                     </div>
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-success border-2 border-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: '#33312d' }}>
+                    <p className="font-semibold text-sm truncate text-stone-900">
                       {currentBaby.name}
                     </p>
-                    <p className="text-xs" style={{ color: '#b0aca0' }}>
+                    <p className="text-xs text-stone-400">
                       {currentBaby.gender === 'boy' ? '小王子' : currentBaby.gender === 'girl' ? '小公主' : '小宝贝'}
                     </p>
                   </div>
-                  <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-x-0.5" style={{ color: '#b0aca0' }} />
+                  <ChevronRight className="w-4 h-4 text-stone-400 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-x-0.5" />
                 </div>
               </div>
             </div>
@@ -109,21 +108,20 @@ export default function Layout() {
             <div className="px-3 mb-5">
               <button
                 onClick={() => navigate('/baby-setup')}
-                className="w-full rounded-2xl p-4 text-center transition-all duration-300 hover:shadow-soft"
+                className="w-full rounded-2xl p-4 text-center transition-all duration-300 hover:shadow-soft border-[1.5px] border-dashed border-stone-300"
                 style={{
-                  background: 'linear-gradient(135deg, #fafaf8 0%, #f5f4f0 100%)',
-                  border: '1.5px dashed #d4d1c7',
+                  background: 'linear-gradient(135deg, var(--color-stone-50) 0%, var(--color-stone-100) 100%)',
                 }}
               >
-                <Baby className="w-6 h-6 mx-auto mb-2" style={{ color: '#b0aca0' }} />
-                <p className="text-xs font-medium" style={{ color: '#8f8b80' }}>添加宝宝信息</p>
+                <Baby className="w-6 h-6 mx-auto mb-2 text-stone-400" />
+                <p className="text-xs font-medium text-stone-500">添加宝宝信息</p>
               </button>
             </div>
           )}
 
           {/* ---- 导航 ---- */}
           <nav className="flex-1 px-2">
-            <p className="px-2 mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: '#b0aca0' }}>
+            <p className="px-2 mb-2 text-xs font-semibold uppercase tracking-wider text-stone-400">
               导航
             </p>
             <ul className="space-y-1">
@@ -157,7 +155,7 @@ export default function Layout() {
           </nav>
 
           {/* ---- 底部操作 ---- */}
-          <div className="px-2 pt-3 border-t" style={{ borderColor: '#e8e6de' }}>
+          <div className="px-2 pt-3 border-t border-stone-200">
             <button
               onClick={() => navigate('/settings')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
@@ -181,7 +179,7 @@ export default function Layout() {
         {/* 背景装饰 */}
         <div className="absolute top-0 right-0 w-[600px] h-[600px] pointer-events-none opacity-[0.03]"
           style={{
-            background: 'radial-gradient(circle at 100% 0%, #f58b3d 0%, transparent 70%)',
+            background: 'radial-gradient(circle at 100% 0%, var(--color-warmth-500) 0%, transparent 70%)',
           }}
         />
         <div className="relative flex h-full">

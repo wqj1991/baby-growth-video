@@ -55,11 +55,11 @@ export default function Step5Complete() {
       {/* 成功动画区 */}
       <div className="text-center py-8">
         <div className="relative inline-block mb-6">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center">
-            <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-success-bg to-success-bg flex items-center justify-center">
+            <CheckCircle2 className="w-12 h-12 text-success" />
           </div>
           {/* 光圈动画 */}
-          <div className="absolute inset-0 rounded-full border-2 border-emerald-300/30 animate-ping" />
+          <div className="absolute inset-0 rounded-full border-2 border-success/30 animate-ping" />
         </div>
         <h2 className="text-2xl font-bold text-stone-800 mb-2 tracking-tight">项目创建成功！</h2>
         <p className="text-stone-500 text-sm">你的成长视频项目已经准备好了</p>
@@ -88,8 +88,8 @@ export default function Step5Complete() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
-              <Image className="w-4 h-4 text-amber-500" />
+            <div className="w-9 h-9 rounded-xl bg-warning-bg flex items-center justify-center">
+              <Image className="w-4 h-4 text-warning" />
             </div>
             <div>
               <p className="text-xs text-stone-400">生成周期</p>
@@ -98,12 +98,12 @@ export default function Step5Complete() {
           </div>
           {scanResult && (
             <div className="flex items-center gap-4">
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-                <Image className="w-4 h-4 text-emerald-500" />
+              <div className="w-9 h-9 rounded-xl bg-success-bg flex items-center justify-center">
+                <Image className="w-4 h-4 text-success" />
               </div>
               <div>
                 <p className="text-xs text-stone-400">扫描照片</p>
-                <p className="text-sm font-semibold text-emerald-700">{scanResult.total_photos} 张</p>
+                <p className="text-sm font-semibold text-success-text">{scanResult.total_photos} 张</p>
               </div>
             </div>
           )}

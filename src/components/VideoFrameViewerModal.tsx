@@ -111,40 +111,40 @@ export default function VideoFrameViewerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white">
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div className="flex items-center justify-between p-4 border-b border-stone-200">
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-semibold">选择视频帧</h3>
           {video && (
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-stone-500">
               {video.file_name} - {frames.length} 帧
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-stone-500">
             已选择 {selectedIds.size} 帧
-            {finalFrame && <span className="ml-2 text-green-600">· 已确认最终帧</span>}
+            {finalFrame && <span className="ml-2 text-success-text">· 已确认最终帧</span>}
           </span>
           <button
             onClick={onReExtract}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             重新抽帧
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-stone-500" />
           </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
         {frames.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <Eye className="w-16 h-16 mb-4 text-gray-300" />
+          <div className="flex flex-col items-center justify-center h-full text-stone-500">
+            <Eye className="w-16 h-16 mb-4 text-stone-300" />
             <p>暂无视频帧</p>
             <p className="text-sm mt-1">点击"重新抽帧"生成视频帧</p>
           </div>
@@ -158,7 +158,7 @@ export default function VideoFrameViewerModal({
                 <div
                   key={frame.id}
                   className={`relative aspect-video rounded-lg overflow-hidden cursor-pointer transition-all ${
-                    isSelected ? 'ring-2 ring-[#7c5cbf]' : ''
+                    isSelected ? 'ring-2 ring-stash-600' : ''
                   } ${frame.is_final ? 'ring-2 ring-green-500' : ''} hover:shadow-md`}
                   onDoubleClick={() => onPreview(frame)}
                 >
@@ -172,8 +172,8 @@ export default function VideoFrameViewerModal({
                   <button
                     className={`absolute top-1 left-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                       isSelected 
-                        ? 'bg-[#7c5cbf] border-[#7c5cbf]' 
-                        : 'bg-white/80 border-gray-300 hover:border-[#7c5cbf]'
+                        ? 'bg-stash-600 border-stash-600' 
+                        : 'bg-white/80 border-stone-300 hover:border-stash-600'
                     }`}
                     onClick={(e) => { e.stopPropagation(); toggleSelect(frame.id); }}
                   >
@@ -181,7 +181,7 @@ export default function VideoFrameViewerModal({
                   </button>
 
                   <button
-                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[#22c55e] flex items-center justify-center hover:bg-[#16a34a] transition-colors"
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-success flex items-center justify-center hover:bg-success/80 transition-colors"
                     onClick={(e) => { e.stopPropagation(); onAddSingle(frame); }}
                   >
                     <Plus className="w-3 h-3 text-white" />
@@ -197,22 +197,22 @@ export default function VideoFrameViewerModal({
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-200 bg-gray-50">
+      <div className="p-4 border-t border-stone-200 bg-stone-50">
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-stone-500">
             提示：双击预览帧，勾选后可批量加入待选区
           </p>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+              className="px-4 py-2 text-stone-700 hover:bg-stone-200 rounded-lg transition-colors"
             >
               取消
             </button>
             <button
               onClick={handleConfirm}
               disabled={selectedIds.size === 0}
-              className="px-4 py-2 bg-[#7c5cbf] text-white rounded-lg hover:bg-[#6a4eb5] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-stash-600 text-white rounded-lg hover:bg-stash-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               加入待选区 ({selectedIds.size})
             </button>

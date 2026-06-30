@@ -108,13 +108,13 @@ export default function BabySetupPage() {
       <div className="mb-8">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-4"
+          className="flex items-center gap-2 text-stone-500 hover:text-stone-700 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           返回
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">宝宝信息</h1>
-        <p className="text-gray-500 mt-1">管理宝宝的基本信息</p>
+        <h1 className="text-2xl font-bold text-stone-900">宝宝信息</h1>
+        <p className="text-stone-500 mt-1">管理宝宝的基本信息</p>
       </div>
 
       <div className="grid grid-cols-12 gap-6">
@@ -134,43 +134,43 @@ export default function BabySetupPage() {
             <div className="card-body">
               {babies.length === 0 ? (
                 <div className="text-center py-8">
-                  <Baby className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">还没有添加宝宝</p>
+                  <Baby className="w-12 h-12 text-stone-300 mx-auto mb-3" />
+                  <p className="text-stone-500">还没有添加宝宝</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {babies.map((baby) => (
                     <div
                       key={baby.id}
-                      className="p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                      className="p-4 rounded-lg bg-stone-100 hover:bg-stone-100 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                          baby.gender === 'boy' ? 'bg-blue-100' : baby.gender === 'girl' ? 'bg-pink-100' : 'bg-gray-100'
+                          baby.gender === 'boy' ? 'bg-info-bg' : baby.gender === 'girl' ? 'bg-warmth-100' : 'bg-stone-100'
                         }`}>
                           <Baby className={`w-6 h-6 ${
-                            baby.gender === 'boy' ? 'text-blue-600' : baby.gender === 'girl' ? 'text-pink-600' : 'text-gray-600'
+                            baby.gender === 'boy' ? 'text-info-text' : baby.gender === 'girl' ? 'text-warmth-700' : 'text-stone-600'
                           }`} />
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">{baby.name}</p>
+                          <p className="font-medium text-stone-900">{baby.name}</p>
                           {baby.nickname && (
-                            <p className="text-sm text-gray-500">小名：{baby.nickname}</p>
+                            <p className="text-sm text-stone-500">小名：{baby.nickname}</p>
                           )}
-                          <p className="text-sm text-gray-500">
+                          <p className="text-sm text-stone-500">
                             {baby.birth_date} 出生
                           </p>
                         </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleEdit(baby)}
-                            className="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                            className="p-2 text-stone-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                           >
                             编辑
                           </button>
                           <button
                             onClick={() => handleDelete(baby.id)}
-                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-stone-500 hover:text-error hover:bg-error-bg rounded-lg transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -195,8 +195,8 @@ export default function BabySetupPage() {
             <div className="card-body">
               {!isEditing ? (
                 <div className="text-center py-12">
-                  <Baby className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-4">选择左侧宝宝进行编辑，或添加新宝宝</p>
+                  <Baby className="w-16 h-16 text-stone-300 mx-auto mb-4" />
+                  <p className="text-stone-500 mb-4">选择左侧宝宝进行编辑，或添加新宝宝</p>
                   <button
                     onClick={handleAddNew}
                     className="btn btn-primary"

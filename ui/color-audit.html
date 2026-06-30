@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baby Growth Video — 颜色体系审计</title>
+<style>
+  :root {
+    --bg: #fafaf8;
+    --bg-card: #ffffff;
+    --border: #e8e6de;
+    --text: #33312d;
+    --text-secondary: #706c63;
+    --text-tertiary: #b0aca0;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+    --warmth: #f58b3d;
+    --rose: #d44d68;
+    --emerald: #2d9d5f;
+    --indigo: #5b66c0;
+    --amber: #f5c000;
+    --stash: #7c5cbf;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  h3 { font-size: 15px; font-weight: 600; margin-bottom: 10px; color: var(--text-secondary); }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin-bottom: 32px; }
+  
+  /* Section Card */
+  .section {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  
+  /* Color Swatch Grid */
+  .swatch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .swatch {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .swatch:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .swatch-chip {
+    width: 100%;
+    aspect-ratio: 16/10;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .swatch-chip.gradient {
+    background: linear-gradient(135deg, var(--from), var(--to));
+  }
+  .swatch-label { font-size: 12px; font-weight: 600; color: var(--text); }
+  .swatch-hex { font-size: 11px; font-weight: 500; color: var(--text-tertiary); font-family: 'SF Mono', 'Fira Code', monospace; }
+  
+  /* Status Table */
+  .status-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+  }
+  .status-table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: #fafaf8;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+  }
+  .status-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #f5f4f0;
+    vertical-align: middle;
+  }
+  .status-table tr:hover td { background: #fdfaf7; }
+  .status-dot {
+    display: inline-block;
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .issue-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .issue-tag.warn { background: #fff9e0; color: #8f6600; }
+  .issue-tag.ok { background: #d9f2e4; color: #1b643c; }
+  .issue-tag.info { background: #e4e7f6; color: #3b3f85; }
+  
+  /* Comparison Side by Side */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .compare-col {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+  }
+  .compare-col.bad { border-color: #f5d0d8; background: #fdf7f8; }
+  .compare-col.good { border-color: #b3e5c9; background: #f8fdf9; }
+  .compare-col h3 { font-size: 13px; margin-bottom: 10px; }
+  .compare-col.bad h3 { color: #9b2441; }
+  .compare-col.good h3 { color: #1b643c; }
+  
+  .color-pair {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 12px;
+  }
+  .color-pair-chip {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  
+  /* Consistency Map */
+  .map-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f5f4f0;
+  }
+  .map-label {
+    width: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .map-colors {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+  .map-chip {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    font-family: 'SF Mono', monospace;
+    color: white;
+    white-space: nowrap;
+  }
+  .map-chip.light-text { color: var(--text); }
+  .map-score {
+    width: 60px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  
+  /* Legend */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; font-size: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+  
+  /* Proposal Cards */
+  .proposal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .proposal-card {
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border);
+    background: var(--bg-card);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .proposal-card:hover { border-color: #d4d1c7; box-shadow: var(--shadow-md); }
+  .proposal-card.selected { border-color: var(--warmth); box-shadow: 0 0 0 3px rgba(245,139,61,0.1); }
+  .proposal-card .big-chip {
+    width: 100%; height: 48px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .proposal-card .name { font-size: 14px; font-weight: 600; }
+  .proposal-card .desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .proposal-card .hex-row { 
+    display: flex; gap: 8px; margin-top: 8px;
+    font-size: 10px; font-family: 'SF Mono', monospace;
+    color: var(--text-tertiary);
+  }
+  .check-mark {
+    position: absolute;
+    top: 12px; right: 12px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--warmth);
+    color: white;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+  .proposal-card.selected .check-mark { display: flex; }
+  
+  /* Interactive toggle */
+  .toggle-group {
+    display: flex;
+    background: #f5f4f0;
+    border-radius: 10px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .toggle-btn {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+  }
+  .toggle-btn.active {
+    background: white;
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  /* Summary stats */
+  .stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    flex: 1;
+    padding: 20px;
+    border-radius: var(--radius);
+    text-align: center;
+  }
+  .stat-card .num { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; }
+  .stat-card .lbl { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+  .stat-g { background: #f2fbf6; border: 1px solid #b3e5c9; }
+  .stat-g .num { color: #1b643c; }
+  .stat-y { background: #fffdf5; border: 1px solid #fff2b8; }
+  .stat-y .num { color: #8f6600; }
+  .stat-r { background: #fdf4f6; border: 1px solid #f5d0d8; }
+  .stat-r .num { color: #9b2441; }
+  
+  /* Fragment highlights */
+  .fragment-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'SF Mono', monospace;
+    margin: 0 2px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+    <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#f58b3d,#d44d68);display:flex;align-items:center;justify-content:center;font-size:22px;">🎨</div>
+    <div>
+      <h1>Baby Growth Video 颜色体系审计</h1>
+      <p class="subtitle" style="margin-bottom:0;">梳理项目各操作/状态的颜色使用现状 & 一致性分析</p>
+    </div>
+  </div>
+  <p class="subtitle" style="margin-top:4px;">2026年6月30日 · 基于最新代码库扫描 · 共扫描 31 个 TSX 组件 + 1 个全局 CSS + 1 个 Tailwind 配置</p>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="stat-card stat-r">
+      <div class="num">4</div>
+      <div class="lbl">颜色碎片化问题</div>
+    </div>
+    <div class="stat-card stat-y">
+      <div class="num">6</div>
+      <div class="lbl">状态定义不一致</div>
+    </div>
+    <div class="stat-card stat-g">
+      <div class="num">12</div>
+      <div class="lbl">设计 Token 色系</div>
+    </div>
+    <div class="stat-card" style="background:#f4f5fb;border:1px solid #c9cfee;">
+      <div class="num" style="color:#3b3f85;">9</div>
+      <div class="lbl">操作/状态类型</div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 1: 设计 Token 色系概览 -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>🎨 设计 Token 色系（tailwind.config.js）</h2>
+      <span class="status-badge" style="background:#d9f2e4;color:#1b643c;">已统一</span>
+    </div>
+    <div class="swatch-grid">
+      <div class="swatch">
+        <div class="swatch-chip gradient" style="--from:#f58b3d;--to:#d44d68;"></div>
+        <div class="swatch-label">warmth (主色)</div>
+        <div class="swatch-hex">#f58b3d → #d44d68</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-chip gradient" style="--from:#5b66c0;--to:#3b3f85;"></div>
+        <div class="swatch-label">indigo (辅色)</div>
+        <div class="swatch-hex">#5b66c0 → #3b3f85</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-chip gradient" style="--from:#ffd43b;--to:#f5c000;"></div>
+        <div class="swatch-label">amber (点缀)</div>
+        <div class="swatch-hex">#ffd43b → #f5c000</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-chip gradient" style="--from:#4db87f;--to:#2d9d5f;"></div>
+        <div class="swatch-label">emerald (点缀)</div>
+        <div class="swatch-hex">#4db87f → #2d9d5f</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-chip gradient" style="--from:#e0788f;--to:#d44d68;"></div>
+        <div class="swatch-label">rose (点缀)</div>
+        <div class="swatch-hex">#e0788f → #d44d68</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-chip" style="background: linear-gradient(135deg, #f5f4f0, #d4d1c7, #706c63);"></div>
+        <div class="swatch-label">stone (中性)</div>
+        <div class="swatch-hex">#fafaf8 → #1c1b18</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-chip" style="background: linear-gradient(135deg, #a993d9, #7c5cbf, #513a8c);"></div>
+        <div class="swatch-label">stash (待选区)</div>
+        <div class="swatch-hex">#7c5cbf (主)</div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-chip" style="background: linear-gradient(135deg, #f9c5d1, #a8d8ea, #ffe8a1, #b5e8c3);"></div>
+        <div class="swatch-label">baby (宝宝)</div>
+        <div class="swatch-hex">粉/蓝/黄/绿/紫</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 2: 操作/状态颜色映射（现状） -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>📊 操作/状态 → 颜色映射（当前实际使用）</h2>
+      <span class="status-badge" style="background:#fff9e0;color:#8f6600;">有碎片化</span>
+    </div>
+    
+    <table class="status-table">
+      <thead>
+        <tr>
+          <th style="width:120px;">状态/操作</th>
+          <th style="width:180px;">主色</th>
+          <th>使用场景</th>
+          <th style="width:90px;">一致性</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:linear-gradient(135deg,#f58b3d,#e06a1e);"></span>
+            <strong>选中 / 激活</strong>
+          </td>
+          <td>
+            <code style="background:#fff2e6;color:#b85218;padding:2px 8px;border-radius:4px;font-size:12px;">warmth-500 #f58b3d</code>
+          </td>
+          <td>照片选中框、Tab 激活态、步骤条当前步、布局选项激活、toggle active</td>
+          <td><span class="issue-tag ok">✓ 一致</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:linear-gradient(135deg,#2d9d5f,#1f7e4a);"></span>
+            <strong>完成 / 已确认</strong>
+          </td>
+          <td>
+            <code style="background:#d9f2e4;color:#1b643c;padding:2px 8px;border-radius:4px;font-size:12px;">emerald-500#2d9d5f</code>
+            <span class="fragment-badge" style="background:#fff9e0;color:#8f6600;">+ green-*</span>
+            <span class="fragment-badge" style="background:#fff9e0;color:#8f6600;">+ #10b981</span>
+          </td>
+          <td>Period completed、连接测试成功、视频生成完成、final badge</td>
+          <td><span class="issue-tag warn">⚠ 碎片</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:linear-gradient(135deg,#7c5cbf,#513a8c);"></span>
+            <strong>待选区 / 多选</strong>
+          </td>
+          <td>
+            <code style="background:#f3f0fb;color:#513a8c;padding:2px 8px;border-radius:4px;font-size:12px;">stash-600 #7c5cbf</code>
+            <span class="fragment-badge" style="background:#fff9e0;color:#8f6600;">+ purple-*</span>
+          </td>
+          <td>Stash tab、multi-selected 照片边框、stash 面板对比、待选区标记</td>
+          <td><span class="issue-tag warn">⚠ 碎片</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:linear-gradient(135deg,#d44d68,#ba3050);"></span>
+            <strong>危险 / 错误</strong>
+          </td>
+          <td>
+            <code style="background:#fae7ea;color:#9b2441;padding:2px 8px;border-radius:4px;font-size:12px;">rose-500 #d44d68</code>
+            <span class="fragment-badge" style="background:#fff9e0;color:#8f6600;">+ red-50/500/600</span>
+          </td>
+          <td>删除按钮、生成失败、连接失败、表单验证错误、ErrorBoundary</td>
+          <td><span class="issue-tag warn">⚠ 碎片</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:linear-gradient(135deg,#ffd43b,#f5c000);"></span>
+            <strong>警告 / 注意</strong>
+          </td>
+          <td>
+            <code style="background:#fff9e0;color:#8f6600;padding:2px 8px;border-radius:4px;font-size:12px;">amber-400 #ffd43b</code>
+            <span class="fragment-badge" style="background:#fff9e0;color:#8f6600;">+ yellow-50/500</span>
+          </td>
+          <td>AI 回退提示、文件夹扫描警告、特殊日期提醒、模糊警告</td>
+          <td><span class="issue-tag warn">⚠ 碎片</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:linear-gradient(135deg,#5b66c0,#484fa5);"></span>
+            <strong>信息 / 引导</strong>
+          </td>
+          <td>
+            <code style="background:#e4e7f6;color:#3b3f85;padding:2px 8px;border-radius:4px;font-size:12px;">indigo-500 #5b66c0</code>
+            <span class="fragment-badge" style="background:#fff9e0;color:#8f6600;">+ blue-50/100/500</span>
+          </td>
+          <td>进度提示、步骤引导图标、info-pill、进度提示条、男孩标识</td>
+          <td><span class="issue-tag warn">⚠ 碎片</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:#f5f4f0;border:2px solid #d4d1c7;"></span>
+            <strong>未开始 / 禁用</strong>
+          </td>
+          <td>
+            <code style="background:#f5f4f0;color:#57544d;padding:2px 8px;border-radius:4px;font-size:12px;">stone-*/gray-*</code>
+          </td>
+          <td>not_started period、禁用按钮、空步骤、placeholder</td>
+          <td><span class="issue-tag warn">⚠ 碎片</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:linear-gradient(135deg,#f58b3d,#d44d68);animation:pulse 2s infinite;"></span>
+            <strong>进行中 / 加载</strong>
+          </td>
+          <td>
+            <code style="background:#fff2e6;color:#b85218;padding:2px 8px;border-radius:4px;font-size:12px;">warmth gradient</code>
+          </td>
+          <td>视频生成进度、扫描进度、skeleton shimmer、spinner</td>
+          <td><span class="issue-tag ok">✓ 一致</span></td>
+        </tr>
+        <tr>
+          <td>
+            <span class="status-dot" style="background:linear-gradient(135deg,#f9c5d1,#a8d8ea);"></span>
+            <strong>宝宝信息</strong>
+          </td>
+          <td>
+            <code style="background:#fef0f3;color:#9b2441;padding:2px 8px;border-radius:4px;font-size:12px;">baby-pink/blue + raw</code>
+            <span class="fragment-badge" style="background:#fff9e0;color:#8f6600;">+ pink-100/600</span>
+            <span class="fragment-badge" style="background:#fff9e0;color:#8f6600;">+ blue-100/600</span>
+          </td>
+          <td>宝宝性别选择、宝宝头像环、avatar-ring 渐变</td>
+          <td><span class="issue-tag warn">⚠ 碎片</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 3: 碎片化对比 -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>🔍 碎片化诊断（设计 Token vs 原始 Tailwind 颜色）</h2>
+      <span class="status-badge" style="background:#fdf4f6;color:#9b2441;">需修复</span>
+    </div>
+
+    <div class="compare-grid">
+      <div class="compare-col bad">
+        <h3>❌ 当前问题：混用两套颜色</h3>
+        <div class="color-pair">
+          <div class="color-pair-chip" style="background:#2d9d5f;"></div>
+          <strong>emerald-600</strong> = #2d9d5f
+          <span style="margin-left:auto;color:#1b643c;font-size:10px;">Design Token ✓</span>
+        </div>
+        <div class="color-pair" style="margin-left:26px;color:var(--text-tertiary);font-size:11px;">vs</div>
+        <div class="color-pair">
+          <div class="color-pair-chip" style="background:#10b981;"></div>
+          <strong>green-500</strong> = #10b981
+          <span style="margin-left:auto;color:#9b2441;font-size:10px;">Raw Tailwind ✗</span>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f5d0d8;font-size:12px;color:#9b2441;">
+          <strong>影响：</strong>PeriodTimeline 中 <code>confirmed</code> 使用 <span class="fragment-badge" style="background:#fae7ea;color:#9b2441;">raw #10b981</span>，而 <code>.badge-final</code> 使用 <span class="fragment-badge" style="background:#d9f2e4;color:#1b643c;">emerald</span>。同一含义两种绿色。
+        </div>
+      </div>
+
+      <div class="compare-col good">
+        <h3>✅ 正确做法：统一使用 Design Token</h3>
+        <div class="color-pair">
+          <div class="color-pair-chip" style="background:#2d9d5f;"></div>
+          <strong>emerald-500/600</strong>
+          <span style="margin-left:auto;color:#1b643c;font-size:10px;">✅ 成功状态</span>
+        </div>
+        <div class="color-pair">
+          <div class="color-pair-chip" style="background:#d44d68;"></div>
+          <strong>rose-500/600</strong>
+          <span style="margin-left:auto;color:#1b643c;font-size:10px;">✅ 危险/错误</span>
+        </div>
+        <div class="color-pair">
+          <div class="color-pair-chip" style="background:#f5c000;"></div>
+          <strong>amber-500</strong>
+          <span style="margin-left:auto;color:#1b643c;font-size:10px;">✅ 警告</span>
+        </div>
+        <div class="color-pair">
+          <div class="color-pair-chip" style="background:#5b66c0;"></div>
+          <strong>indigo-500</strong>
+          <span style="margin-left:auto;color:#1b643c;font-size:10px;">✅ 信息提示</span>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #b3e5c9;font-size:12px;color:#1b643c;">
+          <strong>好处：</strong>统一语义 + 品牌一致性 + 暗色模式自动适配 + 可维护性
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed fragments list -->
+    <div style="margin-top:20px;">
+      <h3>具体碎片实例</h3>
+      <div class="map-row" style="border-top:1px solid #f5f4f0;">
+        <div class="map-label">成功/完成</div>
+        <div class="map-colors">
+          <span class="map-chip" style="background:#2d9d5f;">emerald</span>
+          <span class="map-chip" style="background:#10b981;">#10b981</span>
+          <span class="map-chip" style="background:#22c55e;">green-500</span>
+        </div>
+        <div class="map-score" style="color:#9b2441;">3 种</div>
+      </div>
+      <div class="map-row">
+        <div class="map-label">危险/错误</div>
+        <div class="map-colors">
+          <span class="map-chip" style="background:#d44d68;">rose</span>
+          <span class="map-chip" style="background:#ef4444;">red-500</span>
+          <span class="map-chip" style="background:#dc2626;">red-600</span>
+        </div>
+        <div class="map-score" style="color:#9b2441;">3 种</div>
+      </div>
+      <div class="map-row">
+        <div class="map-label">警告/注意</div>
+        <div class="map-colors">
+          <span class="map-chip light-text" style="background:#f5c000;">amber</span>
+          <span class="map-chip light-text" style="background:#eab308;">yellow-500</span>
+          <span class="map-chip light-text" style="background:#f59e0b;">amber-500</span>
+        </div>
+        <div class="map-score" style="color:#8f6600;">3 种</div>
+      </div>
+      <div class="map-row">
+        <div class="map-label">信息/引导</div>
+        <div class="map-colors">
+          <span class="map-chip" style="background:#5b66c0;">indigo</span>
+          <span class="map-chip" style="background:#3b82f6;">blue-500</span>
+          <span class="map-chip" style="background:#2563eb;">blue-600</span>
+        </div>
+        <div class="map-score" style="color:#8f6600;">3 种</div>
+      </div>
+      <div class="map-row">
+        <div class="map-label">中性/禁用</div>
+        <div class="map-colors">
+          <span class="map-chip" style="background:#706c63;">stone</span>
+          <span class="map-chip" style="background:#9ca3af;">gray-400</span>
+          <span class="map-chip" style="background:#6b7280;">gray-500</span>
+          <span class="map-chip" style="background:#d1d5db;">gray-300</span>
+        </div>
+        <div class="map-score" style="color:#8f6600;">4 种</div>
+      </div>
+      <div class="map-row">
+        <div class="map-label">待选/拼图</div>
+        <div class="map-colors">
+          <span class="map-chip" style="background:#7c5cbf;">stash</span>
+          <span class="map-chip" style="background:#8b5cf6;">purple-500</span>
+          <span class="map-chip" style="background:#7c3aed;">purple-600</span>
+        </div>
+        <div class="map-score" style="color:#8f6600;">3 种</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 4: 统一提案 -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>💡 统一语义化颜色方案（提案）</h2>
+      <span class="status-badge" style="background:#e4e7f6;color:#3b3f85;">讨论中</span>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+      提案：建立 <strong>9 种语义状态色</strong>，全部映射到项目已有的 Design Token 色系。点击卡片表示认可该语义。
+    </p>
+
+    <div class="proposal-grid">
+      <div class="proposal-card selected">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:linear-gradient(135deg,#f58b3d,#e06a1e);"></div>
+        <div class="name">Primary / 主操作</div>
+        <div class="desc">选中、激活、主按钮、当前步骤</div>
+        <div class="hex-row"><span>#f58b3d</span><span>warmth-500</span></div>
+      </div>
+      <div class="proposal-card selected">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:linear-gradient(135deg,#2d9d5f,#1f7e4a);"></div>
+        <div class="name">Success / 成功</div>
+        <div class="desc">完成、已确认、连接成功</div>
+        <div class="hex-row"><span>#2d9d5f</span><span>emerald-500</span></div>
+      </div>
+      <div class="proposal-card">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:linear-gradient(135deg,#d44d68,#ba3050);"></div>
+        <div class="name">Danger / 危险</div>
+        <div class="desc">删除、失败、错误状态</div>
+        <div class="hex-row"><span>#d44d68</span><span>rose-500</span></div>
+      </div>
+      <div class="proposal-card">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:linear-gradient(135deg,#ffd43b,#f5c000);"></div>
+        <div class="name">Warning / 警告</div>
+        <div class="desc">回退提示、注意事项、模糊警告</div>
+        <div class="hex-row"><span>#f5c000</span><span>amber-500</span></div>
+      </div>
+      <div class="proposal-card">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:linear-gradient(135deg,#5b66c0,#484fa5);"></div>
+        <div class="name">Info / 信息</div>
+        <div class="desc">进度提示、引导、帮助信息</div>
+        <div class="hex-row"><span>#5b66c0</span><span>indigo-500</span></div>
+      </div>
+      <div class="proposal-card selected">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:linear-gradient(135deg,#7c5cbf,#513a8c);"></div>
+        <div class="name">Stash / 待选区</div>
+        <div class="desc">待选区、多选、拼图池</div>
+        <div class="hex-row"><span>#7c5cbf</span><span>stash-600</span></div>
+      </div>
+      <div class="proposal-card">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:#f5f4f0;border:2px solid #d4d1c7;"></div>
+        <div class="name">Muted / 未激活</div>
+        <div class="desc">未开始、禁用、空状态</div>
+        <div class="hex-row"><span>#b0aca0</span><span>stone-400</span></div>
+      </div>
+      <div class="proposal-card">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:linear-gradient(135deg,#f58b3d,#d44d68);"></div>
+        <div class="name">Progress / 进行中</div>
+        <div class="desc">加载中、生成中、扫描中</div>
+        <div class="hex-row"><span>warmth → rose</span><span>gradient</span></div>
+      </div>
+      <div class="proposal-card">
+        <div class="check-mark">✓</div>
+        <div class="big-chip" style="background:linear-gradient(135deg,#f9c5d1,#a8d8ea,#ffe8a1,#b5e8c3,#d4c5f0);"></div>
+        <div class="name">Baby / 宝宝</div>
+        <div class="desc">宝宝信息、性别标识</div>
+        <div class="hex-row"><span>baby-* tokens</span><span>专用色系</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 5: 待讨论问题 -->
+  <!-- ============================================================ -->
+  <div class="section">
+    <div class="section-header">
+      <h2>🤔 需要你确认的问题</h2>
+      <span style="font-size:13px;color:var(--text-tertiary);">点击选择你的偏好</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      
+      <!-- Q1 -->
+      <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fdfaf7;">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--warmth);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">1</span>
+          <div>
+            <strong style="font-size:14px;">Pending（待处理）状态应该用什么颜色？</strong>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+              当前项目中 <code>pending</code> 含义不统一：PeriodTimeline 中 pending 是琥珀色进度条，VideoGeneratePage 中 pending step 是紫色 sparkles 图标。需要统一定义。
+            </p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:34px;">
+          <button class="toggle-btn active" style="background:white;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:1px solid var(--border);">🟡 amber 琥珀（待处理≈等待/注意）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🔵 indigo 靛蓝（待处理≈信息/需要操作）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🟣 stash 紫色（和其他待选区分？）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">⚪ stone 灰色（待处理≈中性态）</button>
+        </div>
+      </div>
+
+      <!-- Q2 -->
+      <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fdfaf7;">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--warmth);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">2</span>
+          <div>
+            <strong style="font-size:14px;">Period 状态色：confirmed 用 emerald 还是独立的绿色？</strong>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+              当前 <code>PeriodTimeline</code> 中 confirmed 用了 raw <code>#10b981</code> (green-500)，而 CSS 中 <code>.badge-final</code> 和 <code>.period-item.completed</code> 用了 emerald。建议统一。
+            </p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:34px;">
+          <button class="toggle-btn active" style="background:white;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:1px solid var(--border);">✅ emerald（与成功/完成语义统一）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🟢 独立的绿色（period 概念独立）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🔵 indigo（确认≠完成，概念不同）</button>
+        </div>
+      </div>
+
+      <!-- Q3 -->
+      <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fdfaf7;">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--warmth);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">3</span>
+          <div>
+            <strong style="font-size:14px;">宝宝性别颜色：用 baby token 还是原始 pink/blue？</strong>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+              当前 BabySetupPage 中使用了 <code>bg-blue-100</code>/<code>text-pink-600</code> 等原始 Tailwind 色，而不是项目自定义的 <code>baby-blue</code>/<code>baby-pink</code> token。
+            </p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:34px;">
+          <button class="toggle-btn active" style="background:white;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:1px solid var(--border);">👶 baby token（项目自定义色系，更柔和）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🎨 raw pink/blue（颜色更鲜明）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🏳️ 中性色（避免性别刻板印象）</button>
+        </div>
+      </div>
+
+      <!-- Q4 -->
+      <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fdfaf7;">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--warmth);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">4</span>
+          <div>
+            <strong style="font-size:14px;">Stone vs Gray：中性色体系用哪个？</strong>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+              项目中有的地方用 <code>stone-*</code>（设计 token），有的用 <code>gray-*</code>（Tailwind 默认）。如 ScanLogPanel 用了 gray-50，而大多数新代码用 stone。需要统一。
+            </p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:34px;">
+          <button class="toggle-btn active" style="background:white;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:1px solid var(--border);">🪨 stone（项目 token，暖灰色调）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">⬜ gray（Tailwind 默认，更标准）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🤷 都行，不重要</button>
+        </div>
+      </div>
+
+      <!-- Q5 -->
+      <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fdfaf7;">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">
+          <span style="width:24px;height:24px;border-radius:50%;background:var(--warmth);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">5</span>
+          <div>
+            <strong style="font-size:14px;">需要新增 "Processing/进行中" 语义色吗？</strong>
+            <p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+              当前进行中状态直接用 warmth 渐变（和主按钮相同），但在某些场景下（AI 生成步骤），用了 indigo、purple 等不同颜色区分不同子步骤。是否需要独立的 progress 颜色？
+            </p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:34px;">
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🔄 需要独立 progress 色（如更亮的 warmth 渐变带动画）</button>
+          <button class="toggle-btn active" style="background:white;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:1px solid var(--border);">🟠 复用 warmth（加载就是主流程，语义一致）</button>
+          <button class="toggle-btn" style="background:white;border:1px solid var(--border);">🔮 用 indigo+动画（进度=系统在思考）</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 6: 推荐统一方案（总结） -->
+  <!-- ============================================================ -->
+  <div class="section" style="border:2px solid #f58b3d;box-shadow:0 0 0 4px rgba(245,139,61,0.06);">
+    <div class="section-header">
+      <h2>📐 推荐统一方案（等你确认后执行）</h2>
+    </div>
+    
+    <table class="status-table">
+      <thead>
+        <tr>
+          <th>语义状态</th>
+          <th>Design Token</th>
+          <th>Hex 主色</th>
+          <th>浅色背景</th>
+          <th>文字颜色</th>
+          <th>使用场景</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>主操作 · Primary</strong></td>
+          <td><code>warmth-500</code></td>
+          <td><span class="status-dot" style="background:#f58b3d;width:18px;height:18px;border-radius:4px;"></span> #f58b3d</td>
+          <td><code>warmth-50</code></td>
+          <td><code>warmth-700</code></td>
+          <td>选中、激活、主按钮、当前步骤、toggle active</td>
+        </tr>
+        <tr>
+          <td><strong>成功 · Success</strong></td>
+          <td><code>emerald-500</code></td>
+          <td><span class="status-dot" style="background:#2d9d5f;width:18px;height:18px;border-radius:4px;"></span> #2d9d5f</td>
+          <td><code>emerald-50</code></td>
+          <td><code>emerald-700</code></td>
+          <td>完成、已确认、连接成功、final badge</td>
+        </tr>
+        <tr>
+          <td><strong>危险 · Danger</strong></td>
+          <td><code>rose-500</code></td>
+          <td><span class="status-dot" style="background:#d44d68;width:18px;height:18px;border-radius:4px;"></span> #d44d68</td>
+          <td><code>rose-50</code></td>
+          <td><code>rose-700</code></td>
+          <td>删除、失败、错误状态、表单验证</td>
+        </tr>
+        <tr>
+          <td><strong>警告 · Warning</strong></td>
+          <td><code>amber-500</code></td>
+          <td><span class="status-dot" style="background:#f5c000;width:18px;height:18px;border-radius:4px;"></span> #f5c000</td>
+          <td><code>amber-50</code></td>
+          <td><code>amber-800</code></td>
+          <td>回退提示、注意事项、模糊/清晰度警告</td>
+        </tr>
+        <tr>
+          <td><strong>信息 · Info</strong></td>
+          <td><code>indigo-500</code></td>
+          <td><span class="status-dot" style="background:#5b66c0;width:18px;height:18px;border-radius:4px;"></span> #5b66c0</td>
+          <td><code>indigo-50</code></td>
+          <td><code>indigo-700</code></td>
+          <td>进度提示、引导信息、帮助提示</td>
+        </tr>
+        <tr>
+          <td><strong>待选区 · Stash</strong></td>
+          <td><code>stash-600</code></td>
+          <td><span class="status-dot" style="background:#7c5cbf;width:18px;height:18px;border-radius:4px;"></span> #7c5cbf</td>
+          <td><code>stash-50</code></td>
+          <td><code>stash-700</code></td>
+          <td>待选区、多选标记、拼图候选池</td>
+        </tr>
+        <tr>
+          <td><strong>未激活 · Muted</strong></td>
+          <td><code>stone-300</code></td>
+          <td><span class="status-dot" style="background:#d4d1c7;width:18px;height:18px;border-radius:4px;"></span> #d4d1c7</td>
+          <td><code>stone-50</code></td>
+          <td><code>stone-400</code></td>
+          <td>未开始、禁用、空状态 placeholder</td>
+        </tr>
+        <tr>
+          <td><strong>进行中 · Progress</strong></td>
+          <td><code>warmth gradient</code></td>
+          <td><span class="status-dot" style="background:linear-gradient(90deg,#f58b3d,#d44d68);width:18px;height:18px;border-radius:4px;"></span> warmth → rose</td>
+          <td><code>warmth-50</code></td>
+          <td><code>warmth-600</code></td>
+          <td>加载中、生成中、扫描进度条、skeleton</td>
+        </tr>
+        <tr>
+          <td><strong>宝宝 · Baby</strong></td>
+          <td><code>baby-*</code></td>
+          <td><span class="status-dot" style="background:linear-gradient(90deg,#f9c5d1,#a8d8ea);width:18px;height:18px;border-radius:4px;"></span> baby-*</td>
+          <td><code>baby-*</code></td>
+          <td><code>text-*</code></td>
+          <td>宝宝信息展示、性别选择、头像环</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top:20px;padding:16px;background:#fafaf8;border-radius:var(--radius-sm);border:1px solid var(--border);">
+      <strong style="font-size:13px;">🔧 执行计划（确认后实施）：</strong>
+      <ol style="margin-top:8px;padding-left:20px;font-size:13px;color:var(--text-secondary);line-height:2;">
+        <li>替换所有 <code>green-*</code> → <code>emerald-*</code>（成功/完成）</li>
+        <li>替换所有 <code>red-*</code> → <code>rose-*</code>（危险/错误）</li>
+        <li>替换所有 <code>yellow-*</code> → <code>amber-*</code>（警告）</li>
+        <li>替换所有 <code>blue-*</code> → <code>indigo-*</code>（信息/引导）</li>
+        <li>替换所有 <code>gray-*</code> → <code>stone-*</code>（中性/禁用）</li>
+        <li>替换所有 <code>purple-*</code> → <code>stash-*</code>（待选区）</li>
+        <li>替换所有 <code>pink-*</code>/<code>blue-*</code>（性别） → <code>baby-pink</code>/<code>baby-blue</code></li>
+        <li>统一 <code>confirmed</code> 色值到 <code>emerald</code></li>
+        <li>统一定义 <code>pending</code> 语义色</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <p style="text-align:center;font-size:12px;color:var(--text-tertiary);margin-top:32px;padding-bottom:24px;">
+    UI Designer · 颜色体系审计 · 等待你的反馈
+  </p>
+</div>
+
+<style>
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+</style>
+</body>
+</html>

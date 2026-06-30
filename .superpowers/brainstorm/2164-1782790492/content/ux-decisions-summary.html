@@ -1,0 +1,622 @@
+<h2>✅ UX 交互分析 — 确认结果总结</h2>
+<p class="subtitle">经过代码分析 + 6 轮交互确认，以下是 UX 优化方向的决策汇总</p>
+
+<div class="section">
+  <h3>📋 决策汇总</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 16px; font-size: 13px;">
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <tr style="background:#fffaf5;">
+          <th style="padding:10px; text-align:left; border-bottom:2px solid #f58b3d; width:5%;">#</th>
+          <th style="padding:10px; text-align:left; border-bottom:2px solid #f58b3d; width:30%;">UX 问题</th>
+          <th style="padding:10px; text-align:left; border-bottom:2px solid #f58b3d; width:30%;">当前状态</th>
+          <th style="padding:10px; text-align:left; border-bottom:2px solid #f58b3d; width:35%;">确认方案</th>
+        </tr>
+        <tr>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-weight:700; color:#f58b3d;">1</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de;">向导步骤文件命名混乱</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-family:monospace; font-size:11px;">Step3SelectFolder = 步骤4<br>Step4GeneratePeriods = 步骤3</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; color:#10b981; font-weight:600;">重命名：生成周期→步骤3，选择文件夹→步骤4</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-weight:700; color:#f58b3d;">2</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de;">照片选择流程</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-size:11px;">加入待选区 → 多选打勾 → 拼图（两步）</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; color:#10b981; font-weight:600;">保持现状，已足够清晰</td>
+        </tr>
+        <tr>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-weight:700; color:#f58b3d;">3</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de;">删除确认弹窗</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-size:11px;">window.confirm() 原生弹窗</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; color:#10b981; font-weight:600;">统一为自定义 Modal 组件</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-weight:700; color:#f58b3d;">4</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de;">设置页面</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-size:11px;">仅3个开关，AI完整配置缺失</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; color:#10b981; font-weight:600;">分离：基础设置 + AI设置 两个Tab</td>
+        </tr>
+        <tr>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-weight:700; color:#f58b3d;">5</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de;">视频预览区域</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-size:11px;">静态占位符（图标+文字）</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; color:#10b981; font-weight:600;">生成前：照片序列预览<br>生成后：HTML5 播放器</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-weight:700; color:#f58b3d;">6</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de;">操作反馈方式</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-size:11px;">alert() 原生弹窗</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; color:#10b981; font-weight:600;">统一 Toast 通知系统</td>
+        </tr>
+        <tr>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-weight:700; color:#f58b3d;">7</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de;">侧边栏禁用项点击</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-size:11px;">禁用项点击跳转到 '/'</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; color:#10b981; font-weight:600;">禁用时完全不响应点击</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-weight:700; color:#f58b3d;">8</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de;">项目概览页定位</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; font-size:11px;">统计卡片+快捷操作+周期网格</td>
+          <td style="padding:10px; border-bottom:1px solid #e8e6de; color:#10b981; font-weight:600;">精简：基本信息卡片+快捷入口</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔍 代码审查中发现的额外问题</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 16px; font-size: 13px;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="padding: 8px 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+          <strong style="color:#92400e;">⚠️ P1</strong> 两个 store 中有大量重复代码（scanLogs 管理逻辑几乎一模一样），可提取共用 Hook
+        </div>
+        <div style="padding: 8px 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+          <strong style="color:#92400e;">⚠️ P1</strong> 路由跳转中使用了 navigate(-1) 返回（SettingsPage, BabySetupPage），但历史栈不确定时行为不可预测
+        </div>
+        <div style="padding: 8px 12px; background: #fee2e2; border-left: 4px solid #ef4444; border-radius: 4px;">
+          <strong style="color:#991b1b;">🔴 P0</strong> 目录穿越风险（TD-006）：文件路径未校验 traversal，照片路径来自扫描结果直接传给 Rust
+        </div>
+        <div style="padding: 8px 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+          <strong style="color:#92400e;">⚠️ P1</strong> 拼图生成按钮调用的是 alert() 占位（TODO），后端接口未集成
+        </div>
+        <div style="padding: 8px 12px; background: #e0e7ff; border-left: 4px solid #6366f1; border-radius: 4px;">
+          <strong style="color:#3730a3;">💡 P2</strong> 缺少键盘快捷键支持（如 Ctrl+Z 撤销选择、Space 预览等）
+        </div>
+        <div style="padding: 8px 12px; background: #e0e7ff; border-left: 4px solid #6366f1; border-radius: 4px;">
+          <strong style="color:#3730a3;">💡 P2</strong> 无响应式设计，仅适配桌面端（1280px+）
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>📊 交互模式统计</h3>
+  <div style="display:flex; gap: 12px; flex-wrap: wrap;">
+    <div class="mockup" style="flex:1; min-width:200px;">
+      <div class="mockup-header">点击交互</div>
+      <div class="mockup-body" style="padding:12px; font-size:12px;">
+        <div style="margin:4px 0;">🖱️ 单击选择 8处</div>
+        <div style="margin:4px 0;">🖱️ 双击预览 2处</div>
+        <div style="margin:4px 0;">🖱️ Hover显示操作 3处</div>
+        <div style="margin:4px 0;">🖱️ 拖拽分隔条 1处</div>
+      </div>
+    </div>
+    <div class="mockup" style="flex:1; min-width:200px;">
+      <div class="mockup-header">弹窗/模态框</div>
+      <div class="mockup-body" style="padding:12px; font-size:12px;">
+        <div style="margin:4px 0;">🪟 图片预览 1个</div>
+        <div style="margin:4px 0;">🪟 视频截帧设置 1个</div>
+        <div style="margin:4px 0;">🪟 视频截帧查看 1个</div>
+        <div style="margin:4px 0;">🪟 模板选择器 1个</div>
+      </div>
+    </div>
+    <div class="mockup" style="flex:1; min-width:200px;">
+      <div class="mockup-header">状态展示</div>
+      <div class="mockup-body" style="padding:12px; font-size:12px;">
+        <div style="margin:4px 0;">📊 进度条 2处</div>
+        <div style="margin:4px 0;">🔄 加载Spinner 3处</div>
+        <div style="margin:4px 0;">📭 空状态 6处</div>
+        <div style="margin:4px 0;">❌ 错误提示 0处(alert)</div>
+        <div style="margin:4px 0;">✅ 成功提示 1处</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>🔄 照片状态流转详解</h3>
+  <p class="desc">每张 Photo 实体包含 3 个布尔标记，各自独立控制不同 UI 行为</p>
+  
+  <div class="mockup" style="margin-bottom: 16px;">
+    <div class="mockup-header">3 个布尔标记</div>
+    <div class="mockup-body" style="padding: 12px;">
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <tr style="background:#fffaf5;">
+          <th style="padding:8px; text-align:left; border-bottom:2px solid #f58b3d;">标记</th>
+          <th style="padding:8px; text-align:left; border-bottom:2px solid #f58b3d;">含义</th>
+          <th style="padding:8px; text-align:left; border-bottom:2px solid #f58b3d;">触发操作</th>
+          <th style="padding:8px; text-align:left; border-bottom:2px solid #f58b3d;">清除条件</th>
+        </tr>
+        <tr>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de; font-family:monospace; color:#534AB7; font-weight:600;">is_selected</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">已加入待选区</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">点击「加入待选区」</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">在待选区点击「移除」</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:8px; border-bottom:1px solid #e8e6de; font-family:monospace; color:#1D9E75; font-weight:600;">is_multi_selected</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">多选打勾（拼图用）</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">在待选区勾选 checkbox</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">取消勾选或离开待选区</td>
+        </tr>
+        <tr>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de; font-family:monospace; color:#BA7517; font-weight:600;">is_final</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">该周期最终选定</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">在待选区点击「单独选定」</td>
+          <td style="padding:8px; border-bottom:1px solid #e8e6de;">点击「取消最终」</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <h4 style="font-size:13px; margin:16px 0 8px; color:#555;">📌 5 条操作路径</h4>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 12px; font-size: 12px; line-height: 1.8;">
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
+        <span style="background:#EEEDFE; color:#534AB7; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;">路径 1</span>
+        <span><strong style="color:#534AB7;">照片网格 ↔ 待选区</strong> — 点击「+ 加入待选区」→ <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">is_selected = true</code> → <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">addToSelectedItems()</code></span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; margin-left: 54px;">
+        <span style="font-size:11px; color:#888;">↩ 回退A</span>
+        <span style="font-size:11px;">PhotoCard hover「✕ 从待选区取消」→ <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">onToggleSelect</code> → <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">handleTogglePhotoSelect</code></span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; margin-left: 54px;">
+        <span style="font-size:11px; color:#888;">↩ 回退B</span>
+        <span style="font-size:11px;">PendingPanel「移除」→ <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">handleRemoveFromStash</code> → <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">handleTogglePhotoSelect</code></span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; margin-left: 54px;">
+        <span style="font-size:11px; color:#d44d68;">⚡ 通用效果</span>
+        <span style="font-size:11px; color:#d44d68;">is_selected = false + is_multi_selected 强制重置 + removeFromSelectedItems() + pending_count -1</span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
+        <span style="background:#E1F5EE; color:#1D9E75; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;">路径 2</span>
+        <span><strong style="color:#1D9E75;">待选区 → 拼图</strong> — 勾选 ≥2 张 → 「生成拼图」→ TemplateSelector → CollageWorkspace</span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
+        <span style="background:#FAEEDA; color:#BA7517; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;">路径 3</span>
+        <span><strong style="color:#BA7517;">待选区 ↔ 最终选定</strong> — 点击「单独选定」→ <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">is_final = true</code> + <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">Period.selected_photo_id</code> → 周期状态 🟢</span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; margin-left: 54px;">
+        <span style="font-size:11px; color:#888;">→ 入口A</span>
+        <span style="font-size:11px;">PhotoCard hover「✓ 设为最终」→ <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">onSetFinal</code> → <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">handleSetFinalPhoto</code></span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; margin-left: 54px;">
+        <span style="font-size:11px; color:#888;">→ 入口B</span>
+        <span style="font-size:11px;">PendingPanel hover「单独选定」→ <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">onSelectSingle</code> → <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">handleSetFinalPhoto</code></span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; margin-left: 54px;">
+        <span style="font-size:11px; color:#888;">↩ 回退</span>
+        <span style="font-size:11px;">PhotoCard hover「✕ 取消最终」(红色) → <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">onCancelFinal</code> → <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">handleCancelFinalPhoto()</code></span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; margin-left: 54px;">
+        <span style="font-size:11px; color:#d44d68;">⚡ 全局清除</span>
+        <span style="font-size:11px; color:#d44d68;">所有 currentPhotos.is_final = false + 所有 selectedItems.is_final = false + selected_photo_id = undefined + has_final = false</span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
+        <span style="background:#EDE4FB; color:#7C5CBF; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;">路径 5</span>
+        <span><strong style="color:#7C5CBF;">照片网格 → 最终选定</strong> — PhotoCard hover「✓ 设为最终」→ <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">handleSetFinalPhoto</code> → <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">is_final=true</code> + <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">selected_photo_id</code>（<strong>跳过待选区</strong>）</span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; margin-left: 54px;">
+        <span style="font-size:11px; color:#888;">↩ 回退</span>
+        <span style="font-size:11px;">同一 PhotoCard hover「✕ 取消最终」→ 全局清除（同路径 3 回退）</span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; margin-left: 54px;">
+        <span style="font-size:11px; color:#7c5cbf;">⚡ 区别</span>
+        <span style="font-size:11px; color:#7c5cbf;">照片未经过待选区，但 <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">selectedItems</code> 不受影响（照片不在其中）</span>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 8px;">
+        <span style="background:#FCEBEB; color:#E24B4A; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;">路径 4</span>
+        <span><strong style="color:#E24B4A;">回退</strong> — 「移除」退回网格 / 「取消最终」全局清除当前周期所有 <code style="background:#f5f4f0; padding:1px 4px; border-radius:3px;">is_final</code></span>
+      </div>
+    </div>
+  </div>
+
+  <h4 style="font-size:13px; margin:16px 0 8px; color:#555;">🔑 5 个关键规则</h4>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 12px; font-size: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="padding: 6px 10px; background: #fffaf5; border-left: 3px solid #f58b3d; border-radius: 4px;">
+          <strong>待选区是主要操作入口</strong> — 拼图、单独选定等核心操作在待选区执行。照片网格可直接「设为最终」（路径5，跳过待选区）
+        </div>
+        <div style="padding: 6px 10px; background: #fffaf5; border-left: 3px solid #f58b3d; border-radius: 4px;">
+          <strong>is_final 与 is_selected 共存</strong> — 设为最终后照片仍留在待选区，可同时勾选 is_multi_selected 参与拼图
+        </div>
+        <div style="padding: 6px 10px; background: #fffaf5; border-left: 3px solid #f58b3d; border-radius: 4px;">
+          <strong>取消最终 → 全局回退</strong> — handleCancelFinalPhoto 会清除当前周期所有照片的 is_final 和 selected_photo_id
+        </div>
+        <div style="padding: 6px 10px; background: #fffaf5; border-left: 3px solid #f58b3d; border-radius: 4px;">
+          <strong>周期级别的最终选定</strong> — Period.selected_photo_id 指向最终选定的照片/视频帧 ID，是周期时间线的数据源
+        </div>
+        <div style="padding: 6px 10px; background: #fffaf5; border-left: 3px solid #f58b3d; border-radius: 4px;">
+          <strong>跨周期隔离</strong> — 切换周期时，待选区 (selectedItems) 会根据新周期的 is_selected 照片重新加载
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h4 style="font-size:13px; margin:16px 0 8px; color:#555;">📡 数据流</h4>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 12px; font-size: 12px; font-family: monospace; line-height: 1.8;">
+      <div style="color:#534AB7;">照片选择操作 → Zustand Store (useAppStore)</div>
+      <div style="padding-left: 16px; color:#555;">
+        ├── <span style="color:#D85A30;">selectedItems[]</span> ← 待选区面板的数据源<br>
+        ├── <span style="color:#534AB7;">currentPhotos[]</span> ← 照片网格的数据源<br>
+        ├── <span style="color:#BA7517;">periods[].selected_photo_id</span> ← 周期时间线的数据源<br>
+        └── <span style="color:#1D9E75;">periodStats[].has_final / pending_count</span> ← 周期统计徽章的数据源
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 视频截帧 UX 操作 -->
+<!-- ============================================================ -->
+  <h3 style="font-size:14px; margin: 20px 0 10px; color:#333; border-bottom: 1px solid #e8e6de; padding-bottom: 6px;">🎬 视频截帧 UX 操作</h3>
+  <div class="mockup" style="margin-bottom: 10px;">
+    <div class="mockup-body" style="padding: 14px; background: #f8f7ff; border-radius: 8px;">
+      <p style="font-size:11px; color:#888; margin:0 0 8px;">VideoFrame 与 Photo 共享相同的 3 布尔标记（is_selected / is_multi_selected / is_final），但进入路径完全不同。</p>
+      
+      <h4 style="font-size:13px; margin: 12px 0 6px; color:#333;">📌 入口 — 视频卡片两按钮</h4>
+      <table style="width:100%; border-collapse: collapse; font-size:11px;">
+        <tr style="background:#f0edd9;">
+          <th style="padding:6px 10px; text-align:left; border:1px solid #ddd;">按钮</th>
+          <th style="padding:6px 10px; text-align:left; border:1px solid #ddd;">触发函数</th>
+          <th style="padding:6px 10px; text-align:left; border:1px solid #ddd;">目标</th>
+          <th style="padding:6px 10px; text-align:left; border:1px solid #ddd;">动态文本</th>
+        </tr>
+        <tr>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-weight:600;">截取画面 / 查看(N)</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-size:10px;">handleExtractFrames()</td>
+          <td style="padding:6px 10px; border:1px solid #ddd;">VideoFrameSettingsModal</td>
+          <td style="padding:6px 10px; border:1px solid #ddd;">首次「截取画面」→ 有帧后「查看(N)」</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-weight:600;">播放</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-size:10px;">handleOpenInlinePlayer()</td>
+          <td style="padding:6px 10px; border:1px solid #ddd;">VideoFramePlayer（内嵌播放器）</td>
+          <td style="padding:6px 10px; border:1px solid #ddd;">—</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 路径 A -->
+  <div class="mockup" style="margin-bottom: 8px;">
+    <div class="mockup-body" style="padding: 12px; background: #EEEDFE; border-radius: 8px; border-left: 4px solid #534AB7;">
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+        <span style="background:#534AB7; color:#fff; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0; font-size:11px;">路径 A</span>
+        <span style="font-size:12px;"><strong style="color:#534AB7;">设置 → FFmpeg 抽帧 → 帧浏览器</strong></span>
+      </div>
+      <div style="font-size:11px; font-family:monospace; line-height:1.7; color:#555;">
+        「截取画面」→ <b>VideoFrameSettingsModal</b><br>
+        <span style="padding-left:8px;">├ 模式：按数量抽帧（默认20，1~100）/ 按间隔抽帧</span><br>
+        <span style="padding-left:8px;">├ interval模式实时计算 duration/interval</span><br>
+        <span style="padding-left:8px;">└ 「开始抽帧」→ <b>setIsExtractingFrames(true)</b> → 按钮变灰色「抽帧中...」</span><br>
+        <span style="padding-left:16px;">→ generateVideoFrames() / generateVideoFramesByInterval()</span><br>
+        <span style="padding-left:16px;">→ setCurrentVideoFrames(frames)</span><br>
+        <span style="padding-left:16px;">→ setVideoFrameCounts(...) → 按钮文本更新</span><br>
+        <span style="padding-left:16px;">→ setShowFrameViewer(true)</span><br>
+        <span style="padding-left:24px; color:#534AB7;">→ <b>VideoFrameViewerModal</b> 全屏4列网格</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 路径 B -->
+  <div class="mockup" style="margin-bottom: 8px;">
+    <div class="mockup-body" style="padding: 12px; background: #FAEEDA; border-radius: 8px; border-left: 4px solid #BA7517;">
+      <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+        <span style="background:#BA7517; color:#fff; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0; font-size:11px;">路径 B</span>
+        <span style="font-size:12px;"><strong style="color:#BA7517;">内嵌播放器 → 手动截帧（当前为模拟）</strong></span>
+      </div>
+      <div style="font-size:11px; font-family:monospace; line-height:1.7; color:#555;">
+        「播放」→ <b>VideoFramePlayer</b> 全屏播放器<br>
+        <span style="padding-left:8px;">├ 播放/暂停 · 逐帧(←→) · 倍速(0.25/0.5/1/2x) · 进度条可点击</span><br>
+        <span style="padding-left:8px;">├ 附近帧预览条（8帧缩略图 + 模糊警告）</span><br>
+        <span style="padding-left:8px;">├ 「截取此帧」→ mockFrame(id=Date.now())</span><br>
+        <span style="padding-left:16px;">→ onCapture(frame)</span><br>
+        <span style="padding-left:20px;">→ addToSelectedItems({ type:'video_frame', is_selected:true })</span><br>
+        <span style="padding-left:20px; color:#D85A30;">直接进待选区，不走 updateVideoFrame 持久化！</span><br>
+        <span style="padding-left:8px;">└ 截帧结果栏：缩略图+时间码+模糊警告+「加入待选区」/「直接选定(TODO)」</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 帧浏览器操作 -->
+  <h4 style="font-size:13px; margin: 14px 0 6px; color:#333;">帧浏览器（VideoFrameViewerModal）4 种操作</h4>
+  <div class="mockup" style="margin-bottom: 8px;">
+    <div class="mockup-body" style="padding: 12px; background: #F0FDF4; border-radius: 8px;">
+      <table style="width:100%; border-collapse: collapse; font-size:11px;">
+        <tr style="background:#dcfce7;">
+          <th style="padding:5px 8px; text-align:left; border:1px solid #ddd;">操作</th>
+          <th style="padding:5px 8px; text-align:left; border:1px solid #ddd;">触发</th>
+          <th style="padding:5px 8px; text-align:left; border:1px solid #ddd;">实现</th>
+          <th style="padding:5px 8px; text-align:left; border:1px solid #ddd;">视觉指示</th>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">勾选/取消</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">点击左上角 checkbox</td>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-family:monospace; font-size:10px;">toggleSelect() → selectedIds Set</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">勾选=紫色ring · 未勾选=白色半透明</td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">单独加入</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">点击右上角 +</td>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-family:monospace; font-size:10px;">onAddSingle() → addToSelectedItems()</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">绿色圆按钮</td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">批量加入</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">底部「加入待选区(N)」</td>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-family:monospace; font-size:10px;">onConfirmSelection() → 逐个add</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">紫色按钮，disabled=N=0</td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">预览</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">双击帧</td>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-family:monospace; font-size:10px;">onPreview(frame) → PhotoViewer</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">—</td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">重新抽帧</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">顶部 RefreshCw 按钮</td>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-family:monospace; font-size:10px;">onReExtract() → 关闭Viewer → 开Settings</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">—</td>
+        </tr>
+      </table>
+      <div style="margin-top:8px; font-size:10px; color:#888;">
+        状态指示：勾选=紫色ring · 已确认最终=绿色ring · 顶部「· 已确认最终帧」· 每帧底部时间码 M:SS
+      </div>
+    </div>
+  </div>
+
+  <!-- 进入待选区后的操作 -->
+  <h4 style="font-size:13px; margin: 14px 0 6px; color:#333;">进入待选区后 — 与照片共用 PendingSelectionPanel</h4>
+  <div class="mockup" style="margin-bottom: 8px;">
+    <div class="mockup-body" style="padding: 12px; background: #fffaf5; border-radius: 8px; border-left: 4px solid #f58b3d;">
+      <table style="width:100%; border-collapse: collapse; font-size:11px;">
+        <tr style="background:#fef3c7;">
+          <th style="padding:5px 8px; text-align:left; border:1px solid #ddd;">操作</th>
+          <th style="padding:5px 8px; text-align:left; border:1px solid #ddd;">状态变化</th>
+          <th style="padding:5px 8px; text-align:left; border:1px solid #ddd;">关键实现</th>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">移除</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;"><code>is_selected=false</code></td>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-family:monospace; font-size:10px;">handleToggleFrameSelect() → updateVideoFrame() 持久化 → removeFromSelectedItems()</td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">多选勾选</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;"><code>is_multi_selected=toggle</code></td>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-family:monospace; font-size:10px;">handleToggleMultiSelect() → 同步 currentVideoFrames + selectedItems</td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">设为最终</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;"><code>is_final=true</code></td>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-family:monospace; font-size:10px;">handleSetFinalVideoFrame() → setFinalVideoFrame() 持久化 → period.selected_photo_id</td>
+        </tr>
+        <tr>
+          <td style="padding:5px 8px; border:1px solid #ddd; font-weight:600;">拼图</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">勾选 ≥2</td>
+          <td style="padding:5px 8px; border:1px solid #ddd;">与照片混合进入 CollageWorkspace，标题显示「视频截帧 #N」</td>
+        </tr>
+      </table>
+
+      <div style="margin-top:10px; font-size:11px; line-height:1.7; color:#555;">
+        <div style="padding:6px 10px; background:#fef3c7; border-left:3px solid #BA7517; border-radius:4px; margin-bottom:6px;">
+          <strong>设为最终 完整调用链</strong><br>
+          <code style="font-size:10px;">
+          handleSelectSingle(item) → handleSetFinalVideoFrame(frame)<br>
+          → setFinalVideoFrame(periodId, frame.id) ← Tauri 持久化<br>
+          → setCurrentVideoFrames(所有帧is_final重置，仅目标帧=true)<br>
+          → setSelectedItems(is_final同步) → setPeriods(selected_photo_id=frame.id)<br>
+          → updatePeriodStat(has_final:true)
+          </code>
+        </div>
+        <div style="padding:6px 10px; background:#FCEBEB; border-left:3px solid #E24B4A; border-radius:4px;">
+          <strong>回退（取消最终） — 全局操作</strong><br>
+          <code style="font-size:10px;">
+          handleCancelFinalPhoto() → cancelFinalVideoFrame(periodId)<br>
+          → currentVideoFrames 所有 is_final=false<br>
+          → selected_photo_id=undefined · has_final=false
+          </code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 跨周期加载 -->
+  <div class="mockup" style="margin-bottom: 10px;">
+    <div class="mockup-body" style="padding: 12px; background: #f5f4f0; border-radius: 8px;">
+      <h4 style="font-size:13px; margin: 0 0 8px; color:#333;">跨周期数据加载</h4>
+      <div style="font-size:11px; font-family:monospace; line-height:1.7; color:#555;">
+        loadPeriodData(periodId)<br>
+        <span style="padding-left:8px;">→ <b>getPeriodVideoFrames(periodId)</b> ← Tauri 查询</span><br>
+        <span style="padding-left:8px;">→ setCurrentVideoFrames(frames)</span><br>
+        <span style="padding-left:8px;">→ pendingFrames = frames.filter(is_selected).map(is_multi_selected=false)</span><br>
+        <span style="padding-left:8px;">→ allPending = [...pendingPhotos, ...pendingFrames]</span><br>
+        <span style="padding-left:8px;">→ setSelectedItems(allPending)</span>
+      </div>
+      <p style="font-size:10px; color:#D85A30; margin:6px 0 0;">is_multi_selected 跨周期强制清零，防止上一周期拼图勾选泄漏</p>
+    </div>
+  </div>
+
+<!-- ============================================================ -->
+<!-- 路径操作 → UI 显示状态映射 -->
+<!-- ============================================================ -->
+  <h3 style="font-size:14px; margin: 20px 0 10px; color:#333; border-bottom: 1px solid #e8e6de; padding-bottom: 6px;">🖥️ 路径操作 → UI 显示状态映射</h3>
+  
+  <div class="mockup" style="margin-bottom: 8px;">
+    <div class="mockup-body" style="padding: 12px; background: #f8f7ff; border-radius: 8px;">
+      <h4 style="font-size:13px; margin: 0 0 8px; color:#333;">📍 受影响 UI 组件一览</h4>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; font-size:11px;">
+        <span style="background:#EEEDFE; padding:3px 8px; border-radius:4px; white-space:nowrap;">📷 PhotoCard</span>
+        <span style="background:#E1F5EE; padding:3px 8px; border-radius:4px; white-space:nowrap;">📋 PendingSelectionPanel</span>
+        <span style="background:#FAEEDA; padding:3px 8px; border-radius:4px; white-space:nowrap;">📅 PeriodTimeline</span>
+        <span style="background:#EDE4FB; padding:3px 8px; border-radius:4px; white-space:nowrap;">🎥 VideoCard</span>
+        <span style="background:#FCEBEB; padding:3px 8px; border-radius:4px; white-space:nowrap;">🖼️ VideoFrameViewerModal</span>
+        <span style="background:#F0EDD9; padding:3px 8px; border-radius:4px; white-space:nowrap;">🎬 VideoFramePlayer</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 状态标记速查表 -->
+  <div class="mockup" style="margin-bottom: 8px;">
+    <div class="mockup-body" style="padding: 12px; font-size: 11px;">
+      <h4 style="font-size:13px; margin: 0 0 8px; color:#333;">状态标记 → 视觉信号速查</h4>
+      <table style="width:100%; border-collapse: collapse; font-size:11px;">
+        <tr style="background:#f0edd9;">
+          <th style="padding:6px 10px; text-align:left; border:1px solid #ddd; width:20%;">属性</th>
+          <th style="padding:6px 10px; text-align:left; border:1px solid #ddd; width:40%;">true 时视觉</th>
+          <th style="padding:6px 10px; text-align:left; border:1px solid #ddd; width:40%;">false 时视觉</th>
+        </tr>
+        <tr>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-weight:600; color:#534AB7;">is_selected</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">hover「✕ 取消」+ 右下🟡圆点 + PendingPanel中可见</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">hover「+ 加入待选区」+ 无圆点 + 不在PendingPanel</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-weight:600; color:#1D9E75;">is_multi_selected</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">PendingPanel checkbox 打勾；≥2张: 🟣进度条 +「生成拼图」启用</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">checkbox 空；「生成拼图」灰色 disabled</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-weight:600; color:#BA7517;">is_final</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">🟣 ring + hover「✕ 取消最终」红色 + 右下紫色Check圆点</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">无 ring + hover「✓ 设为最终」紫色按钮</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-weight:600; color:#D85A30;">has_final (周期)</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">Timeline圆点 ✓ + 徽章「完成」+ 蓝色实线连接</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">Timeline圆点 ○ + 徽章「未开始」+ 灰色虚线</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-weight:600;">pending_count</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">Timeline子项显示 +N amber徽章</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">不显示数字</td>
+        </tr>
+        <tr style="background:#fafaf8;">
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-weight:600;">videoFrameCounts</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">VideoCard按钮「查看(N)」</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">VideoCard按钮「截取画面」</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-family:monospace; font-weight:600;">isExtractingFrames</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">VideoCard按钮变灰 disabled「抽帧中...」</td>
+          <td style="padding:6px 10px; border:1px solid #ddd; font-size:10px;">正常可点击</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 路径对照表 -->
+  <h4 style="font-size:13px; margin: 16px 0 8px; color:#555;">📊 路径 → UI 影响对照表</h4>
+
+  <!-- 路径 1 -->
+  <div class="mockup" style="margin-bottom: 6px;">
+    <div class="mockup-body" style="padding: 10px; background: #EEEDFE; border-radius: 8px; border-left: 4px solid #534AB7; font-size:11px;">
+      <strong style="color:#534AB7; font-size:12px;">路径 1 正向: 加入待选区</strong> <span style="color:#888;">→ 影响 3 个组件</span>
+      <table style="width:100%; margin-top:6px; border-collapse:collapse; font-size:10px;">
+        <tr><td style="padding:3px 6px; font-weight:600; width:20%;">PhotoCard</td><td style="padding:3px 6px;">hover 按钮「+ 加入待选区」→「✕ 取消」；右下出现 🟡 琥珀圆点</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">PendingPanel</td><td style="padding:3px 6px;">列表 +1 卡片；顶部计数徽章 +1</td></tr>
+        <tr><td style="padding:3px 6px; font-weight:600;">Timeline</td><td style="padding:3px 6px;">对应周期 pending_count +1 → +N 徽章出现/更新</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">回退A/B</td><td style="padding:3px 6px; color:#d44d68;">以上全部反向：按钮复位、圆点消失、列表 -1、pending_count -1、is_multi_selected 强制清零</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 路径 3 -->
+  <div class="mockup" style="margin-bottom: 6px;">
+    <div class="mockup-body" style="padding: 10px; background: #FAEEDA; border-radius: 8px; border-left: 4px solid #BA7517; font-size:11px;">
+      <strong style="color:#BA7517; font-size:12px;">路径 3 正向: 待选区 → 最终选定</strong> <span style="color:#888;">→ 影响 3 个组件</span>
+      <table style="width:100%; margin-top:6px; border-collapse:collapse; font-size:10px;">
+        <tr><td style="padding:3px 6px; font-weight:600; width:20%;">PhotoCard</td><td style="padding:3px 6px;">🟣 紫色 ring；hover「✓ 设为最终」→「✕ 取消最终」红色；右下琥珀圆点 → 🟣 紫色 Check 圆点</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">PendingPanel</td><td style="padding:3px 6px;">对应卡片同步紫色 ring</td></tr>
+        <tr><td style="padding:3px 6px; font-weight:600;">Timeline</td><td style="padding:3px 6px;">○ → ✓ 勾选圆点；徽章「未开始」→「完成」；连接线 灰色虚线 → 蓝色实线</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">回退</td><td style="padding:3px 6px; color:#d44d68;">以上全部反向：ring消失、按钮复位、Timeline回退（pending_count 不受影响）</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 路径 5 -->
+  <div class="mockup" style="margin-bottom: 6px;">
+    <div class="mockup-body" style="padding: 10px; background: #EDE4FB; border-radius: 8px; border-left: 4px solid #7C5CBF; font-size:11px;">
+      <strong style="color:#7C5CBF; font-size:12px;">路径 5 正向: 照片网格 → 直接最终选定</strong> <span style="color:#888;">→ 影响 2 个组件（跳过待选区）</span>
+      <table style="width:100%; margin-top:6px; border-collapse:collapse; font-size:10px;">
+        <tr><td style="padding:3px 6px; font-weight:600; width:20%;">PhotoCard</td><td style="padding:3px 6px;"><strong>同路径3</strong> — 紫色 ring + 紫色 Check 圆点 +「✕ 取消最终」按钮</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">PendingPanel</td><td style="padding:3px 6px; color:#7c5cbf;"><strong>无变化</strong> — 照片从未加入待选区，列表/计数不变</td></tr>
+        <tr><td style="padding:3px 6px; font-weight:600;">Timeline</td><td style="padding:3px 6px;"><strong>同路径3</strong> — ✓ +「完成」+ 蓝色连接线（pending_count 不变）</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">回退</td><td style="padding:3px 6px; color:#d44d68;">全局清除同路径3；PhotoCard回到完全初始态（无圆点/无ring）</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 路径 2 -->
+  <div class="mockup" style="margin-bottom: 6px;">
+    <div class="mockup-body" style="padding: 10px; background: #E1F5EE; border-radius: 8px; border-left: 4px solid #1D9E75; font-size:11px;">
+      <strong style="color:#1D9E75; font-size:12px;">路径 2: 待选区 → 拼图勾选</strong> <span style="color:#888;">→ 影响 1 个组件（自含式）</span>
+      <table style="width:100%; margin-top:6px; border-collapse:collapse; font-size:10px;">
+        <tr><td style="padding:3px 6px; font-weight:600; width:20%;">PendingPanel 卡片</td><td style="padding:3px 6px;">checkbox 打勾/取消</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">PendingPanel 底部</td><td style="padding:3px 6px;">0张:💡提示 → 1张:无显示 → ≥2张:🧩「已选中N张」+ 🟣进度条 +「生成拼图(N张)」启用</td></tr>
+        <tr><td style="padding:3px 6px; font-weight:600;">回退(去勾选)</td><td style="padding:3px 6px; color:#d44d68;">checkbox清 → 计数减 → &lt;2张时按钮 disabled + 进度条消失</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 视频 路径A -->
+  <div class="mockup" style="margin-bottom: 6px;">
+    <div class="mockup-body" style="padding: 10px; background: #FCEBEB; border-radius: 8px; border-left: 4px solid #E24B4A; font-size:11px;">
+      <strong style="color:#E24B4A; font-size:12px;">视频 路径 A: FFmpeg 抽帧 → 帧浏览器 → 待选区</strong> <span style="color:#888;">→ 4 阶段</span>
+      <table style="width:100%; margin-top:6px; border-collapse:collapse; font-size:10px;">
+        <tr><td style="padding:3px 6px; font-weight:600; width:20%;">VideoCard (设置)</td><td style="padding:3px 6px;">VideoFrameSettingsModal 弹窗 → count/interval 模式 + 滑块</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">VideoCard (抽帧)</td><td style="padding:3px 6px;">按钮变灰 disabled「抽帧中...」</td></tr>
+        <tr><td style="padding:3px 6px; font-weight:600;">VideoCard (完成)</td><td style="padding:3px 6px;">按钮恢复「查看(N)」→ 全屏帧浏览器 4 列网格</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">ViewerModal</td><td style="padding:3px 6px;">勾选 → 🟣 ring → 批量按钮「加入待选区(N)」；单帧+ → 待选区 +1</td></tr>
+        <tr><td style="padding:3px 6px; font-weight:600;">PendingPanel</td><td style="padding:3px 6px;">帧入待选区后 → 与照片共用相同的 3 标记体系 + 5 条路径</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 视频 路径B -->
+  <div class="mockup" style="margin-bottom: 6px;">
+    <div class="mockup-body" style="padding: 10px; background: #F0EDD9; border-radius: 8px; border-left: 4px solid #8B6914; font-size:11px;">
+      <strong style="color:#8B6914; font-size:12px;">视频 路径 B: 内嵌播放器 手动截帧</strong> <span style="color:#888;">→ 影响 2 个组件 ⚠️ 模拟数据</span>
+      <table style="width:100%; margin-top:6px; border-collapse:collapse; font-size:10px;">
+        <tr><td style="padding:3px 6px; font-weight:600; width:20%;">VideoFramePlayer</td><td style="padding:3px 6px;">截帧结果栏 → 缩略图 + 时间码 +「加入待选区」按钮</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:3px 6px; font-weight:600;">PendingPanel</td><td style="padding:3px 6px;">mockFrame 入待选区 → 列表 +1（id=Date.now() 无持久化，跨周期丢失）</td></tr>
+        <tr><td style="padding:3px 6px; font-weight:600; color:#D85A30;">⚠️ 持久性</td><td style="padding:3px 6px; color:#D85A30;">不走 updateVideoFrame() ← 与路径A不一致</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 聚合统计 -->
+  <div class="mockup" style="margin-bottom: 8px;">
+    <div class="mockup-body" style="padding: 12px; background: #f8f7ff; border-radius: 8px;">
+      <h4 style="font-size:13px; margin: 0 0 8px; color:#333;">📊 聚合影响：同时触发的 UI 表面数量</h4>
+      <table style="width:100%; border-collapse: collapse; font-size:11px; text-align:center;">
+        <tr style="background:#f0edd9;">
+          <th style="padding:6px 10px; text-align:left; border:1px solid #ddd;">路径 & 操作</th>
+          <th style="padding:6px 10px; border:1px solid #ddd;">触发的 UI 组件数</th>
+        </tr>
+        <tr><td style="padding:6px 10px; text-align:left; border:1px solid #ddd;"><span style="color:#534AB7; font-weight:600;">路径 1</span> 加入/移除待选区</td><td style="padding:6px 10px; border:1px solid #ddd; font-weight:600;">3</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:6px 10px; text-align:left; border:1px solid #ddd;"><span style="color:#BA7517; font-weight:600;">路径 3</span> 设为最终 / 回退</td><td style="padding:6px 10px; border:1px solid #ddd; font-weight:600;">3–4</td></tr>
+        <tr><td style="padding:6px 10px; text-align:left; border:1px solid #ddd;"><span style="color:#7C5CBF; font-weight:600;">路径 5</span> 直接最终 / 回退</td><td style="padding:6px 10px; border:1px solid #ddd; font-weight:600;">2–3</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:6px 10px; text-align:left; border:1px solid #ddd;"><span style="color:#1D9E75; font-weight:600;">路径 2</span> 拼图勾选</td><td style="padding:6px 10px; border:1px solid #ddd; font-weight:600;">1</td></tr>
+        <tr><td style="padding:6px 10px; text-align:left; border:1px solid #ddd;"><span style="color:#E24B4A; font-weight:600;">视频 A</span> FFmpeg 抽帧流程</td><td style="padding:6px 10px; border:1px solid #ddd; font-weight:600;">4 阶段</td></tr>
+        <tr style="background:#fafaf8;"><td style="padding:6px 10px; text-align:left; border:1px solid #ddd;"><span style="color:#8B6914; font-weight:600;">视频 B</span> 手动截帧</td><td style="padding:6px 10px; border:1px solid #ddd; font-weight:600;">2</td></tr>
+      </table>
+    </div>
+  </div>

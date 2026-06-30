@@ -40,8 +40,8 @@ function TemplateThumbnail({
     <div
       className={`relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all duration-200 ${
         selected
-          ? 'border-[#d44d68] shadow-[0_0_0_3px_rgba(212,77,104,0.15)] bg-gradient-to-br from-[#fef7f0] to-[#fdf2f2]'
-          : 'border-[#e8e6de] hover:border-[#f58b3d] hover:-translate-y-1 hover:shadow-lg bg-[#fafaf8]'
+          ? 'border-rose-500 shadow-[0_0_0_3px_rgba(var(--color-rose-500),0.15)] bg-gradient-to-br from-warmth-50 to-rose-50'
+          : 'border-stone-200 hover:border-warmth-500 hover:-translate-y-1 hover:shadow-lg bg-stone-50'
       }`}
       onClick={onClick}
     >
@@ -126,28 +126,27 @@ export default function TemplateSelector({
     >
       {/* Modal Container */}
       <div
-        className="relative w-full max-w-[960px] max-h-[92vh] mx-4 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-[#e8e6de] overflow-hidden flex flex-col"
+        className="relative w-full max-w-[960px] max-h-[92vh] mx-4 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-[#e8e6de] flex-shrink-0">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-stone-200 flex-shrink-0">
           <button
             onClick={onCancel}
-            className="flex items-center gap-1 text-sm text-[#706c63] hover:text-[#33312d] transition-colors"
+            className="flex items-center gap-1 text-sm text-stone-600 hover:text-stone-900 transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
             返回
           </button>
-          <span className="text-[#e8e6de]">|</span>
-          <Grid3X3 className="w-4 h-4 text-[#f58b3d]" />
-          <h3 className="text-base font-semibold text-[#33312d]">
+          <span className="text-stone-200">|</span>
+          <Grid3X3 className="w-4 h-4 text-warmth-500" />
+          <h3 className="text-base font-semibold text-stone-900">
             选择拼图模板
           </h3>
           <span
-            className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full"
+            className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full text-rose-500"
             style={{
               background: 'linear-gradient(135deg, rgba(245,139,61,0.12), rgba(212,77,104,0.12))',
-              color: '#c7516f',
             }}
           >
             {photoCount} 张照片 · {availableTemplates.length} 个模板
@@ -159,7 +158,7 @@ export default function TemplateSelector({
           {/* 左侧: 模板卡片网格 */}
           <div className="flex-1 overflow-y-auto p-5">
             {availableTemplates.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-[#b0aca0]">
+              <div className="flex flex-col items-center justify-center h-full text-stone-400">
                 <Grid3X3 className="w-12 h-12 mb-3 opacity-30" />
                 <p className="text-sm">暂无可用的拼图模板</p>
                 <p className="text-xs mt-1">请选择 2–9 张照片后重试</p>
@@ -180,12 +179,12 @@ export default function TemplateSelector({
                     <div className="mt-1.5 px-1">
                       <p
                         className={`text-xs font-semibold truncate transition-colors ${
-                          activeId === tpl.id ? 'text-[#c7516f]' : 'text-[#33312d] group-hover:text-[#f58b3d]'
+                          activeId === tpl.id ? 'text-rose-500' : 'text-stone-900 group-hover:text-warmth-500'
                         }`}
                       >
                         {tpl.name}
                       </p>
-                      <p className="text-[10px] text-[#b0aca0] truncate">{tpl.desc}</p>
+                      <p className="text-[10px] text-stone-400 truncate">{tpl.desc}</p>
                     </div>
                   </button>
                 ))}
@@ -194,9 +193,9 @@ export default function TemplateSelector({
           </div>
 
           {/* 右侧: 预览 + 详情面板 */}
-          <div className="w-[300px] flex-shrink-0 border-l border-[#e8e6de] p-5 flex flex-col bg-[#fafaf8]/80">
+          <div className="w-[300px] flex-shrink-0 border-l border-stone-200 p-5 flex flex-col bg-stone-50/80">
             {/* 大预览 */}
-            <div className="aspect-square rounded-xl overflow-hidden border-2 border-[#e8e6de] bg-white shadow-md relative mb-4">
+            <div className="aspect-square rounded-xl overflow-hidden border-2 border-stone-200 bg-white shadow-md relative mb-4">
               {activeTemplate ? (
                 activeTemplate.regions.map((r, i) => (
                   <div
@@ -216,7 +215,7 @@ export default function TemplateSelector({
                   </div>
                 ))
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-[#b0aca0] text-sm">
+                <div className="w-full h-full flex items-center justify-center text-stone-400 text-sm">
                   请选择一个模板
                 </div>
               )}
@@ -225,23 +224,23 @@ export default function TemplateSelector({
             {/* 模板信息 */}
             {activeTemplate && (
               <div className="flex-1">
-                <h4 className="text-sm font-bold text-[#33312d] mb-0.5">
+                <h4 className="text-sm font-bold text-stone-900 mb-0.5">
                   {activeTemplate.name}
                 </h4>
-                <p className="text-xs text-[#b0aca0] mb-3">{activeTemplate.desc}</p>
-                <p className="text-[11px] text-[#706c63] leading-relaxed mb-4">
+                <p className="text-xs text-stone-400 mb-3">{activeTemplate.desc}</p>
+                <p className="text-[11px] text-stone-600 leading-relaxed mb-4">
                   {activeTemplate.tips}
                 </p>
 
                 {/* 区域定义列表 */}
-                <h5 className="text-[10px] font-bold text-[#b0aca0] uppercase tracking-wider mb-2">
+                <h5 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">
                   区域布局
                 </h5>
                 <div className="space-y-1 mb-4">
                   {activeTemplate.regions.map((r, i) => (
                     <div
                       key={i}
-                      className="flex items-center gap-2 px-2 py-1 rounded-md text-[11px] border border-[#e8e6de] bg-white"
+                      className="flex items-center gap-2 px-2 py-1 rounded-md text-[11px] border border-stone-200 bg-white"
                     >
                       <div
                         className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center text-[8px] font-bold text-white"
@@ -249,8 +248,8 @@ export default function TemplateSelector({
                       >
                         {r.order + 1}
                       </div>
-                      <span className="text-[#33312d]">照片 #{r.order + 1}</span>
-                      <span className="ml-auto text-[9px] text-[#b0aca0] font-mono">
+                      <span className="text-stone-900">照片 #{r.order + 1}</span>
+                      <span className="ml-auto text-[9px] text-stone-400 font-mono">
                         x:{(r.x * 100).toFixed(0)}% y:{(r.y * 100).toFixed(0)}%
                         {' '}w:{(r.w * 100).toFixed(0)}% h:{(r.h * 100).toFixed(0)}%
                       </span>
@@ -261,7 +260,7 @@ export default function TemplateSelector({
             )}
 
             {/* 确认按钮 */}
-            <div className="flex gap-2 mt-auto pt-4 border-t border-[#e8e6de]">
+            <div className="flex gap-2 mt-auto pt-4 border-t border-stone-200">
               <button onClick={onCancel} className="btn btn-ghost btn-sm flex-1">
                 取消
               </button>

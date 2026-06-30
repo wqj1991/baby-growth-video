@@ -121,13 +121,51 @@ export default {
           900: '#433273',
           950: '#281e47',
         },
-        // baby 色系保留但升级
+        // baby 色系 — 基于 CSS 变量
         baby: {
-          pink:   '#f9c5d1',
-          blue:   '#a8d8ea',
+          pink:   'var(--color-baby-pink)',
+          blue:   'var(--color-baby-blue)',
           yellow: '#ffe8a1',
           green:  '#b5e8c3',
           purple: '#d4c5f0',
+        },
+
+        // ── 语义操作 / 状态色 (基于 CSS 变量，支持主题切换) ──
+        brand: {
+          DEFAULT: 'var(--color-brand)',
+          light:   'var(--color-brand-light)',
+          dark:    'var(--color-brand-dark)',
+        },
+        success: {
+          DEFAULT: 'var(--color-success)',
+          bg:      'var(--color-success-bg)',
+          text:    'var(--color-success-text)',
+          border:  'var(--color-success-border)',
+        },
+        warning: {
+          DEFAULT: 'var(--color-warning)',
+          bg:      'var(--color-warning-bg)',
+          text:    'var(--color-warning-text)',
+        },
+        error: {
+          DEFAULT: 'var(--color-error)',
+          bg:      'var(--color-error-bg)',
+          text:    'var(--color-error-text)',
+          border:  'var(--color-error-border)',
+        },
+        info: {
+          DEFAULT: 'var(--color-info)',
+          bg:      'var(--color-info-bg)',
+          text:    'var(--color-info-text)',
+        },
+        pending: {
+          DEFAULT: 'var(--color-pending)',
+          bg:      'var(--color-pending-bg)',
+          text:    'var(--color-pending-text)',
+        },
+        stash: {
+          DEFAULT: 'var(--color-stash)',
+          bg:      'var(--color-stash-bg)',
         },
       },
       borderRadius: {

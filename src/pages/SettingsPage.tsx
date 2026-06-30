@@ -16,29 +16,29 @@ export default function SettingsPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   return (
-    <div className="min-h-screen bg-[#faf9f6]">
+    <div className="min-h-screen bg-stone-50">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-[#e8e6de]">
-          <button
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-stone-200">
+            <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-[#f0efe9] rounded-lg transition-colors"
+            className="p-2 hover:bg-stone-200 rounded-lg transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-[#33312d]" />
+            <ArrowLeft className="w-5 h-5 text-stone-900" />
           </button>
-          <h1 className="text-lg font-bold text-[#33312d]">设置</h1>
+          <h1 className="text-lg font-bold text-stone-900">设置</h1>
         </div>
 
         <div className="p-5 space-y-4">
           <div className="bg-white rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#f3f0fb] rounded-lg">
-                <Sparkles className="w-5 h-5 text-[#7c5cbf]" />
+              <div className="p-2.5 bg-stash-100 rounded-lg">
+                <Sparkles className="w-5 h-5 text-stash-600" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-base font-semibold" style={{ color: '#33312d' }}>
+                <h3 className="text-base font-semibold text-stone-900">
                   启用 AI 智能过渡
                 </h3>
-                <p className="text-sm mt-1 leading-relaxed" style={{ color: '#b0aca0', maxWidth: '340px' }}>
+                <p className="text-sm mt-1 leading-relaxed text-stone-400" style={{ maxWidth: '340px' }}>
                   在视频生成时使用 AI 创建照片之间的装饰性过渡帧，让成长回忆更生动
                 </p>
               </div>
@@ -53,8 +53,8 @@ export default function SettingsPage() {
             </div>
 
             {aiSettings.enabled && (
-              <div className="mt-4 pt-4 border-t border-[#f0efe9]">
-                <label className="block text-sm font-medium text-[#33312d] mb-2">过渡效果</label>
+              <div className="mt-4 pt-4 border-t border-stone-200">
+                <label className="block text-sm font-medium text-stone-900 mb-2">过渡效果</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['smooth', 'zoom', 'fade'] as const).map((style) => (
                     <button
@@ -62,8 +62,8 @@ export default function SettingsPage() {
                       onClick={() => setAiSettings({ ...aiSettings, transitionStyle: style })}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         aiSettings.transitionStyle === style
-                          ? 'bg-[#7c5cbf] text-white'
-                          : 'bg-[#f5f4f0] text-[#33312d] hover:bg-[#f0efe9]'
+                          ? 'bg-stash-600 text-white'
+                          : 'bg-stone-100 text-stone-900 hover:bg-stone-200'
                       }`}
                     >
                       {style === 'smooth' && '平滑'}
@@ -78,14 +78,14 @@ export default function SettingsPage() {
 
           <div className="bg-white rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#f0f7f4] rounded-lg">
-                <Volume2 className="w-5 h-5 text-[#5da48c]" />
+              <div className="p-2.5 bg-success-bg rounded-lg">
+                <Volume2 className="w-5 h-5 text-success" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-base font-semibold" style={{ color: '#33312d' }}>
+                <h3 className="text-base font-semibold text-stone-900">
                   背景音乐
                 </h3>
-                <p className="text-sm mt-1" style={{ color: '#b0aca0' }}>
+                <p className="text-sm mt-1 text-stone-400">
                   生成视频时添加默认背景音乐
                 </p>
               </div>
@@ -102,18 +102,18 @@ export default function SettingsPage() {
 
           <div className="bg-white rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#fef6f0] rounded-lg">
-                <Camera className="w-5 h-5 text-[#e5966e]" />
+              <div className="p-2.5 bg-warmth-50 rounded-lg">
+                <Camera className="w-5 h-5 text-warmth-400" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-base font-semibold" style={{ color: '#33312d' }}>
+                <h3 className="text-base font-semibold text-stone-900">
                   照片质量
                 </h3>
-                <p className="text-sm mt-1" style={{ color: '#b0aca0' }}>
+                <p className="text-sm mt-1 text-stone-400">
                   视频中照片的分辨率和压缩质量
                 </p>
               </div>
-              <span className="text-sm font-medium text-[#7c5cbf]">高</span>
+              <span className="text-sm font-medium text-stash-600">高</span>
             </div>
           </div>
         </div>

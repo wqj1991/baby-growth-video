@@ -53,20 +53,20 @@ export default function HistoryPage() {
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">历史记录</h1>
-        <p className="text-gray-500 mt-1">查看所有已生成的视频记录</p>
+        <h1 className="text-2xl font-bold text-stone-900">历史记录</h1>
+        <p className="text-stone-500 mt-1">查看所有已生成的视频记录</p>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500">加载中...</div>
+          <div className="text-stone-500">加载中...</div>
         </div>
       ) : records.length === 0 ? (
         <div className="card">
           <div className="card-body text-center py-16">
-            <Video className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">暂无历史记录</h3>
-            <p className="text-gray-500 mb-6">还没有生成过视频，去生成第一个成长视频吧！</p>
+            <Video className="w-16 h-16 mx-auto mb-4 text-stone-300" />
+            <h3 className="text-lg font-medium text-stone-900 mb-2">暂无历史记录</h3>
+            <p className="text-stone-500 mb-6">还没有生成过视频，去生成第一个成长视频吧！</p>
             <button className="btn btn-primary">
               <Play className="w-4 h-4" />
               去生成视频
@@ -79,16 +79,16 @@ export default function HistoryPage() {
             <div key={record.id} className="card overflow-hidden">
               <div className="flex">
                 {/* 视频缩略图 */}
-                <div className="w-48 aspect-video bg-gray-900 flex items-center justify-center flex-shrink-0">
-                  <Video className="w-12 h-12 text-gray-600" />
+                <div className="w-48 aspect-video bg-stone-900 flex items-center justify-center flex-shrink-0">
+                  <Video className="w-12 h-12 text-stone-600" />
                 </div>
 
                 {/* 信息 */}
                 <div className="flex-1 p-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{record.file_name}</h3>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                      <h3 className="font-semibold text-stone-900">{record.file_name}</h3>
+                      <div className="flex items-center gap-4 mt-2 text-sm text-stone-500">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           {record.created_at}
@@ -107,8 +107,8 @@ export default function HistoryPage() {
                   </div>
 
                   {record.error_message && (
-                    <div className="mt-3 p-3 bg-red-50 rounded-lg">
-                      <p className="text-sm text-red-600">
+                    <div className="mt-3 p-3 bg-error-bg rounded-lg">
+                      <p className="text-sm text-error-text">
                         错误信息：{record.error_message}
                       </p>
                     </div>
@@ -127,7 +127,7 @@ export default function HistoryPage() {
                         </button>
                       </>
                     )}
-                    <button className="btn btn-outline btn-sm text-red-600 hover:bg-red-50">
+                    <button className="btn btn-outline btn-sm text-error-text hover:bg-error-bg">
                       <Trash2 className="w-4 h-4" />
                       删除
                     </button>

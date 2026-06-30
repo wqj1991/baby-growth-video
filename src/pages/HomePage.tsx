@@ -97,7 +97,7 @@ export default function HomePage() {
       <div
         className={`relative overflow-hidden rounded-3xl p-8 mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
         style={{
-          background: 'linear-gradient(135deg, #fffaf5 0%, #fff2e6 30%, #fae7ea 70%, #e4e7f6 100%)',
+          background: 'linear-gradient(135deg, var(--color-warmth-50) 0%, var(--color-warmth-100) 30%, var(--color-error-bg) 70%, var(--color-indigo-100) 100%)',
         }}
       >
         <div className="relative z-10 flex items-center justify-between">
@@ -108,13 +108,13 @@ export default function HomePage() {
                 成长记录
               </span>
             </div>
-            <h1 className="text-3xl font-bold mb-2 tracking-tight" style={{ color: '#33312d' }}>
+            <h1 className="text-3xl font-bold mb-2 tracking-tight text-stone-900">
               欢迎回来
               {selectedBaby && (
                 <span className="ml-2 text-warmth-500">{selectedBaby.name}的家长</span>
               )}
             </h1>
-            <p className="text-base" style={{ color: '#706c63' }}>
+            <p className="text-base text-stone-600">
               记录宝宝每一个珍贵瞬间，制作专属成长视频
             </p>
           </div>
@@ -126,10 +126,10 @@ export default function HomePage() {
         </div>
         {/* 装饰元素 */}
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, #f58b3d 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, var(--color-brand) 0%, transparent 70%)' }}
         />
         <div className="absolute bottom-0 left-1/3 w-48 h-48 rounded-full opacity-8"
-          style={{ background: 'radial-gradient(circle, #d44d68 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, var(--color-error) 0%, transparent 70%)' }}
         />
       </div>
 
@@ -138,18 +138,17 @@ export default function HomePage() {
         {/* 新建项目 */}
         <button
           onClick={handleCreateProject}
-          className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-medium group ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+          className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-medium group border border-warmth-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
           style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #fffaf5 100%)',
-            border: '1px solid #ffe4cc',
+            background: 'linear-gradient(135deg, white 0%, var(--color-warmth-50) 100%)',
             transitionDelay: '0.05s',
           }}
         >
           <div className="w-11 h-11 rounded-xl gradient-warm flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform duration-300">
             <Plus className="w-5 h-5 text-white" />
           </div>
-          <h3 className="font-semibold text-base mb-1" style={{ color: '#33312d' }}>新建项目</h3>
-          <p className="text-xs" style={{ color: '#8f8b80' }}>创建新的成长视频项目</p>
+          <h3 className="font-semibold text-base mb-1 text-stone-900">新建项目</h3>
+          <p className="text-xs text-stone-500">创建新的成长视频项目</p>
         </button>
 
         {/* 继续制作 */}
@@ -161,18 +160,17 @@ export default function HomePage() {
               handleCreateProject();
             }
           }}
-          className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-medium group ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+          className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-medium group border border-indigo-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
           style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f4f5fb 100%)',
-            border: '1px solid #e4e7f6',
+            background: 'linear-gradient(135deg, white 0%, var(--color-indigo-50) 100%)',
             transitionDelay: '0.1s',
           }}
         >
           <div className="w-11 h-11 rounded-xl gradient-indigo flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform duration-300">
             <Play className="w-5 h-5 text-white" />
           </div>
-          <h3 className="font-semibold text-base mb-1" style={{ color: '#33312d' }}>继续制作</h3>
-          <p className="text-xs" style={{ color: '#8f8b80' }}>继续上次的视频项目</p>
+          <h3 className="font-semibold text-base mb-1 text-stone-900">继续制作</h3>
+          <p className="text-xs text-stone-500">继续上次的视频项目</p>
         </button>
 
         {/* 历史记录 */}
@@ -182,18 +180,17 @@ export default function HomePage() {
               navigate(`/project/${currentProject.id}/history`);
             }
           }}
-          className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-medium group ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+          className={`relative overflow-hidden rounded-2xl p-5 text-left transition-all duration-500 hover:shadow-medium group border border-success-border ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
           style={{
-            background: 'linear-gradient(135deg, #ffffff 0%, #f2fbf6 100%)',
-            border: '1px solid #d9f2e4',
+            background: 'linear-gradient(135deg, white 0%, var(--color-success-bg) 100%)',
             transitionDelay: '0.15s',
           }}
         >
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform duration-300">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-success to-success/80 flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform duration-300">
             <Calendar className="w-5 h-5 text-white" />
           </div>
-          <h3 className="font-semibold text-base mb-1" style={{ color: '#33312d' }}>历史记录</h3>
-          <p className="text-xs" style={{ color: '#8f8b80' }}>查看已生成的成长视频</p>
+          <h3 className="font-semibold text-base mb-1 text-stone-900">历史记录</h3>
+          <p className="text-xs text-stone-500">查看已生成的成长视频</p>
         </button>
       </div>
 
@@ -206,7 +203,7 @@ export default function HomePage() {
             style={{ transitionDelay: '0.2s' }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold tracking-tight" style={{ color: '#33312d' }}>我的宝宝</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-stone-900">我的宝宝</h2>
               <button
                 onClick={handleCreateBaby}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white gradient-warm shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
@@ -221,8 +218,8 @@ export default function HomePage() {
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-warmth-100 to-warmth-200 flex items-center justify-center mx-auto mb-4">
                   <Baby className="w-8 h-8 text-warmth-400" />
                 </div>
-                <p className="font-medium mb-1" style={{ color: '#706c63' }}>还没有添加宝宝信息</p>
-                <p className="text-xs mb-5" style={{ color: '#b0aca0' }}>添加宝宝后开始制作成长视频</p>
+                <p className="font-medium mb-1 text-stone-600">还没有添加宝宝信息</p>
+                <p className="text-xs mb-5 text-stone-400">添加宝宝后开始制作成长视频</p>
                 <button
                   onClick={handleCreateBaby}
                   className="btn btn-primary btn-sm"
@@ -247,8 +244,8 @@ export default function HomePage() {
                         {getBabyEmoji(baby.gender)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate" style={{ color: '#33312d' }}>{baby.name}</p>
-                        <p className="text-xs" style={{ color: '#8f8b80' }}>
+                        <p className="font-semibold text-sm truncate text-stone-900">{baby.name}</p>
+                        <p className="text-xs text-stone-500">
                           {baby.birth_date} 出生
                         </p>
                       </div>
@@ -271,9 +268,9 @@ export default function HomePage() {
           >
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h2 className="text-lg font-semibold tracking-tight" style={{ color: '#33312d' }}>视频项目</h2>
+                <h2 className="text-lg font-semibold tracking-tight text-stone-900">视频项目</h2>
                 {selectedBaby && (
-                  <p className="text-xs mt-0.5" style={{ color: '#b0aca0' }}>
+                  <p className="text-xs mt-0.5 text-stone-400">
                     {selectedBaby.name} 的成长视频项目 · {projects.length} 个项目
                   </p>
                 )}
@@ -294,16 +291,16 @@ export default function HomePage() {
                 <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-stone-100 to-stone-200 flex items-center justify-center mx-auto mb-4">
                   <Video className="w-10 h-10 text-stone-400" />
                 </div>
-                <p className="font-medium text-lg mb-1" style={{ color: '#706c63' }}>选择一个宝宝</p>
-                <p className="text-sm" style={{ color: '#b0aca0' }}>从左侧选择宝宝后查看项目</p>
+                <p className="font-medium text-lg mb-1 text-stone-600">选择一个宝宝</p>
+                <p className="text-sm text-stone-400">从左侧选择宝宝后查看项目</p>
               </div>
             ) : projects.length === 0 ? (
               <div className="text-center py-14">
                 <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-warmth-100 to-warmth-200 flex items-center justify-center mx-auto mb-4">
                   <Sparkles className="w-10 h-10 text-warmth-400" />
                 </div>
-                <p className="font-medium text-lg mb-1" style={{ color: '#706c63' }}>开启第一个项目</p>
-                <p className="text-sm mb-6" style={{ color: '#b0aca0' }}>
+                <p className="font-medium text-lg mb-1 text-stone-600">开启第一个项目</p>
+                <p className="text-sm mb-6 text-stone-400">
                   为 {selectedBaby.name} 创建第一个成长视频项目
                 </p>
                 <button onClick={handleCreateProject} className="btn btn-primary">
@@ -317,10 +314,9 @@ export default function HomePage() {
                   <div
                     key={project.id}
                     onClick={() => handleOpenProject(project)}
-                    className="group relative overflow-hidden rounded-2xl p-5 cursor-pointer transition-all duration-300 hover:shadow-medium hover:-translate-y-0.5"
+                    className="group relative overflow-hidden rounded-2xl p-5 cursor-pointer transition-all duration-300 hover:shadow-medium hover:-translate-y-0.5 border border-stone-200"
                     style={{
-                      background: 'linear-gradient(135deg, #ffffff 0%, #fafaf8 100%)',
-                      border: '1px solid #e8e6de',
+                      background: 'linear-gradient(135deg, white 0%, var(--color-stone-50) 100%)',
                       animationDelay: `${0.3 + idx * 0.05}s`,
                     }}
                   >
@@ -329,27 +325,27 @@ export default function HomePage() {
 
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm truncate mb-1" style={{ color: '#33312d' }}>
+                        <h3 className="font-semibold text-sm truncate mb-1 text-stone-900">
                           {project.name}
                         </h3>
-                        <p className="text-xs line-clamp-2" style={{ color: '#8f8b80' }}>
+                        <p className="text-xs line-clamp-2 text-stone-500">
                           {project.description || '暂无描述'}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 ml-3 shrink-0">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           project.status === 'completed'
-                            ? 'bg-emerald-50 text-emerald-600'
+                            ? 'bg-success-bg text-success-text'
                             : 'bg-warmth-50 text-warmth-600'
                         }`}>
                           <span className={`w-1.5 h-1.5 rounded-full mr-1 ${
-                            project.status === 'completed' ? 'bg-emerald-400' : 'bg-warmth-400'
+                            project.status === 'completed' ? 'bg-success' : 'bg-warmth-400'
                           }`} />
                           {project.status === 'completed' ? '已完成' : '进行中'}
                         </span>
                         <button
                           onClick={(e) => handleDeleteProject(e, project)}
-                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 text-stone-400 hover:text-rose-500 hover:bg-rose-50"
+                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 text-stone-400 hover:text-error hover:bg-error-bg"
                           title="删除项目"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -358,14 +354,14 @@ export default function HomePage() {
                     </div>
 
                     <div className="flex items-center gap-4 mb-3">
-                      <span className="inline-flex items-center gap-1.5 text-xs" style={{ color: '#8f8b80' }}>
+                      <span className="inline-flex items-center gap-1.5 text-xs text-stone-500">
                         <Clock className="w-3.5 h-3.5" />
                         {project.period_days}天/周期
                       </span>
                     </div>
 
-                    <div className="pt-3 flex items-center justify-between" style={{ borderTop: '1px solid #f5f4f0' }}>
-                      <span className="text-xs" style={{ color: '#b0aca0' }}>
+                    <div className="pt-3 flex items-center justify-between border-t border-stone-100">
+                      <span className="text-xs text-stone-400">
                         更新于 {project.updated_at}
                       </span>
                       <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-x-0.5 text-warmth-400" />
