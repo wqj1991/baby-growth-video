@@ -15,6 +15,9 @@ export default function HomePage() {
   const [selectedBaby, setSelectedBaby] = useState<BabyType | null>(null);
   const [mounted, setMounted] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Project | null>(null);
+  const [loadingBabies, setLoadingBabies] = useState(true);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
 
   useEffect(() => {
     loadBabies();
@@ -36,15 +39,20 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('加载宝宝列表失败:', error);
+    } finally {
+      setLoadingBabies(false);
     }
   };
 
   const loadProjects = async (babyId: number) => {
+    setLoadingProjects(true);
     try {
       const data = await getProjects(babyId);
       setProjects(data);
     } catch (error) {
       console.error('加载项目列表失败:', error);
+    } finally {
+      setLoadingProjects(false);
     }
   };
 
@@ -75,6 +83,7 @@ export default function HomePage() {
     const project = deleteConfirm;
     if (!project) return;
     setDeleteConfirm(null);
+    setDeletingProject(true);
     try {
       await deleteProject(project.id);
       if (selectedBaby) {
@@ -84,6 +93,8 @@ export default function HomePage() {
     } catch (error) {
       console.error('删除项目失败:', error);
       showToast('error', '删除失败', '请重试');
+    } finally {
+      setDeletingProject(false);
     }
   };
 
@@ -221,7 +232,12 @@ export default function HomePage() {
               </button>
             </div>
 
-            {babies.length === 0 ? (
+            {loadingBabies ? (
+              <div className="text-center py-10">
+                <div className="w-8 h-8 border-2 border-stone-200 border-t-warmth-400 rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-sm text-stone-500">加载中...</p>
+              </div>
+            ) : babies.length === 0 ? (
               <div className="text-center py-10">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-warmth-100 to-warmth-200 flex items-center justify-center mx-auto mb-4">
                   <Baby className="w-8 h-8 text-warmth-400" />
@@ -301,6 +317,11 @@ export default function HomePage() {
                 </div>
                 <p className="font-medium text-lg mb-1 text-stone-600">选择一个宝宝</p>
                 <p className="text-sm text-stone-400">从左侧选择宝宝后查看项目</p>
+              </div>
+            ) : loadingProjects ? (
+              <div className="text-center py-14">
+                <div className="w-8 h-8 border-2 border-stone-200 border-t-warmth-400 rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-sm text-stone-500">加载项目中...</p>
               </div>
             ) : projects.length === 0 ? (
               <div className="text-center py-14">
@@ -388,6 +409,7 @@ export default function HomePage() {
         message={`确定要删除项目「${deleteConfirm?.name ?? ''}」吗？此操作不可恢复。`}
         confirmText="删除"
         variant="danger"
+        loading={deletingProject}
         onConfirm={confirmDeleteProject}
         onCancel={() => setDeleteConfirm(null)}
       />

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use image::{GenericImageView, ImageBuffer, Rgba, ColorType};
+use image::{GenericImageView, ImageBuffer, Rgba, Rgb, ColorType};
 use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -79,14 +79,16 @@ fn apply_flips(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, flip_h: bool, flip_v: bool)
 }
 
 fn apply_rotation(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, rotation: i64) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-    let angle = rotation as f32;
-    if angle == 0.0 {
+    let angle_deg = rotation as f32;
+    if angle_deg == 0.0 {
         return img.clone();
     }
     
+    let angle_rad = angle_deg.to_radians();
+    
     rotate_about_center(
         img,
-        angle,
+        angle_rad,
         Interpolation::Bilinear,
         Rgba([0, 0, 0, 0]),
     )
@@ -221,12 +223,17 @@ pub fn generate_collage(req: CollageRequest, project_id: i64) -> Result<CollageR
         quality_percent,
     );
 
+    let rgb_output: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(output_width, output_height, |x, y| {
+        let p = output.get_pixel(x, y);
+        Rgb([p[0], p[1], p[2]])
+    });
+
     image::codecs::jpeg::JpegEncoder::encode(
         &mut jpeg_encoder,
-        &output,
-        output.width(),
-        output.height(),
-        ColorType::Rgba8,
+        &rgb_output,
+        rgb_output.width(),
+        rgb_output.height(),
+        ColorType::Rgb8,
     )
     .map_err(|e| format!("Failed to write output image: {}", e))?;
 

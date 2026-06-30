@@ -10,6 +10,7 @@ interface PendingSelectionPanelProps {
   onSelectSingle: (item: SelectableItem) => void;
   onGenerateCollage: () => void;
   onPreview?: (item: SelectableItem) => void;
+  loading?: boolean;
 }
 
 export default function PendingSelectionPanel({
@@ -20,6 +21,7 @@ export default function PendingSelectionPanel({
   onSelectSingle,
   onGenerateCollage,
   onPreview,
+  loading = false,
 }: PendingSelectionPanelProps) {
   const multiSelectedCount = selectedItems.filter((item) => {
     if (item.type === 'photo') return item.item.is_multi_selected;
@@ -181,18 +183,21 @@ export default function PendingSelectionPanel({
                   onSelectSingle(selectedItems[0]);
                 }
               }}
+              disabled={loading}
               className="btn btn-secondary w-full !justify-center text-xs"
             >
+              {loading && <div className="w-3 h-3 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />}
               <Check className="w-3 h-3" />
-              单独选定
+              {loading ? '处理中...' : '单独选定'}
             </button>
             <button
               onClick={onGenerateCollage}
-              disabled={!canCollage}
+              disabled={!canCollage || loading}
               className="btn btn-primary w-full !justify-center text-xs"
             >
+              {loading && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               <Wand2 className="w-3 h-3" />
-              生成拼图 {canCollage ? `(${multiSelectedCount}张)` : ''}
+              {loading ? '生成中...' : `生成拼图${canCollage ? `(${multiSelectedCount}张)` : ''}`}
             </button>
           </div>
         </div>

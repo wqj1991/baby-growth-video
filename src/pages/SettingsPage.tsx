@@ -13,13 +13,19 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>('basic');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [photoQuality, setPhotoQuality] = useState<'high' | 'medium'>('high');
+  const [savingAi, setSavingAi] = useState(false);
 
   // Local form state for AI settings (not synced until save)
   const [localAi, setLocalAi] = useState({ ...aiSettings });
 
-  const handleAiSave = () => {
-    setAiSettings(localAi);
-    showToast('success', 'AI 设置已保存');
+  const handleAiSave = async () => {
+    setSavingAi(true);
+    try {
+      setAiSettings(localAi);
+      showToast('success', 'AI 设置已保存');
+    } finally {
+      setSavingAi(false);
+    }
   };
 
   const tabs: { id: TabId; icon: typeof Settings; label: string }[] = [
@@ -267,9 +273,11 @@ export default function SettingsPage() {
               {/* 保存按钮 */}
               <button
                 onClick={handleAiSave}
-                className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-warmth-400 to-warmth-500 shadow-lg shadow-warmth-400/25 hover:shadow-xl hover:shadow-warmth-400/35 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+                disabled={savingAi}
+                className="w-full py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-warmth-400 to-warmth-500 shadow-lg shadow-warmth-400/25 hover:shadow-xl hover:shadow-warmth-400/35 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2"
               >
-                保存 AI 设置
+                {savingAi && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {savingAi ? '保存中...' : '保存 AI 设置'}
               </button>
             </div>
           )}

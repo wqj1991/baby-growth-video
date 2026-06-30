@@ -13,13 +13,17 @@ export default function Step5Complete() {
   } = useCreateProjectStore();
   const { setCurrentProject, setCurrentBaby, setPeriods } = useAppStore();
   const [createdProject, setCreatedProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadProject();
   }, []);
 
   const loadProject = async () => {
-    if (!selectedBaby || !projectId) return;
+    if (!selectedBaby || !projectId) {
+      setLoading(false);
+      return;
+    }
     try {
       const projects = await getProjects(selectedBaby.id);
       const project = projects.find((p) => p.id === projectId);
@@ -33,6 +37,8 @@ export default function Step5Complete() {
       }
     } catch (err) {
       console.error('加载项目失败:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,6 +58,14 @@ export default function Step5Complete() {
 
   return (
     <div className="p-10 max-w-lg mx-auto animate-fade-in-scale">
+      {loading ? (
+        <div className="text-center py-16">
+          <div className="w-10 h-10 border-2 border-stone-200 border-t-warmth-400 rounded-full animate-spin mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-stone-700">加载中...</h2>
+          <p className="text-sm text-stone-500 mt-2">正在获取项目信息</p>
+        </div>
+      ) : (
+        <>
       {/* 成功动画区 */}
       <div className="text-center py-8">
         <div className="relative inline-block mb-6">
@@ -127,6 +141,8 @@ export default function Step5Complete() {
           立即开始选照片
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 }

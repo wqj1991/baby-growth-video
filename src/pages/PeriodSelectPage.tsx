@@ -42,7 +42,7 @@ import PendingSelectionPanel from '../components/PendingSelectionPanel';
 import CollageWorkspace from '../components/CollageWorkspace';
 import VideoFramePlayer from '../components/VideoFramePlayer';
 import TemplateSelector from '../components/TemplateSelector';
-import { getTemplateById } from '../utils/collageTemplates';
+import { getTemplateById, estimateFileSize } from '../utils/collageTemplates';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -104,6 +104,13 @@ export default function PeriodSelectPage() {
   // Draggable pending panel state
   const [pendingPanelWidth, setPendingPanelWidth] = useState(320);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Loading states
+  const [loadingPeriods, setLoadingPeriods] = useState(true);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [generatingPeriods, setGeneratingPeriods] = useState(false);
+  const [addingPeriod, setAddingPeriod] = useState(false);
+  const [generatingCollage, setGeneratingCollage] = useState(false);
 
   const handleMouseDown = () => setIsDragging(true);
 
@@ -261,9 +268,11 @@ export default function PeriodSelectPage() {
       setPeriodStats(statsData);
       if (periodsData.length > 0 && !currentPeriod) setCurrentPeriod(periodsData[0]);
     } catch (error) { console.error('加载周期失败:', error); }
+    finally { setLoadingPeriods(false); }
   };
 
   const loadPeriodMedia = async (periodId: number) => {
+    setLoadingMedia(true);
     try {
       setLoadedImages({});
       loadedImageIds.current.clear();
@@ -296,6 +305,7 @@ export default function PeriodSelectPage() {
       
       setSelectedTab('photos');
     } catch (error) { console.error('加载周期媒体失败:', error); }
+    finally { setLoadingMedia(false); }
   };
 
   // ============================
@@ -304,11 +314,13 @@ export default function PeriodSelectPage() {
 
   const handleGeneratePeriods = async () => {
     if (!projectId || !currentBaby) return;
+    setGeneratingPeriods(true);
     try {
       const data = await generatePeriods(parseInt(projectId), currentBaby.birth_date, 7);
       setPeriods(data);
       if (data.length > 0) setCurrentPeriod(data[0]);
     } catch (error) { console.error('生成周期失败:', error); }
+    finally { setGeneratingPeriods(false); }
   };
 
   const handleScanFolder = async () => {
@@ -327,6 +339,7 @@ export default function PeriodSelectPage() {
 
   const handleAddPeriod = async () => {
     if (!projectId || !newPeriodName || !newPeriodDate) return;
+    setAddingPeriod(true);
     try {
       const period = await createPeriod({
         project_id: parseInt(projectId), name: newPeriodName,
@@ -338,6 +351,7 @@ export default function PeriodSelectPage() {
       setNewPeriodName('');
       setNewPeriodDate('');
     } catch (error) { console.error('添加周期失败:', error); }
+    finally { setAddingPeriod(false); }
   };
 
   // ============================
@@ -556,13 +570,20 @@ export default function PeriodSelectPage() {
     outputSize: number,
   ) => {
     // Build the payload for Rust backend
-    const multiSelected = selectedItems.filter(i => i.item.is_multi_selected);
     const photoPaths = order.map(idx => {
-      const item = multiSelected[idx];
+      const item = selectedItems[idx];
+      if (!item) {
+        showToast('error', '拼图生成失败', '照片索引错误');
+        return '';
+      }
       return item.type === 'photo'
         ? (item.item as Photo).file_path
         : (item.item as VideoFrame).file_path;
     });
+
+    if (photoPaths.some(p => p === '')) {
+      return;
+    }
 
     // Build region definitions from the template
     const template = getTemplateById(templateId);
@@ -597,12 +618,25 @@ export default function PeriodSelectPage() {
       return;
     }
 
+    const pId = parseInt(projectId);
+    if (isNaN(pId)) {
+      showToast('error', '项目错误', '项目ID格式错误');
+      return;
+    }
+
+    setGeneratingCollage(true);
     try {
-      const result = await generateCollage(collagePayload, parseInt(projectId));
+      console.log('调用 generateCollage, projectId:', pId);
+      const result = await generateCollage(collagePayload, pId);
       console.log('拼图生成成功:', result);
 
+      if (!result.output_path) {
+        showToast('error', '拼图生成失败', '返回的输出路径为空');
+        return;
+      }
+
       const fileName = `collage_${Date.now()}.jpg`;
-      const fileSize = (await fetch(result.output_path).then(r => r.blob())).size;
+      const fileSize = estimateFileSize(outputSize * outputSize, quality).bytes;
 
       const newPhoto = {
         id: -1,
@@ -629,10 +663,14 @@ export default function PeriodSelectPage() {
       );
     } catch (error) {
       console.error('拼图生成失败:', error);
-      showToast('error', '拼图生成失败', String(error));
+      const errorMsg = error instanceof Error 
+        ? error.message 
+        : String(error);
+      showToast('error', '拼图生成失败', errorMsg);
+    } finally {
+      setGeneratingCollage(false);
+      setCollageMode(false);
     }
-
-    setCollageMode(false);
   };
 
   const handleExitCollage = () => {
@@ -718,18 +756,23 @@ export default function PeriodSelectPage() {
           </button>
 
           {periods.length === 0 && (
-            <button onClick={handleGeneratePeriods} className="btn btn-outline btn-sm">
-              <Calendar className="w-3.5 h-3.5" />
-              自动生成周期
+            <button
+              onClick={handleGeneratePeriods}
+              disabled={generatingPeriods}
+              className="btn btn-outline btn-sm flex items-center gap-2"
+            >
+              <Calendar className={`w-3.5 h-3.5 ${generatingPeriods ? 'animate-spin' : ''}`} />
+              {generatingPeriods ? '生成中...' : '自动生成周期'}
             </button>
           )}
 
             <button
             onClick={() => setShowAddPeriod(true)}
-            className="btn btn-ghost btn-sm text-stone-600"
+            disabled={addingPeriod}
+            className="btn btn-ghost btn-sm text-stone-600 flex items-center gap-2"
           >
             <Plus className="w-3.5 h-3.5" />
-            添加周期
+            {addingPeriod ? '添加中...' : '添加周期'}
           </button>
         </div>
 
@@ -775,8 +818,13 @@ export default function PeriodSelectPage() {
                   onChange={(e) => setNewPeriodDate(e.target.value)}
                 />
               </div>
-              <button onClick={handleAddPeriod} className="btn btn-primary btn-sm h-[38px]">
-                确认添加
+              <button
+                onClick={handleAddPeriod}
+                disabled={addingPeriod}
+                className="btn btn-primary btn-sm h-[38px] flex items-center gap-2"
+              >
+                {addingPeriod && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {addingPeriod ? '添加中...' : '确认添加'}
               </button>
               <button onClick={() => setShowAddPeriod(false)} className="btn btn-ghost btn-sm h-[38px]">
                 取消
@@ -807,6 +855,7 @@ export default function PeriodSelectPage() {
                 if (index !== -1) handleOpenPreview(index);
               }
             }}
+            loading={generatingCollage}
           />
         </div>
         
@@ -820,11 +869,23 @@ export default function PeriodSelectPage() {
         
         {/* 右侧内容区 */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {!currentPeriod ? (
+          {loadingPeriods ? (
+            <div className="empty-state-v2 flex-1">
+              <div className="w-8 h-8 border-2 border-stone-200 border-t-warmth-400 rounded-full animate-spin mb-4" />
+              <h4>加载周期中...</h4>
+              <p>请稍候，正在加载项目周期信息</p>
+            </div>
+          ) : !currentPeriod ? (
             <div className="empty-state-v2 flex-1">
               <Calendar className="w-16 h-16 text-stone-300 mb-4" />
               <h4>选择一个周期开始</h4>
               <p>在上方周期进度条中选择一个周期，或通过「扫描文件夹」导入照片</p>
+            </div>
+          ) : loadingMedia ? (
+            <div className="empty-state-v2 flex-1">
+              <div className="w-8 h-8 border-2 border-stone-200 border-t-warmth-400 rounded-full animate-spin mb-4" />
+              <h4>加载媒体中...</h4>
+              <p>请稍候，正在加载照片和视频</p>
             </div>
           ) : (
             <>

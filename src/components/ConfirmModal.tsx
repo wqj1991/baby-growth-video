@@ -8,6 +8,7 @@ export interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'default';
+  loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,6 +20,7 @@ export default function ConfirmModal({
   confirmText = '确认',
   cancelText = '取消',
   variant = 'default',
+  loading = false,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -107,15 +109,19 @@ export default function ConfirmModal({
           <button
             ref={confirmBtnRef}
             onClick={onConfirm}
+            disabled={loading}
             className={`
               px-6 py-2.5 rounded-xl text-sm font-bold text-white
-              transition-all duration-200 active:scale-[0.98]
-              ${isDanger
-                ? 'bg-gradient-to-r from-[#d44d68] to-[#ba3050] shadow-lg shadow-[#d44d68]/25 hover:shadow-xl hover:shadow-[#d44d68]/35 hover:-translate-y-0.5'
-                : 'bg-gradient-to-r from-warmth-400 to-warmth-500 shadow-lg shadow-warmth-400/25 hover:shadow-xl hover:shadow-warmth-400/35 hover:-translate-y-0.5'
+              transition-all duration-200 active:scale-[0.98] flex items-center gap-2 justify-center
+              ${loading
+                ? 'opacity-70 cursor-not-allowed'
+                : isDanger
+                  ? 'bg-gradient-to-r from-[#d44d68] to-[#ba3050] shadow-lg shadow-[#d44d68]/25 hover:shadow-xl hover:shadow-[#d44d68]/35 hover:-translate-y-0.5'
+                  : 'bg-gradient-to-r from-warmth-400 to-warmth-500 shadow-lg shadow-warmth-400/25 hover:shadow-xl hover:shadow-warmth-400/35 hover:-translate-y-0.5'
               }
             `}
           >
+            {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
             {confirmText}
           </button>
         </div>
