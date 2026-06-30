@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use image::{GenericImageView, ImageBuffer, Rgba};
-use imageproc::transform::{rotate_about_center, Interpolation};
+use std::path::PathBuf;
+use image::{GenericImageView, ImageBuffer, Rgba, ColorType};
+use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CollageRegion {
     pub x: f64,
     pub y: f64,
@@ -63,20 +63,23 @@ fn compute_cover_crop(
 }
 
 fn apply_flips(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, flip_h: bool, flip_v: bool) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-    let mut result = img.clone();
-    
-    if flip_h {
-        result = imageproc::transform::flip_horizontal(&result);
-    }
-    if flip_v {
-        result = imageproc::transform::flip_vertical(&result);
+    let w = img.width();
+    let h = img.height();
+    let mut result = ImageBuffer::new(w, h);
+
+    for y in 0..h {
+        for x in 0..w {
+            let src_x = if flip_h { w - 1 - x } else { x };
+            let src_y = if flip_v { h - 1 - y } else { y };
+            result.put_pixel(x, y, *img.get_pixel(src_x, src_y));
+        }
     }
     
     result
 }
 
 fn apply_rotation(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, rotation: i64) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-    let angle = rotation as f64;
+    let angle = rotation as f32;
     if angle == 0.0 {
         return img.clone();
     }
@@ -94,6 +97,18 @@ pub fn generate_collage(req: CollageRequest, project_id: i64) -> Result<CollageR
     let output_height = req.output_height as u32;
     let gap_px = req.gap_px as u32;
     let quality = req.jpeg_quality;
+
+    if output_width == 0 || output_height == 0 {
+        return Err("Output dimensions cannot be zero".to_string());
+    }
+
+    if req.photo_paths.is_empty() {
+        return Err("No photo paths provided".to_string());
+    }
+
+    if req.regions.is_empty() {
+        return Err("No regions provided".to_string());
+    }
 
     let mut output = ImageBuffer::new(output_width, output_height);
 
@@ -116,7 +131,13 @@ pub fn generate_collage(req: CollageRequest, project_id: i64) -> Result<CollageR
         }
 
         let photo_path = &req.photo_paths[order_idx];
-        let img = image::open(photo_path)
+        let path = std::path::Path::new(photo_path);
+        
+        if !path.exists() {
+            return Err(format!("Photo file does not exist: {}", photo_path));
+        }
+
+        let img = image::open(path)
             .map_err(|e| format!("Failed to open image {}: {}", photo_path, e))?;
 
         let img_rgba = img.to_rgba8();
@@ -187,21 +208,27 @@ pub fn generate_collage(req: CollageRequest, project_id: i64) -> Result<CollageR
 
     let collages_dir = get_project_collages_dir(project_id);
     std::fs::create_dir_all(&collages_dir)
-        .map_err(|e| format!("Failed to create collages directory: {}", e))?;
+        .map_err(|e| format!("Failed to create collages directory {}: {}", collages_dir.display(), e))?;
 
     let uuid = uuid::Uuid::new_v4().to_string();
     let filename = format!("{}_collage.jpg", uuid);
     let output_path = collages_dir.join(&filename);
 
-    let quality_percent = std::cmp::max(1, std::cmp::min(100, quality));
-    let jpeg_quality = image::codecs::jpeg::JpegEncoder::new_with_quality(
+    let quality_percent = std::cmp::max(1, std::cmp::min(100, quality)) as u8;
+    let mut jpeg_encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(
         std::fs::File::create(&output_path)
-            .map_err(|e| format!("Failed to create output file: {}", e))?,
+            .map_err(|e| format!("Failed to create output file {}: {}", output_path.display(), e))?,
         quality_percent,
     );
 
-    image::ImageRgba8(output).write_to(&mut *jpeg_quality, image::ImageFormat::Jpeg)
-        .map_err(|e| format!("Failed to write output image: {}", e))?;
+    image::codecs::jpeg::JpegEncoder::encode(
+        &mut jpeg_encoder,
+        &output,
+        output.width(),
+        output.height(),
+        ColorType::Rgba8,
+    )
+    .map_err(|e| format!("Failed to write output image: {}", e))?;
 
     Ok(CollageResult {
         output_path: output_path.to_string_lossy().to_string(),
