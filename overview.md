@@ -1,48 +1,52 @@
-# 拼图模板系统 — 前端集成完成
+# 拼图区域编辑 + 导出设置 — 完成总结
 
-## 完成内容
+## 新增功能
 
-将拼图能力从硬编码 4 种布局（2-4张）升级为 **36 种模板（2-9张）**，并完成前端全链路集成。
+### 1. 区域点击选中
+- 点击预览画布中任意区域 → 橙色高亮 ring + 右上角序号标签
+- 右侧照片列表中对应行同步高亮
+- 点击画布空白或再次点击同区域 → 取消选中
 
-## 变更文件
+### 2. 区域编辑工具栏（选中后显示）
+| 操作 | 说明 |
+|------|------|
+| **替换照片** | 展开当前周期所有照片缩略图网格，点击即换（已用照片标记"已用"） |
+| **旋转 90°** | 每次顺时针旋转 90°（0→90→180→270→0） |
+| **水平翻转** | 切换镜像翻转，按钮高亮指示当前状态 |
+| **垂直翻转** | 切换上下翻转，按钮高亮指示当前状态 |
 
-| 文件 | 操作 | 说明 |
-|------|------|------|
-| `src/utils/collageTemplates.ts` | **新增** | 36 个模板的归一化坐标数据 + 类型定义 + 工具函数 |
-| `src/store/index.ts` | 修改 | `collageLayout` → `selectedTemplateId` + `selectedTemplate` |
-| `src/components/TemplateSelector.tsx` | **新增** | Modal 模板选择器（照片数量匹配、卡片网格、实时预览） |
-| `src/components/CollageWorkspace.tsx` | 重写 | 模板驱动渲染（region-based），替换硬编码 CSS 布局 |
-| `src/components/PendingSelectionPanel.tsx` | 修改 | 移除 "4张上限"，改为 2-9 张自动适配 |
-| `src/pages/PeriodSelectPage.tsx` | 修改 | 集成 TemplateSelector → CollageWorkspace 两段流程 |
+所有变换通过 CSS `transform` 实时预览在画布中。
 
-## 交互流程
+### 3. 导出设置（侧边栏可折叠面板）
+- **清晰度滑块**：60% ~ 100%，4 个快捷预设（低/中/高/无损）
+- **输出尺寸**：1080 / 2048 / 4096 px，三个按钮切换
+- **预估文件大小**：基于 `pixels × quality_ratio` 经验公式实时计算
 
-```
-待选区 → 勾选 2-9 张
-  → 点击「生成拼图」
-  → TemplateSelector Modal（按张数自动筛选模板）
-  → 选模板 → 确认
-  → CollageWorkspace（模板驱动预览 + 间距/顺序调整）
-  → 生成拼图（后端待集成）
-```
+## 修改文件
 
-## 模板数据共享
+| 文件 | 变更 |
+|------|------|
+| `src/utils/collageTemplates.ts` | +RegionTransform 类型、toCssTransform()、QUALITY_PRESETS、OUTPUT_SIZE_PRESETS、estimateFileSize() |
+| `src/store/index.ts` | +selectedRegionIndex、regionTransforms、collageQuality、collageOutputSize |
+| `src/components/CollageWorkspace.tsx` | 全面重写：区域选中+变换预览+编辑工具栏+照片替换器+导出设置 |
+| `src/pages/PeriodSelectPage.tsx` | handleGenerateCollage 扩展签名，构造后端 genPayload |
 
-所有模板定义在 `src/utils/collageTemplates.ts`，类型为：
-```ts
-interface CollageRegion {
-  x: number; y: number; w: number; h: number; order: number;
+## 后端接口预留结构
+
+```typescript
+{
+  template_id: "t3-1",
+  output_width: 1080,
+  output_height: 1080,
+  gap_px: 3,
+  jpeg_quality: 92,
+  photo_paths: ["/path/photo1.jpg", "/path/photo2.jpg", "/path/photo3.jpg"],
+  regions: [
+    { x: 0, y: 0, w: 0.5, h: 1, order: 0, rotation: 0, flip_h: false, flip_v: false },
+    { x: 0.5, y: 0, w: 0.5, h: 0.5, order: 1, rotation: 90, flip_h: false, flip_v: false },
+    { x: 0.5, y: 0.5, w: 0.5, h: 0.5, order: 2, rotation: 0, flip_h: true, flip_v: false },
+  ]
 }
-interface CollageTemplate {
-  id: string; name: string; desc: string; tips: string;
-  regions: CollageRegion[];
-}
 ```
 
-前端渲染和后续 Rust 后端合成共享同一套归一化坐标，直接映射到 1080×1080 输出。
-
-## 后续待做
-
-- Rust 后端：基于 `CollageTemplate.regions` 用 image crate 做像素级拼图合成
-- 拖拽排序：CollageWorkspace 中照片顺序的拖拽交互
-- 实时预览优化：在 TemplateSelector 中使用实际照片缩略图替代色块
+Rust 后端收到后流程：region 坐标 → 裁剪子图 → 应用 rotation/flip → 像素拼合 → JPEG 编码 → 写入文件 → 返回路径给前端加入待选区。

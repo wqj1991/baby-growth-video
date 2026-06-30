@@ -13,7 +13,7 @@ import {
   Settings2,
 } from 'lucide-react';
 import { useAppStore } from '../store';
-import type { SelectableItem, Photo, VideoFrame } from '../types';
+import type { SelectableItem, Photo } from '../types';
 import { PREVIEW_COLORS } from './TemplateSelector';
 import { toCssTransform, estimateFileSize, QUALITY_PRESETS, OUTPUT_SIZE_PRESETS } from '../utils/collageTemplates';
 

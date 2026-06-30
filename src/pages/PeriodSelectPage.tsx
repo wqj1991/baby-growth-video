@@ -41,6 +41,7 @@ import PendingSelectionPanel from '../components/PendingSelectionPanel';
 import CollageWorkspace from '../components/CollageWorkspace';
 import VideoFramePlayer from '../components/VideoFramePlayer';
 import TemplateSelector from '../components/TemplateSelector';
+import { getTemplateById } from '../utils/collageTemplates';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -69,6 +70,7 @@ export default function PeriodSelectPage() {
     collageMode,
     setCollageMode,
     setCollagePhotoOrder,
+    resetRegionTransforms,
     // Video player state
     setShowVideoPlayer,
     currentPlayingVideo,
@@ -122,6 +124,7 @@ export default function PeriodSelectPage() {
       setShowFrameViewer(false);
       setShowInlinePlayer(false);
       setCollageMode(false);
+      resetRegionTransforms();
       setCurrentVideoForFrames(null);
       setVideoFrameCounts({});
     }
@@ -499,6 +502,9 @@ export default function PeriodSelectPage() {
     // 补全 photoOrder 为初始顺序
     setCollagePhotoOrder(multiSelected.map((_, i) => i));
 
+    // 重置区域编辑状态
+    resetRegionTransforms();
+
     // 显示模板选择器（内部会自动匹配 count 数量的模板）
     setShowTemplateSelector(true);
   };
@@ -512,13 +518,74 @@ export default function PeriodSelectPage() {
     setShowTemplateSelector(false);
   };
 
-  const handleGenerateCollage = (_templateId: string, _gap: number, _order: number[]) => {
-    // TODO: Call Rust backend to generate collage image via FFmpeg
-    alert('拼图生成功能将在后端集成后可用');
+  const handleGenerateCollage = async (
+    templateId: string,
+    gap: number,
+    order: number[],
+    transforms: Record<number, { rotation: number; flipH: boolean; flipV: boolean }>,
+    quality: number,
+    outputSize: number,
+  ) => {
+    // Build the payload for Rust backend
+    const multiSelected = selectedItems.filter(i => i.item.is_multi_selected);
+    const photoPaths = order.map(idx => {
+      const item = multiSelected[idx];
+      return item.type === 'photo'
+        ? (item.item as Photo).file_path
+        : (item.item as VideoFrame).file_path;
+    });
+
+    // Build region definitions from the template
+    const template = getTemplateById(templateId);
+    if (!template) {
+      alert('未找到模板');
+      return;
+    }
+
+    const collagePayload = {
+      template_id: templateId,
+      output_width: outputSize,
+      output_height: outputSize,
+      gap_px: gap,
+      jpeg_quality: quality,
+      photo_paths: photoPaths,
+      regions: template.regions.map((r, idx) => ({
+        x: r.x,
+        y: r.y,
+        w: r.w,
+        h: r.h,
+        order: r.order,
+        rotation: transforms[idx]?.rotation ?? 0,
+        flip_h: transforms[idx]?.flipH ?? false,
+        flip_v: transforms[idx]?.flipV ?? false,
+      })),
+    };
+
+    console.log('拼图生成请求:', collagePayload);
+
+    // TODO: Call Rust backend to generate collage
+    // const outputPath = await generateCollage(collagePayload);
+    // Then add to pending selection:
+    // if (outputPath) {
+    //   const newPhoto = await addCollagePhoto(currentPeriod!.id, outputPath);
+    //   addToSelectedItems({ type: 'photo', item: { ...newPhoto, is_multi_selected: false } });
+    // }
+
+    alert(
+      `拼图生成参数已就绪：\n` +
+      `模板: ${template.name}\n` +
+      `输出尺寸: ${outputSize}×${outputSize}\n` +
+      `JPEG质量: ${quality}%\n` +
+      `间距: ${gap}px\n` +
+      `照片数: ${photoPaths.length}\n` +
+      `含变换区域: ${Object.values(transforms).filter(t => t.rotation !== 0 || t.flipH || t.flipV).length}\n\n` +
+      `后端接口集成后将自动生成并放入待选区`
+    );
     setCollageMode(false);
   };
 
   const handleExitCollage = () => {
+    resetRegionTransforms();
     setCollageMode(false);
   };
 
