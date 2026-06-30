@@ -32,6 +32,8 @@ import {
   getVideoThumbnail,
   getPeriodStats,
   generateCollage,
+  createCollagePhoto,
+  deletePhoto,
 } from '../utils/tauriCommands';
 import type { Photo, Video, VideoFrame, SelectableItem } from '../types';
 import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
@@ -303,6 +305,30 @@ export default function PeriodSelectPage() {
       const allPending = [...pendingPhotos, ...pendingFrames];
       if (allPending.length > 0) setSelectedItems(allPending);
       
+      const pendingPhotoItems: Photo[] = pendingPhotos.map(p => p.item as Photo);
+      if (pendingPhotoItems.length > 0) {
+        pendingPhotoItems.forEach(p => loadedImageIds.current.add(p.id));
+        const batchSize = 5;
+        for (let i = 0; i < pendingPhotoItems.length; i += batchSize) {
+          const batch = pendingPhotoItems.slice(i, i + batchSize);
+          const results = await Promise.all(
+            batch.map(async (photo) => {
+              try {
+                const base64 = await getImageBase64(photo.file_path);
+                return { id: photo.id, url: base64 };
+              } catch (error) {
+                console.error(`加载图片 ${photo.file_name} 失败:`, error);
+                loadedImageIds.current.delete(photo.id);
+                return { id: photo.id, url: '' };
+              }
+            })
+          );
+          const newLoadedImages: Record<number, string> = {};
+          results.forEach(({ id, url }) => { if (url) newLoadedImages[id] = url; });
+          setLoadedImages(prev => ({ ...prev, ...newLoadedImages }));
+        }
+      }
+      
       setSelectedTab('photos');
     } catch (error) { console.error('加载周期媒体失败:', error); }
     finally { setLoadingMedia(false); }
@@ -524,7 +550,11 @@ export default function PeriodSelectPage() {
 
   const handleRemoveFromStash = (item: SelectableItem) => {
     if (item.type === 'photo') {
-      handleTogglePhotoSelect({ ...(item.item as Photo), is_selected: true } as Photo);
+      const photo = item.item as Photo;
+      if (photo.description?.includes('拼图')) {
+        deletePhoto(photo.id).catch(console.error);
+      }
+      handleTogglePhotoSelect({ ...photo, is_selected: true } as Photo);
     } else {
       handleToggleFrameSelect({ ...(item.item as VideoFrame), is_selected: true } as VideoFrame);
     }
@@ -637,30 +667,32 @@ export default function PeriodSelectPage() {
 
       const fileName = `collage_${Date.now()}.jpg`;
       const fileSize = estimateFileSize(outputSize * outputSize, quality).bytes;
-      const tempId = -Date.now();
+      const periodId = currentPeriod?.id ?? 0;
+
+      // 持久化到数据库
+      const persistedPhoto = await createCollagePhoto(
+        periodId,
+        result.output_path,
+        fileName,
+        fileSize,
+        outputSize,
+        outputSize,
+        `拼图 (${template.name})`,
+      );
+      console.log('拼图已持久化到数据库:', persistedPhoto);
 
       const newPhoto = {
-        id: tempId,
-        period_id: currentPeriod?.id ?? 0,
-        file_path: result.output_path,
-        file_name: fileName,
-        file_size: fileSize,
-        width: outputSize,
-        height: outputSize,
-        taken_at: new Date().toISOString().split('T')[0],
-        description: `拼图 (${template.name})`,
-        is_selected: true,
-        is_final: false,
-        is_multi_selected: false,
-        created_at: new Date().toISOString(),
+        ...persistedPhoto,
+        is_multi_selected: true,
       };
 
-      addToSelectedItems({ type: 'photo', item: newPhoto });
+      const newItem = { type: 'photo' as const, item: newPhoto };
+      setSelectedItems([newItem, ...selectedItems]);
 
       try {
         const base64 = await getImageBase64(result.output_path);
-        loadedImageIds.current.add(tempId);
-        setLoadedImages(prev => ({ ...prev, [tempId]: base64 }));
+        loadedImageIds.current.add(persistedPhoto.id);
+        setLoadedImages(prev => ({ ...prev, [persistedPhoto.id]: base64 }));
       } catch (loadError) {
         console.error('加载拼图图片失败:', loadError);
       }

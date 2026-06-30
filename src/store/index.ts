@@ -240,7 +240,7 @@ export const useAppStore = create<AppState>((set) => ({
       i => i.type === item.type && i.item.id === item.item.id
     );
     if (exists) return state;
-    return { selectedItems: [item, ...state.selectedItems] };
+    return { selectedItems: [...state.selectedItems, item] };
   }),
   removeFromSelectedItems: (item) => set((state) => ({
     selectedItems: state.selectedItems.filter(

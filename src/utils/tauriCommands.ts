@@ -145,6 +145,32 @@ export async function cancelFinalPhoto(periodId: number): Promise<void> {
   return invoke('cancel_final_photo', { periodId });
 }
 
+// 创建拼图照片（持久化到数据库）
+export async function createCollagePhoto(
+  periodId: number,
+  filePath: string,
+  fileName: string,
+  fileSize: number,
+  width: number,
+  height: number,
+  description: string,
+): Promise<Photo> {
+  return invoke('create_collage_photo', {
+    periodId,
+    filePath,
+    fileName,
+    fileSize,
+    width,
+    height,
+    description,
+  });
+}
+
+// 删除照片（从数据库移除）
+export async function deletePhoto(photoId: number): Promise<void> {
+  return invoke('delete_photo', { photoId });
+}
+
 // ==================== 视频相关 ====================
 
 // 获取周期的所有视频

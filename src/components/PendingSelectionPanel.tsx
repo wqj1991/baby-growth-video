@@ -56,6 +56,42 @@ export default function PendingSelectionPanel({
         <span className="ml-auto text-[11px] text-stone-400">单击选择 · 双击预览</span>
       </div>
 
+      {/* 已选中状态条 — 紧跟标题栏 */}
+      {selectedItems.length > 0 && (
+        <div className="px-5 py-2.5 border-b border-stone-100 bg-stone-50/80">
+          {multiSelectedCount >= 2 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs">🧩</span>
+              <span className="text-xs font-medium text-stone-700">
+                已选中 <b className="text-stash-600">{multiSelectedCount}</b> 张
+              </span>
+              <span className="text-[10px] text-stone-400 ml-1">
+                {canCollage ? '可生成拼图' : `还需 ${MIN_PHOTOS - multiSelectedCount} 张`}
+              </span>
+              <div className="ml-auto h-1.5 w-16 bg-stone-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min((multiSelectedCount / MAX_PHOTOS) * 100, 100)}%`,
+                    background: 'linear-gradient(90deg, var(--color-stash-600), var(--color-stash-500))',
+                  }}
+                />
+              </div>
+            </div>
+          ) : multiSelectedCount === 1 ? (
+            <div className="flex items-center gap-2 text-xs text-stone-500">
+              <span>🧩</span>
+              <span>已选中 1 张，再选 {Math.min(MIN_PHOTOS - 1, MAX_PHOTOS - 1)} 张可生成拼图</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-stone-400">
+              <span>💡</span>
+              <span>单击照片进行多选，选 {MIN_PHOTOS}–{MAX_PHOTOS} 张可启用拼图</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-5">
         {selectedItems.length === 0 ? (
           <div className="empty-state-v2">
@@ -75,7 +111,7 @@ export default function PendingSelectionPanel({
                 return (
                   <div
                     key={uniqueKey}
-                    className={`stash-compare-item relative cursor-pointer ${final ? 'ring-2 ring-success' : multiSelected ? 'ring-2 ring-stash-600' : ''}`}
+                    className={`stash-compare-item relative cursor-pointer group ${final ? 'ring-2 ring-success' : multiSelected ? 'ring-2 ring-stash-600' : ''}`}
                     onClick={() => onToggleMultiSelect(item)}
                     onDoubleClick={() => onPreview?.(item)}
                   >
@@ -88,7 +124,7 @@ export default function PendingSelectionPanel({
                     </div>
 
                     <button
-                      className="stash-remove-btn absolute top-1 right-1 bg-black/50 hover:bg-black/70 text-white rounded-full p-1"
+                      className="stash-remove-btn bg-black/50 hover:bg-black/70 text-white rounded-full p-1 shadow-sm"
                       onClick={(e) => {
                         e.stopPropagation();
                         onRemoveItem(item);
@@ -161,38 +197,6 @@ export default function PendingSelectionPanel({
                 );
               })}
             </div>
-
-            {multiSelectedCount >= 2 && (
-              <div className="progress-hint-bar mt-3">
-                <span>🧩</span>
-                <div>
-                  <div className="font-medium">已选中 {multiSelectedCount} 张</div>
-                  <div className="text-[11px] opacity-80">
-                    {canCollage
-                      ? '点击「生成拼图」选择模板后合成一张输出图片'
-                      : `最多可选 ${MAX_PHOTOS} 张进行拼图`}
-                  </div>
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                  <div className="h-1.5 w-20 bg-indigo-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.min((multiSelectedCount / MAX_PHOTOS) * 100, 100)}%`,
-                        background: 'linear-gradient(90deg, var(--color-stash-600), var(--color-stash-500))',
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {multiSelectedCount === 0 && (
-              <div className="progress-hint-bar mt-3">
-                <span>💡</span>
-                <span className="text-[11px]">单击照片进行多选，选 {MIN_PHOTOS}–{MAX_PHOTOS} 张可启用拼图</span>
-              </div>
-            )}
           </>
         )}
       </div>

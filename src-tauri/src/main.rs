@@ -150,6 +150,36 @@ fn cancel_final_photo(period_id: i64, state: State<AppState>) -> Result<(), Stri
     db.cancel_final_photo(period_id).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn create_collage_photo(
+    period_id: i64,
+    file_path: String,
+    file_name: String,
+    file_size: i64,
+    width: i64,
+    height: i64,
+    description: String,
+    state: State<AppState>,
+) -> Result<db::Photo, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.create_collage_photo(
+        period_id,
+        &file_path,
+        &file_name,
+        file_size,
+        width,
+        height,
+        &description,
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_photo(photo_id: i64, state: State<AppState>) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.delete_photo(photo_id).map_err(|e| e.to_string())
+}
+
 // ==================== 视频相关 ====================
 
 #[tauri::command]
@@ -531,6 +561,8 @@ pub fn run() {
             update_photo,
             set_final_photo,
             cancel_final_photo,
+            create_collage_photo,
+            delete_photo,
             get_period_videos,
             get_video_frames,
             get_period_video_frames,

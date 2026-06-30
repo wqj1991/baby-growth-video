@@ -706,6 +706,13 @@ impl Database {
         Ok(())
     }
 
+    // 删除单张照片
+    pub fn delete_photo(&self, photo_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        conn.execute("DELETE FROM photos WHERE id = ?1", params![photo_id])?;
+        Ok(())
+    }
+
     // 批量插入照片（事务）
     pub fn add_photos(&self, photos: &[NewPhoto]) -> Result<Vec<Photo>> {
         let conn = self.get_conn();
@@ -745,6 +752,41 @@ impl Database {
 
         conn.execute("COMMIT", params![])?;
         Ok(result)
+    }
+
+    // 创建拼图照片（持久化到数据库）
+    pub fn create_collage_photo(
+        &self,
+        period_id: i64,
+        file_path: &str,
+        file_name: &str,
+        file_size: i64,
+        width: i64,
+        height: i64,
+        description: &str,
+    ) -> Result<Photo> {
+        let conn = self.get_conn();
+        let now = Self::now();
+        
+        conn.execute(
+            "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, description, is_selected, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                period_id,
+                file_path,
+                file_name,
+                file_size,
+                width,
+                height,
+                &now[..10], // taken_at: YYYY-MM-DD
+                description,
+                1, // is_selected: true
+                &now,
+            ],
+        )?;
+        
+        let id = conn.last_insert_rowid();
+        self.get_photo_by_id(id)
     }
 
     pub fn update_photo(&self, photo: &Photo) -> Result<Photo> {

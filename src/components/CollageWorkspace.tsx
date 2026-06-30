@@ -74,6 +74,19 @@ export default function CollageWorkspace({
   const [showReplacer, setShowReplacer] = useState(false);
   // 导出设置面板
   const [showExportSettings, setShowExportSettings] = useState(false);
+  // 照片顺序拖拽状态（用 ref 避免 React state 异步导致事件丢失）
+  const dragIdxRef = useRef<number | null>(null);
+  const dragOverIdxRef = useRef<number | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  // 画布区域拖拽状态（直接在预览画布上拖拽照片排序）
+  const [canvasDragState, setCanvasDragState] = useState<{
+    isDragging: boolean;
+    fromRegionIdx: number | null;
+    overRegionIdx: number | null;
+  }>({ isDragging: false, fromRegionIdx: null, overRegionIdx: null });
+  // 空格拖拽模式：选中区域后按空格进入照片内拖拽模式
+  const [spaceDragMode, setSpaceDragMode] = useState(false);
   // 拖拽状态
   const dragState = useRef<{
     isDragging: boolean;
@@ -156,6 +169,108 @@ export default function CollageWorkspace({
       offsetY: 0,
       scale: 1,
     });
+  };
+
+  // ── 照片顺序拖拽排序 handlers ──
+
+  const handleOrderDragStart = (index: number, e: React.DragEvent) => {
+    dragIdxRef.current = index;
+    setDragIdx(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+    const el = e.currentTarget as HTMLElement;
+    requestAnimationFrame(() => {
+      el.style.opacity = '0.4';
+      el.style.transform = 'scale(0.98)';
+    });
+  };
+
+  const handleOrderDragOver = (index: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragIdxRef.current === null || index === dragIdxRef.current) return;
+    dragOverIdxRef.current = index;
+    setDragOverIdx(index);
+  };
+
+  const handleOrderDragLeave = (e: React.DragEvent) => {
+    if ((e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) return;
+    dragOverIdxRef.current = null;
+    setDragOverIdx(null);
+  };
+
+  const handleOrderDrop = (dropIndex: number, e: React.DragEvent) => {
+    e.preventDefault();
+    const fromIdx = dragIdxRef.current;
+    if (fromIdx === null || fromIdx === dropIndex) { resetOrderDrag(); return; }
+    const newOrder = [...order];
+    const [moved] = newOrder.splice(fromIdx, 1);
+    newOrder.splice(dropIndex, 0, moved);
+    setCollagePhotoOrder(newOrder);
+    resetOrderDrag();
+  };
+
+  const handleOrderDragEnd = () => { resetOrderDrag(); };
+  const resetOrderDrag = () => {
+    dragIdxRef.current = null;
+    dragOverIdxRef.current = null;
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+
+  // ── 画布区域拖拽排序 handlers（直接拖拽照片到另一个区域） ──
+
+  /** 开始拖拽画布中的照片 */
+  const handleCanvasDragStart = (regionIdx: number, e: React.DragEvent) => {
+    const itemIdx = order[template?.regions[regionIdx]?.order ?? regionIdx];
+    if (itemIdx === undefined) return; // 该区域没有照片，不允许拖拽
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/region-index', String(regionIdx));
+    setCanvasDragState({ isDragging: true, fromRegionIdx: regionIdx, overRegionIdx: null });
+  };
+
+  /** 拖拽经过画布中的区域 */
+  const handleCanvasDragOver = (_regionIdx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setCanvasDragState((prev) => ({ ...prev, overRegionIdx: _regionIdx }));
+  };
+
+  /** 拖拽离画布区域 */
+  const handleCanvasDragLeave = (_regionIdx: number) => {
+    setCanvasDragState((prev) => {
+      if (prev.overRegionIdx === _regionIdx) {
+        return { ...prev, overRegionIdx: null };
+      }
+      return prev;
+    });
+  };
+
+  /** 在画布区域中放下照片 */
+  const handleCanvasDrop = (toRegionIdx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    const fromRegionIdx = canvasDragState.fromRegionIdx;
+    if (fromRegionIdx === null || fromRegionIdx === toRegionIdx) {
+      setCanvasDragState({ isDragging: false, fromRegionIdx: null, overRegionIdx: null });
+      return;
+    }
+    if (!template) return;
+    const fromOrder = template.regions[fromRegionIdx]?.order;
+    const toOrder = template.regions[toRegionIdx]?.order;
+    if (fromOrder === undefined || toOrder === undefined) return;
+
+    // 交换两张照片的位置
+    const newOrder = [...order];
+    const temp = newOrder[fromOrder];
+    newOrder[fromOrder] = newOrder[toOrder];
+    newOrder[toOrder] = temp;
+    setCollagePhotoOrder(newOrder);
+    setCanvasDragState({ isDragging: false, fromRegionIdx: null, overRegionIdx: null });
+  };
+
+  /** 画布拖拽结束 */
+  const handleCanvasDragEnd = () => {
+    setCanvasDragState({ isDragging: false, fromRegionIdx: null, overRegionIdx: null });
   };
 
   /** 开始拖拽 */
@@ -259,6 +374,29 @@ export default function CollageWorkspace({
       window.removeEventListener('mouseup', onMouseUp);
     };
   }, []);
+
+  // 全局键盘事件：空格键切换照片内拖拽模式
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // 忽略在输入框等元素中按下的空格
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
+      ) return;
+
+      if (e.code === 'Space' && selectedRegionIndex !== null) {
+        e.preventDefault();
+        setSpaceDragMode((prev) => !prev);
+      }
+      // ESC 退出拖拽模式
+      if (e.code === 'Escape') {
+        setSpaceDragMode(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedRegionIndex]);
 
   /** 替换照片：从待选区 pendingItems 中选择 */
   const handleReplacePhoto = (pendingItem: SelectableItem) => {
@@ -389,12 +527,25 @@ export default function CollageWorkspace({
       <div className="collage-layout">
         {/* Preview Canvas */}
         <div className="collage-preview">
-          <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3">
+            {/* 空格拖拽模式指示器 */}
+            {spaceDragMode && selectedRegionIndex !== null && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-warmth-500/20 border border-warmth-500/40 rounded-lg text-[11px] text-warmth-500">
+                <Move className="w-3.5 h-3.5" />
+                <span>拖拽调整模式 · 拖动画布中照片调整位置</span>
+                <span className="text-[10px] text-warmth-500/70 ml-1">按空格退出</span>
+              </div>
+            )}
             <div className="text-[11px] text-white/40">
-              点击区域选中 · 实时编辑预览
+              点击区域选中 · 拖拽照片到另一区域可交换顺序
               {selectedRegionIndex !== null && (
                 <span className="ml-2 text-warmth-500">
                   已选中区域 #{selectedRegionIndex + 1}
+                </span>
+              )}
+              {!spaceDragMode && selectedRegionIndex !== null && (
+                <span className="ml-2 text-white/30">
+                  · 按空格拖拽调整位置
                 </span>
               )}
             </div>
@@ -422,7 +573,19 @@ export default function CollageWorkspace({
                           isSelected
                             ? 'ring-[3px] ring-warmth-500 ring-offset-0 z-10'
                             : ''
-                        } ${!isSelected ? 'hover:ring-2 hover:ring-white/30' : ''}`}
+                        } ${!isSelected ? 'hover:ring-2 hover:ring-white/30' : ''} ${
+                          canvasDragState.isDragging && canvasDragState.fromRegionIdx === idx
+                            ? 'opacity-40'
+                            : ''
+                        } ${
+                          canvasDragState.isDragging && canvasDragState.fromRegionIdx !== null && canvasDragState.fromRegionIdx !== idx && canvasDragState.overRegionIdx !== idx
+                            ? 'ring-2 ring-warmth-500/50 bg-warmth-500/10'
+                            : ''
+                        } ${
+                          canvasDragState.overRegionIdx === idx
+                            ? 'ring-[3px] ring-warmth-500 bg-warmth-500/20'
+                            : ''
+                        }`}
                         style={{
                           left: `calc(${region.x * 100}% + ${padding}px)`,
                           top: `calc(${region.y * 100}% + ${padding}px)`,
@@ -433,14 +596,26 @@ export default function CollageWorkspace({
                           background: imageUrl
                             ? undefined
                             : PREVIEW_COLORS[idx % PREVIEW_COLORS.length],
-                          cursor: imageUrl && isSelected ? 'grab' : 'pointer',
+                          cursor: spaceDragMode && isSelected
+                            ? 'move'
+                            : imageUrl && isSelected
+                              ? 'grab'
+                              : 'pointer',
                         }}
                         onClick={(e) => handleRegionClick(idx, e)}
                         onMouseDown={(e) => {
-                          if (imageUrl && isSelected) {
+                          if (spaceDragMode && imageUrl && isSelected) {
+                            handleDragStart(idx, e);
+                          } else if (imageUrl && isSelected && !spaceDragMode) {
                             handleDragStart(idx, e);
                           }
                         }}
+                        draggable={imageUrl !== null && !spaceDragMode}
+                        onDragStart={(e) => handleCanvasDragStart(idx, e)}
+                        onDragOver={(e) => handleCanvasDragOver(idx, e)}
+                        onDragLeave={() => handleCanvasDragLeave(idx)}
+                        onDrop={(e) => handleCanvasDrop(idx, e)}
+                        onDragEnd={handleCanvasDragEnd}
                       >
                         {imageUrl ? (
                           <div className="w-full h-full relative overflow-hidden">
@@ -486,8 +661,8 @@ export default function CollageWorkspace({
 
                         {/* 拖拽提示 */}
                         {isSelected && imageUrl && (
-                          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/60 rounded text-[9px] text-white/80 pointer-events-none z-10">
-                            拖拽调整位置
+                          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/60 rounded text-[9px] text-white/80 pointer-events-none z-10 whitespace-nowrap">
+                            {spaceDragMode ? '拖拽调整位置中...' : '拖拽调整位置 · 按空格进入拖拽模式'}
                           </div>
                         )}
                       </div>
@@ -692,26 +867,42 @@ export default function CollageWorkspace({
           {/* Photo Order */}
           <div className="collage-section">
             <h4>照片顺序</h4>
+            <p className="text-[10px] text-stone-400 mb-2">拖拽排序 · 也可直接在画布中拖拽照片到另一区域</p>
             <div className="flex flex-col gap-1">
               {selectedItems.map((selItem, idx) => {
                 const item = selItem.item;
                 const imageUrl = loadedImages[item.id];
-                // 找到该照片在模板中对应的 region
                 const regionIdx = template?.regions.find(
                   (r) => r.order === idx
                 );
+                const isDragging = dragIdx === idx;
+                const isDragOver = dragOverIdx === idx;
+                const isBetween = dragOverIdx !== null && dragIdx !== null
+                  && ((dragIdx < dragOverIdx && idx > dragIdx && idx <= dragOverIdx)
+                    || (dragIdx > dragOverIdx && idx >= dragOverIdx && idx < dragOverIdx));
 
                 return (
                   <div
                     key={`${selItem.type}-${item.id}`}
-                    className={`source-item-v2 cursor-pointer transition-colors ${
+                    draggable={true}
+                    onDragStart={(e) => handleOrderDragStart(idx, e)}
+                    onDragOver={(e) => handleOrderDragOver(idx, e)}
+                    onDragLeave={(e) => handleOrderDragLeave(e)}
+                    onDrop={(e) => handleOrderDrop(idx, e)}
+                    onDragEnd={handleOrderDragEnd}
+                    className={`source-item-v2 cursor-grab active:cursor-grabbing transition-all ${
                       selectedRegionIndex === regionIdx?.order
                         ? 'ring-2 ring-warmth-500 bg-warmth-50'
                         : ''
+                    } ${
+                      isDragging ? 'opacity-40 scale-[0.98]' : ''
+                    } ${
+                      isDragOver ? 'ring-2 ring-primary-500 bg-primary-50 border-dashed' : ''
+                    } ${
+                      isBetween ? 'transform -translate-y-1' : ''
                     }`}
                     onClick={() => {
                       if (regionIdx !== undefined) {
-                        // 找到 region 在 regions 数组中的索引
                         const rIdx = template?.regions.findIndex(
                           (r) => r.order === regionIdx.order
                         );
@@ -722,7 +913,9 @@ export default function CollageWorkspace({
                       }
                     }}
                   >
-                    <GripVertical className="w-3.5 h-3.5 text-stone-400" />
+                    <GripVertical className={`w-3.5 h-3.5 transition-colors cursor-grab active:cursor-grabbing ${
+                      isDragging ? 'text-primary-500' : 'text-stone-400 hover:text-stone-600'
+                    }`} />
                     <div
                       className="w-9 h-6 rounded flex-shrink-0 bg-cover bg-center"
                       style={{
@@ -745,7 +938,11 @@ export default function CollageWorkspace({
                         )}
                       </div>
                     </div>
-                    <span className="text-[10px] font-semibold text-warmth-800 bg-warmth-100 border border-warmth-200 px-2 py-0.5 rounded">
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                      isDragging
+                        ? 'text-primary-600 bg-primary-100 border-primary-200'
+                        : 'text-warmth-800 bg-warmth-100 border-warmth-200'
+                    }`}>
                       #{idx + 1}
                     </span>
                   </div>
