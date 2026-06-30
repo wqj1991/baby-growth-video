@@ -155,7 +155,7 @@ export default function PeriodSelectPage() {
       setCurrentVideoForFrames(null);
       setVideoFrameCounts({});
     }
-  }, [currentPeriod]);
+  }, [currentPeriod?.id]);
 
   // Load photo base64 images
   useEffect(() => {
@@ -370,6 +370,12 @@ export default function PeriodSelectPage() {
     try {
       await setFinalPhoto(currentPeriod.id, photo.id);
       setCurrentPhotos(currentPhotos.map(p => ({ ...p, is_final: p.id === photo.id })));
+      // 同步待选区中的 is_final 状态，确保照片留在待选区中
+      setSelectedItems(selectedItems.map(item =>
+        item.type === 'photo' && item.item.id === photo.id
+          ? { ...item, item: { ...item.item, is_final: true } }
+          : item
+      ));
       const updatedPeriods = periods.map(p =>
         p.id === currentPeriod.id ? { ...p, selected_photo_id: photo.id } : p
       );
@@ -384,6 +390,12 @@ export default function PeriodSelectPage() {
     try {
       await cancelFinalPhoto(currentPeriod.id);
       setCurrentPhotos(currentPhotos.map(p => ({ ...p, is_final: false })));
+      // 同步待选区中所有照片的 is_final 状态
+      setSelectedItems(selectedItems.map(item =>
+        item.type === 'photo'
+          ? { ...item, item: { ...item.item, is_final: false } }
+          : item
+      ));
       setPeriods(periods.map(p =>
         p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
       ));
@@ -440,6 +452,12 @@ export default function PeriodSelectPage() {
     try {
       await setFinalVideoFrame(currentPeriod.id, frame.id);
       setCurrentVideoFrames(currentVideoFrames.map(f => ({ ...f, is_final: f.id === frame.id })));
+      // 同步待选区中的 is_final 状态
+      setSelectedItems(selectedItems.map(item =>
+        item.type === 'video_frame' && item.item.id === frame.id
+          ? { ...item, item: { ...item.item, is_final: true } }
+          : item
+      ));
       setPeriods(periods.map(p =>
         p.id === currentPeriod.id ? { ...p, selected_photo_id: frame.id } : p
       ));
@@ -935,6 +953,26 @@ export default function PeriodSelectPage() {
               </div>
             </>
           )}
+          
+          {/* 底部统计栏 */}
+          <div className="flex-shrink-0 border-t border-[#e8e6de] bg-white px-5 py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 rounded-full bg-[#7c5cbf] flex items-center justify-center">
+                  <Plus className="w-2.5 h-2.5 text-white" />
+                </div>
+                <span className="text-xs text-[#706c63]">待选区 <strong className="text-[#7c5cbf]">{selectedItems.length}</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Image className="w-4 h-4 text-[#f58b3d]" />
+                <span className="text-xs text-[#706c63]">照片 <strong className="text-[#33312d]">{currentPhotos.length}</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <VideoIcon className="w-4 h-4 text-[#10b981]" />
+                <span className="text-xs text-[#706c63]">视频 <strong className="text-[#33312d]">{currentVideos.length}</strong></span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

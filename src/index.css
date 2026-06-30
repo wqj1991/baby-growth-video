@@ -703,12 +703,6 @@ body {
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
-.period-step-dot.has_pending {
-  background: linear-gradient(135deg, #f58b3d 0%, #d44d68 100%);
-  color: white;
-  box-shadow: 0 0 0 3px rgba(245,139,61,0.18), 0 4px 12px rgba(245,139,61,0.25);
-}
-
 .period-step-dot.not_started {
   background: #f5f4f0;
   color: #b0aca0;
@@ -743,8 +737,15 @@ body {
 }
 
 .period-step-info .ps-status.confirmed { color: #10b981; font-weight: 600; }
-.period-step-info .ps-status.has_pending { color: #f58b3d; font-weight: 500; }
 .period-step-info .ps-status.not_started { color: #b0aca0; }
+.period-step-info .ps-date {
+  display: block;
+  font-size: 9px;
+  color: #b0aca0;
+  margin-top: 2px;
+  margin-left: 0 !important;
+  opacity: 0.8;
+}
 
 .period-step-connector {
   width: 24px;

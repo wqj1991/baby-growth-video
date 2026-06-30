@@ -1,4 +1,4 @@
-import { Check, Image, Video as VideoIcon, Plus } from 'lucide-react';
+import { Check, Circle, Image, Video as VideoIcon, Plus } from 'lucide-react';
 import type { Period, PeriodStats } from '../types';
 
 interface PeriodTimelineProps {
@@ -9,8 +9,8 @@ interface PeriodTimelineProps {
 }
 
 /**
- * 水平步骤式周期进度条（V3）
- * 周期状态统一为三种：未开始 / 已有待选 / 已确认最终
+ * 水平步骤式周期进度条
+ * 周期状态统一为两种：未开始 / 完成
  */
 export default function PeriodTimeline({
   periods,
@@ -20,23 +20,21 @@ export default function PeriodTimeline({
 }: PeriodTimelineProps) {
   if (periods.length === 0) return null;
 
-  type PeriodStatus = 'not_started' | 'has_pending' | 'confirmed';
+  type PeriodStatus = 'not_started' | 'confirmed';
 
   const getStatusText = (status: PeriodStatus) => {
     switch (status) {
       case 'not_started':
         return '未开始';
-      case 'has_pending':
-        return '已有待选';
       case 'confirmed':
-        return '已确认最终';
+        return '完成';
     }
   };
 
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
-      return `${d.getMonth() + 1}/${d.getDate()}`;
+      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
     } catch {
       return dateStr;
     }
@@ -51,32 +49,25 @@ export default function PeriodTimeline({
           const pendingCount = stats?.pending_count || 0;
           const photoCount = stats?.photo_count || 0;
           const videoCount = stats?.video_count || 0;
-          const totalMedia = photoCount + videoCount;
           const hasFinal = period.selected_photo_id !== undefined;
           const isCurrent = period.id === currentPeriod?.id;
-          const status: PeriodStatus = hasFinal
-            ? 'confirmed'
-            : totalMedia > 0
-            ? 'has_pending'
-            : 'not_started';
+          const status: PeriodStatus = hasFinal ? 'confirmed' : 'not_started';
 
           return (
             <div key={period.id} className="period-step-item" onClick={() => onSelectPeriod(period)}>
               <div className={`period-step-dot ${status} ${isCurrent ? 'selected' : ''}`}>
                 {hasFinal ? (
                   <Check className="w-3.5 h-3.5" />
-                ) : pendingCount > 0 ? (
-                  <span className="pending-badge">{pendingCount}/{totalMedia}</span>
                 ) : (
-                  idx + 1
+                  <Circle className="w-3.5 h-3.5" />
                 )}
               </div>
               <div className="period-step-info">
                 <div className="ps-name">{period.name}</div>
                 <div className={`ps-status ${status}`}>
                   {getStatusText(status)}
-                  <span style={{ marginLeft: 4, opacity: 0.6 }}>
-                    {formatDate(period.start_date)}
+                  <span className="ps-date">
+                    {formatDate(period.start_date)} ~ {formatDate(period.end_date)}
                   </span>
                 </div>
                 {(photoCount > 0 || videoCount > 0) && (
