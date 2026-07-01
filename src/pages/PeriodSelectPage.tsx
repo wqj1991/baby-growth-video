@@ -314,7 +314,7 @@ export default function PeriodSelectPage() {
         start_date: newPeriodDate, end_date: newPeriodDate,
         period_type: 'custom', sort_order: periods.length,
       });
-      setPeriods([...periods, period]);
+      setPeriods([...periods, period].sort((a, b) => a.start_date.localeCompare(b.start_date)));
       setShowAddPeriod(false);
       setNewPeriodName('');
       setNewPeriodDate('');

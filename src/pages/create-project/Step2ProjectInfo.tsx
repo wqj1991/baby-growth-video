@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useCreateProjectStore } from '../../store/createProjectStore';
-import { FileText, Clock, Star } from 'lucide-react';
+import { FileText, Clock, Star, Calendar } from 'lucide-react';
 
 const periodPresets = [
   { label: '每月', days: 30, emoji: '📅' },
@@ -16,6 +16,7 @@ export default function Step2ProjectInfo() {
     projectDescription,
     periodDays,
     includeSpecialDates,
+    endDate,
     setProjectInfo,
   } = useCreateProjectStore();
 
@@ -23,44 +24,51 @@ export default function Step2ProjectInfo() {
   const [localDesc, setLocalDesc] = useState(projectDescription);
   const [localPeriodDays, setLocalPeriodDays] = useState(periodDays);
   const [localIncludeSpecial, setLocalIncludeSpecial] = useState(includeSpecialDates);
+  const [localEndDate, setLocalEndDate] = useState(endDate);
   const [isFocused, setIsFocused] = useState<'name' | 'desc' | null>(null);
 
   useEffect(() => {
     if (!localName && selectedBaby) {
       const defaultName = `${selectedBaby.name}成长视频`;
       setLocalName(defaultName);
-      updateStore(defaultName, localDesc, localPeriodDays, localIncludeSpecial);
+      updateStore(defaultName, localDesc, localPeriodDays, localIncludeSpecial, localEndDate);
     }
   }, [selectedBaby]);
 
-  const updateStore = (name: string, desc: string, days: number, special: boolean) => {
+  const updateStore = (name: string, desc: string, days: number, special: boolean, endDate: string) => {
     setProjectInfo({
       name,
       description: desc,
       periodDays: days,
       includeSpecialDates: special,
+      endDate,
     });
   };
 
   const handleNameChange = (value: string) => {
     setLocalName(value);
-    updateStore(value, localDesc, localPeriodDays, localIncludeSpecial);
+    updateStore(value, localDesc, localPeriodDays, localIncludeSpecial, localEndDate);
   };
 
   const handleDescChange = (value: string) => {
     setLocalDesc(value);
-    updateStore(localName, value, localPeriodDays, localIncludeSpecial);
+    updateStore(localName, value, localPeriodDays, localIncludeSpecial, localEndDate);
   };
 
   const handlePeriodDaysChange = (value: number) => {
     const safeValue = Math.max(1, Math.min(365, value || 1));
     setLocalPeriodDays(safeValue);
-    updateStore(localName, localDesc, safeValue, localIncludeSpecial);
+    updateStore(localName, localDesc, safeValue, localIncludeSpecial, localEndDate);
   };
 
   const handleSpecialChange = (checked: boolean) => {
     setLocalIncludeSpecial(checked);
-    updateStore(localName, localDesc, localPeriodDays, checked);
+    updateStore(localName, localDesc, localPeriodDays, checked, localEndDate);
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setLocalEndDate(value);
+    updateStore(localName, localDesc, localPeriodDays, localIncludeSpecial, value);
   };
 
   return (
@@ -255,6 +263,31 @@ export default function Step2ProjectInfo() {
               </p>
             </div>
           </label>
+        </div>
+
+        {/* ============ 结束时间 ============ */}
+        <div className="card p-6 hover:shadow-md transition-all duration-300">
+          <label className="flex items-center gap-2 text-sm font-semibold text-stone-700 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+            结束时间
+          </label>
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-[200px]">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                <Calendar className="w-4 h-4 text-stone-400" />
+              </div>
+              <input
+                type="date"
+                value={localEndDate}
+                onChange={(e) => handleEndDateChange(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-stone-50 border-2 border-stone-200 text-stone-700 font-mono text-sm focus:border-indigo-400/60 focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-100/40 transition-all duration-300"
+                min={selectedBaby?.birth_date}
+              />
+            </div>
+            <span className="text-xs text-stone-400 flex-1">
+              选填，不填则默认生成到今天
+            </span>
+          </div>
         </div>
       </div>
     </div>

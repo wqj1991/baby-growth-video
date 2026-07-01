@@ -13,6 +13,7 @@ interface CreateProjectState {
   projectDescription: string;
   periodDays: number;
   includeSpecialDates: boolean;
+  endDate: string;
 
   // 项目ID（创建后保存）
   projectId: number | null;
@@ -42,6 +43,7 @@ interface CreateProjectState {
     description: string;
     periodDays: number;
     includeSpecialDates: boolean;
+    endDate: string;
   }) => void;
   setProjectId: (id: number) => void;
   setFolderPath: (path: string) => void;
@@ -66,6 +68,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   projectDescription: '',
   periodDays: 7,
   includeSpecialDates: false,
+  endDate: '',
   projectId: null,
   folderPath: null,
   scanResult: null,
@@ -87,6 +90,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
       projectDescription: info.description,
       periodDays: info.periodDays,
       includeSpecialDates: info.includeSpecialDates,
+      endDate: info.endDate || '',
     }),
 
   setProjectId: (id) => set({ projectId: id }),
@@ -214,6 +218,7 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
       projectDescription: '',
       periodDays: 7,
       includeSpecialDates: false,
+      endDate: '',
       projectId: null,
       folderPath: null,
       scanResult: null,

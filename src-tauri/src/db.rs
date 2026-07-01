@@ -590,7 +590,7 @@ impl Database {
     pub fn get_periods(&self, project_id: i64) -> Result<Vec<Period>> {
         let conn = self.get_conn();
         let mut stmt = conn.prepare(
-            "SELECT * FROM periods WHERE project_id = ?1 ORDER BY sort_order ASC, id ASC",
+            "SELECT * FROM periods WHERE project_id = ?1 ORDER BY start_date ASC, sort_order ASC, id ASC",
         )?;
         let periods = stmt.query_map(params![project_id], |row| {
             Ok(Period {
@@ -676,6 +676,7 @@ impl Database {
         project_id: i64,
         birth_date: &str,
         period_days: i64,
+        end_date: Option<&str>,
     ) -> Result<Vec<Period>> {
         let conn = self.get_conn();
         let now = Self::now();
@@ -684,11 +685,18 @@ impl Database {
         let birth = NaiveDate::parse_from_str(birth_date, "%Y-%m-%d")
             .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?;
 
-        let today = Local::now().date_naive();
+        // 解析结束时间，如果未提供则使用今天
+        let end = if let Some(end_date_str) = end_date {
+            NaiveDate::parse_from_str(end_date_str, "%Y-%m-%d")
+                .map_err(|e| rusqlite::Error::InvalidParameterName(e.to_string()))?
+        } else {
+            Local::now().date_naive()
+        };
+
         let mut week_num = 1;
         let mut current_start = birth;
 
-        while current_start <= today {
+        while current_start <= end {
             let current_end = current_start + Duration::days(period_days - 1);
             let name = format!("第{}周", week_num);
 

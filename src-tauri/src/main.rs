@@ -96,10 +96,11 @@ fn generate_periods(
     project_id: i64,
     birth_date: String,
     period_days: i64,
+    end_date: Option<String>,
     state: State<AppState>,
 ) -> Result<Vec<db::Period>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.generate_periods(project_id, &birth_date, period_days)
+    db.generate_periods(project_id, &birth_date, period_days, end_date.as_deref())
         .map_err(|e| e.to_string())
 }
 

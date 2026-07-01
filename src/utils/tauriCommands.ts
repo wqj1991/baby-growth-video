@@ -102,9 +102,10 @@ export async function getPeriods(projectId: number): Promise<Period[]> {
 export async function generatePeriods(
   projectId: number,
   birthDate: string,
-  periodDays: number
+  periodDays: number,
+  endDate?: string
 ): Promise<Period[]> {
-  return invoke('generate_periods', { projectId, birthDate, periodDays });
+  return invoke('generate_periods', { projectId, birthDate, periodDays, endDate });
 }
 
 // 创建自定义周期

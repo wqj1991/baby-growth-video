@@ -12,6 +12,7 @@ export default function Step3GeneratePeriods() {
     selectedBaby,
     periodDays,
     includeSpecialDates,
+    endDate,
     periods,
     isGeneratingPeriods,
     projectId,
@@ -28,7 +29,8 @@ export default function Step3GeneratePeriods() {
       const result: Period[] = await generatePeriods(
         projectId || 0,
         selectedBaby.birth_date,
-        periodDays
+        periodDays,
+        endDate
       );
       setPeriods(result);
     } catch (error) {
