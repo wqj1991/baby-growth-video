@@ -96,7 +96,7 @@ export interface ExportRecord {
 // ==================== 扫描 ====================
 
 export interface ScanResult {
-  photos: Photo[];
+  photos: Thumbnail[];
   videos: Video[];
   total_photos: number;
   total_videos: number;
@@ -110,6 +110,25 @@ export interface ScanResult {
   skipped_no_period_videos: number;
   skipped_copy_failed_photos: number;
   skipped_copy_failed_videos: number;
+}
+
+export interface ScanResultsBatch {
+  photos: Thumbnail[];
+  videos: Video[];
+  total_photos: number;
+  total_videos: number;
+  recognized_photos: number;
+  recognized_videos: number;
+  skipped_duplicate_photos: number;
+  skipped_duplicate_videos: number;
+  skipped_no_date_photos: number;
+  skipped_no_date_videos: number;
+  skipped_no_period_photos: number;
+  skipped_no_period_videos: number;
+  skipped_copy_failed_photos: number;
+  skipped_copy_failed_videos: number;
+  processed_files: number;
+  total_files: number;
 }
 
 export interface ScanLog {

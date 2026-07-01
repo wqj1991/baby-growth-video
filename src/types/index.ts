@@ -67,10 +67,26 @@ export interface ExportRecord {
 
 // 扫描结果
 export interface ScanResult {
-  thumbnails: Thumbnail[];
+  photos: Thumbnail[];
   videos: Video[];
   total_photos: number;
   total_videos: number;
+  recognized_photos: number;
+  recognized_videos: number;
+  skipped_duplicate_photos: number;
+  skipped_duplicate_videos: number;
+  skipped_no_date_photos: number;
+  skipped_no_date_videos: number;
+  skipped_no_period_photos: number;
+  skipped_no_period_videos: number;
+  skipped_copy_failed_photos: number;
+  skipped_copy_failed_videos: number;
+}
+
+// 扫描结果批次（增量推送）
+export interface ScanResultsBatch {
+  photos: Thumbnail[];
+  videos: Video[];
   recognized_photos: number;
   recognized_videos: number;
   skipped_duplicate_photos: number;

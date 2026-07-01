@@ -25,7 +25,7 @@ export default function CreateProjectPage() {
   const navigate = useNavigate();
   const {
     currentStep, setCurrentStep, reset, selectedBaby, projectName,
-    periodDays, scanResult, periods, setProjectId, projectId } = useCreateProjectStore();
+    periodDays, scanResult, periods, setProjectId, projectId, isScanning } = useCreateProjectStore();
   const [isCreating, setIsCreating] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
@@ -96,7 +96,7 @@ export default function CreateProjectPage() {
       case 1: return !!selectedBaby;
       case 2: return projectName.trim().length > 0 && periodDays >= 1 && periodDays <= 365;
       case 3: return periods.length > 0;
-      case 4: return !!scanResult;
+      case 4: return !!scanResult && !isScanning;
       default: return currentStep < 5;
     }
   };

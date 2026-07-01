@@ -15,7 +15,7 @@ import type { ScanLog } from '../types';
 interface ScanLogPanelProps {
   logs: ScanLog[];
   isExpanded: boolean;
-  onToggleExpand: () => void;
+  onToggleExpand?: () => void;
   autoScroll: boolean;
   onToggleAutoScroll: () => void;
   onDownload?: () => void;
@@ -198,22 +198,24 @@ export default function ScanLogPanel({
             </span>
           )}
         </div>
-        <button
-          onClick={onToggleExpand}
-          className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
-        >
-          {isExpanded ? (
-            <>
-              收起
-              <ChevronUp className="w-4 h-4" />
-            </>
-          ) : (
-            <>
-              展开查看全部日志
-              <ChevronDown className="w-4 h-4" />
-            </>
-          )}
-        </button>
+        {onToggleExpand && (
+          <button
+            onClick={onToggleExpand}
+            className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+          >
+            {isExpanded ? (
+              <>
+                收起
+                <ChevronUp className="w-4 h-4" />
+              </>
+            ) : (
+              <>
+                展开查看全部日志
+                <ChevronDown className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

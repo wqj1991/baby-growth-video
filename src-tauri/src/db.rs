@@ -93,6 +93,7 @@ pub struct Thumbnail {
     pub created_at: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NewThumbnail {
     pub project_id: i64,
     pub period_id: i64,
@@ -175,7 +176,11 @@ impl Database {
     fn get_db_path() -> PathBuf {
         let mut path = dirs_next::data_dir().unwrap_or_else(|| PathBuf::from("."));
         path.push("baby-growth-video");
-        std::fs::create_dir_all(&path).ok();
+        
+        if !path.exists() {
+            std::fs::create_dir_all(&path).ok();
+        }
+        
         path.push("app.db");
         path
     }
@@ -1317,6 +1322,7 @@ pub struct PendingItem {
     pub source: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NewVideo {
     pub period_id: i64,
     pub file_path: String,

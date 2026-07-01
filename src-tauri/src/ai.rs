@@ -145,8 +145,10 @@ impl AiImageProvider for SiliconFlowProvider {
 
             // Ensure parent dir exists
             if let Some(parent) = Path::new(output_path).parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| format!("Failed to create output dir: {}", e))?;
+                if !parent.exists() {
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("Failed to create output dir: {}", e))?;
+                }
             }
 
             fs::write(output_path, &img_bytes)
@@ -160,8 +162,10 @@ impl AiImageProvider for SiliconFlowProvider {
                 .map_err(|e| format!("Failed to decode base64: {}", e))?;
 
             if let Some(parent) = Path::new(output_path).parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| format!("Failed to create output dir: {}", e))?;
+                if !parent.exists() {
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("Failed to create output dir: {}", e))?;
+                }
             }
 
             fs::write(output_path, &img_bytes)

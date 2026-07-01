@@ -74,7 +74,7 @@ export default function PeriodTimeline({
                   <span className="ps-date-separator">~</span>
                   <span className="ps-date-end">{formatDate(period.end_date)}</span>
                 </div>
-                {(photoCount > 0 || videoCount > 0) && (
+                {(photoCount > 0 || videoCount > 0 || pendingCount > 0) && (
                   <div className="ps-stats">
                     <span className="stat-item photo">
                       <Image className="w-3 h-3" />

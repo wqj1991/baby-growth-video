@@ -375,7 +375,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadThumbnails: async (periodId: number) => {
     try {
       const thumbs = await getPeriodThumbnails(periodId);
-      set({ thumbnails: thumbs });
+      set((state) => {
+        const newPeriodStats = { ...state.periodStats };
+        const existing = newPeriodStats[periodId];
+        const photoCount = thumbs.filter(t => t.source_type === 'scan').length;
+        const pendingCount = thumbs.filter(t => t.is_selected).length;
+        const hasFinal = thumbs.some(t => t.is_final);
+
+        if (existing) {
+          newPeriodStats[periodId] = {
+            ...existing,
+            photo_count: photoCount,
+            pending_count: pendingCount,
+            has_final: hasFinal,
+          };
+        } else {
+          newPeriodStats[periodId] = {
+            period_id: periodId,
+            photo_count: photoCount,
+            video_count: 0,
+            pending_count: pendingCount,
+            has_final: hasFinal,
+          };
+        }
+        return { thumbnails: thumbs, periodStats: newPeriodStats };
+      });
     } catch (e) {
       console.error('Failed to load thumbnails:', e);
     }
@@ -384,11 +408,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   addThumbToPending: async (id: number) => {
     try {
       await addToPending(id);
-      set((state) => ({
-        thumbnails: state.thumbnails.map(t => 
+      set((state) => {
+        const thumb = state.thumbnails.find(t => t.id === id);
+        // 如果已经选中，不重复计数
+        if (!thumb || thumb.is_selected) return { thumbnails: state.thumbnails };
+        const periodId = thumb.period_id;
+        const newThumbnails = state.thumbnails.map(t => 
           t.id === id ? { ...t, is_selected: true } : t
-        )
-      }));
+        );
+        const newPeriodStats = { ...state.periodStats };
+        if (periodId && newPeriodStats[periodId]) {
+          newPeriodStats[periodId] = {
+            ...newPeriodStats[periodId],
+            pending_count: (newPeriodStats[periodId].pending_count || 0) + 1,
+          };
+        }
+        return { thumbnails: newThumbnails, periodStats: newPeriodStats };
+      });
     } catch (e) {
       console.error('Failed to add to pending:', e);
     }
@@ -397,11 +433,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeThumbFromPending: async (id: number) => {
     try {
       await removeFromPending(id);
-      set((state) => ({
-        thumbnails: state.thumbnails.map(t => 
+      set((state) => {
+        const thumb = state.thumbnails.find(t => t.id === id);
+        // 如果已经取消选中，不重复减计数
+        if (!thumb || !thumb.is_selected) return { thumbnails: state.thumbnails };
+        const periodId = thumb.period_id;
+        const newThumbnails = state.thumbnails.map(t => 
           t.id === id ? { ...t, is_selected: false } : t
-        )
-      }));
+        );
+        const newPeriodStats = { ...state.periodStats };
+        if (periodId && newPeriodStats[periodId]) {
+          newPeriodStats[periodId] = {
+            ...newPeriodStats[periodId],
+            pending_count: Math.max(0, (newPeriodStats[periodId].pending_count || 0) - 1),
+          };
+        }
+        return { thumbnails: newThumbnails, periodStats: newPeriodStats };
+      });
     } catch (e) {
       console.error('Failed to remove from pending:', e);
     }

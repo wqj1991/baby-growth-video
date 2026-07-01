@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Folder, Image, Film, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { useCreateProjectStore } from '../../store/createProjectStore';
-import { scanMediaFolder, selectFolder, onScanLog, getScanLog } from '../../utils/tauriCommands';
+import { scanMediaFolder, selectFolder, onScanLog, onScanResultsBatch, getScanLog } from '../../utils/tauriCommands';
 import { downloadJson } from '../../utils/download';
-import type { ScanResult, ScanLog } from '../../types';
+import type { ScanResult, ScanLog, ScanResultsBatch } from '../../types';
 import ScanLogPanel from '../../components/ScanLogPanel';
 import { showToast } from '../../store/toastStore';
 
@@ -15,7 +15,6 @@ export default function Step4SelectFolder() {
     scanProgress,
     projectId,
     scanLogs,
-    isLogExpanded,
     autoScrollLog,
     setFolderPath,
     setScanResult,
@@ -24,11 +23,12 @@ export default function Step4SelectFolder() {
     addScanLog,
     addScanLogs,
     clearScanLogs,
-    toggleLogExpanded,
     toggleAutoScrollLog,
+    addScanResultBatch,
   } = useCreateProjectStore();
 
   const unlistenScanLogRef = useRef<(() => void) | null>(null);
+  const unlistenScanResultsRef = useRef<(() => void) | null>(null);
   const pendingLogsRef = useRef<Array<Parameters<typeof addScanLog>[0]>>([]);
   const flushTimerRef = useRef<number | null>(null);
 
@@ -64,9 +64,9 @@ export default function Step4SelectFolder() {
     if (!folderPath) return;
     setIsScanning(true);
     clearScanLogs();
+    setScanResult(null);
     try {
-      const unlisten = await onScanLog((log) => {
-        // 解析进度日志: "已处理 X/Y"
+      const unlistenLog = await onScanLog((log) => {
         const progressMatch = log.message.match(/已处理\s*(\d+)\/(\d+)/);
         if (progressMatch) {
           const processed = parseInt(progressMatch[1], 10);
@@ -75,10 +75,19 @@ export default function Step4SelectFolder() {
         }
         enqueueLog(log);
       });
-      unlistenScanLogRef.current = unlisten;
+      unlistenScanLogRef.current = unlistenLog;
+
+      const unlistenResults = await onScanResultsBatch((batch: ScanResultsBatch) => {
+        addScanResultBatch(batch);
+        if (batch.processed_files > 0 && batch.total_files > 0) {
+          setScanProgress({ processed: batch.processed_files, total: batch.total_files });
+        }
+      });
+      unlistenScanResultsRef.current = unlistenResults;
+
       const result: ScanResult = await scanMediaFolder(projectId || 0, folderPath);
       setScanResult(result);
-      setScanProgress(null);  // 扫描完成,清除进度
+      setScanProgress(null);
     } catch (error) {
       console.error('扫描失败:', error);
       showToast('error', '扫描失败', '扫描文件夹失败，请重试');
@@ -91,6 +100,10 @@ export default function Step4SelectFolder() {
       if (unlistenScanLogRef.current) {
         unlistenScanLogRef.current();
         unlistenScanLogRef.current = null;
+      }
+      if (unlistenScanResultsRef.current) {
+        unlistenScanResultsRef.current();
+        unlistenScanResultsRef.current = null;
       }
     }
   };
@@ -137,6 +150,9 @@ export default function Step4SelectFolder() {
       if (unlistenScanLogRef.current) {
         unlistenScanLogRef.current();
       }
+      if (unlistenScanResultsRef.current) {
+        unlistenScanResultsRef.current();
+      }
       if (flushTimerRef.current) {
         clearTimeout(flushTimerRef.current);
       }
@@ -144,9 +160,9 @@ export default function Step4SelectFolder() {
   }, []);
 
   return (
-    <div className="p-10 max-w-3xl mx-auto animate-fade-in-up">
+    <div className="p-10 max-w-6xl mx-auto animate-fade-in-up">
       {/* 页面标题区 */}
-      <div className="mb-10">
+      <div className="mb-8">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-warmth-400/12 to-warmth-500/8 flex items-center justify-center">
             <Folder className="w-5 h-5 text-warmth-500" strokeWidth={1.8} />
@@ -196,60 +212,96 @@ export default function Step4SelectFolder() {
         </div>
       )}
 
-      {/* 日志面板 */}
-      {folderPath && (isScanning || scanLogs.length > 0) && (
-        <div className="mb-6">
-          <ScanLogPanel
-            logs={scanLogs}
-            isExpanded={isLogExpanded}
-            onToggleExpand={toggleLogExpanded}
-            autoScroll={autoScrollLog}
-            onToggleAutoScroll={toggleAutoScrollLog}
-            onDownload={handleDownloadLog}
-            progress={scanProgress}
-          />
-        </div>
-      )}
-
-      {/* 扫描结果 */}
-      {scanResult && (
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-success-bg flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-success" />
+      {/* 状态和日志双栏布局 */}
+      {folderPath && (isScanning || scanLogs.length > 0 || scanResult) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 左侧：扫描状态和统计 */}
+          <div className="card p-6 flex flex-col">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isScanning ? 'bg-warmth-100' : 'bg-success-bg'}`}>
+                  {isScanning ? (
+                    <RefreshCw className="w-5 h-5 text-warmth-500 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5 text-success" />
+                  )}
+                </div>
+                <h3 className="font-bold text-stone-800">{isScanning ? '扫描中' : '扫描完成'}</h3>
               </div>
-              <h3 className="font-bold text-stone-800">扫描完成</h3>
+              {!isScanning && scanResult && (
+                <button
+                  onClick={handleRescan}
+                  className="text-sm text-warmth-500 hover:text-warmth-600 font-medium flex items-center gap-1.5 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  重新扫描
+                </button>
+              )}
             </div>
-            <button
-              onClick={handleRescan}
-              className="text-sm text-warmth-500 hover:text-warmth-600 font-medium flex items-center gap-1.5 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              重新扫描
-            </button>
+
+            {/* 实时统计 */}
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={Image} label="照片总数" value={scanResult?.total_photos || 0} color="stone" />
+                <StatCard icon={Film} label="视频总数" value={scanResult?.total_videos || 0} color="stone" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={Image} label="已识别照片" value={scanResult?.recognized_photos || 0} color="success" />
+                <StatCard icon={Film} label="已识别视频" value={scanResult?.recognized_videos || 0} color="success" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={AlertCircle} label="重复跳过" value={(scanResult?.skipped_duplicate_photos || 0) + (scanResult?.skipped_duplicate_videos || 0)} color="warning" />
+                <StatCard icon={AlertCircle} label="日期不匹配" value={(scanResult?.skipped_no_period_photos || 0) + (scanResult?.skipped_no_period_videos || 0)} color="brand" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={AlertCircle} label="未识别日期" value={(scanResult?.skipped_no_date_photos || 0) + (scanResult?.skipped_no_date_videos || 0)} color="error" />
+                <StatCard icon={AlertCircle} label="复制失败" value={(scanResult?.skipped_copy_failed_photos || 0) + (scanResult?.skipped_copy_failed_videos || 0)} color="error" />
+              </div>
+            </div>
+
+            {!isScanning && scanResult && scanResult.total_photos === 0 && (
+              <div className="mt-4 p-4 rounded-xl bg-warning-bg border border-warning-border/60 text-sm text-warning-text flex items-center gap-2">
+                <span className="text-lg">⚠️</span>
+                未找到任何照片，你可以继续创建项目，后续再添加照片
+              </div>
+            )}
+
+            {/* 填充高度 */}
+            <div className="flex-1" />
+
+            {/* 进度条（扫描中显示） */}
+            {isScanning && scanProgress && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-stone-600">扫描进度</span>
+                  <span className="text-stone-700 font-medium">
+                    {scanProgress.processed} / {scanProgress.total}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-warmth-400 to-warmth-500 transition-all duration-300"
+                    style={{ width: `${(scanProgress.processed / scanProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard icon={Image} label="照片总数" value={scanResult.total_photos} color="stone" />
-            <StatCard icon={Film} label="视频总数" value={scanResult.total_videos} color="stone" />
-            <StatCard icon={CheckCircle} label="已识别总数" value={(scanResult.recognized_photos || 0) + (scanResult.recognized_videos || 0)} color="success" />
-            <StatCard icon={Image} label="已识别照片" value={scanResult.recognized_photos || 0} color="success" />
-            <StatCard icon={Film} label="已识别视频" value={scanResult.recognized_videos || 0} color="success" />
-            <StatCard icon={AlertCircle} label="重复照片" value={scanResult.skipped_duplicate_photos || 0} color="warning" />
-            <StatCard icon={AlertCircle} label="重复视频" value={scanResult.skipped_duplicate_videos || 0} color="warning" />
-            <StatCard icon={AlertCircle} label="日期不匹配照片" value={scanResult.skipped_no_period_photos || 0} color="brand" />
-            <StatCard icon={AlertCircle} label="日期不匹配视频" value={scanResult.skipped_no_period_videos || 0} color="brand" />
-            <StatCard icon={AlertCircle} label="未识别日期照片" value={scanResult.skipped_no_date_photos || 0} color="error" />
-            <StatCard icon={AlertCircle} label="未识别日期视频" value={scanResult.skipped_no_date_videos || 0} color="error" />
+          {/* 右侧：日志面板 */}
+          <div className="lg:col-span-2">
+            <ScanLogPanel
+              logs={scanLogs}
+              isExpanded={true}
+              autoScroll={autoScrollLog}
+              onToggleAutoScroll={toggleAutoScrollLog}
+              onDownload={handleDownloadLog}
+              progress={scanProgress}
+            />
           </div>
-
-          {scanResult.total_photos === 0 && (
-            <div className="mt-4 p-4 rounded-xl bg-warning-bg border border-warning-border/60 text-sm text-warning-text flex items-center gap-2">
-              <span className="text-lg">⚠️</span>
-              未找到任何照片，你可以继续创建项目，后续再添加照片
-            </div>
-          )}
         </div>
       )}
     </div>

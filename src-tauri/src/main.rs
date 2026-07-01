@@ -16,6 +16,7 @@ use tauri_plugin_fs::init as init_fs;
 use tauri_plugin_shell::init as init_shell;
 use base64::Engine;
 use uuid::Uuid;
+use walkdir::WalkDir;
 
 struct AppState {
     db: Arc<Mutex<Database>>,
@@ -229,23 +230,11 @@ async fn scan_media_folder(
             Ok::<_, String>((periods, paths))
         }?; // 锁释放
 
-        // ========== Phase 2: 文件处理（无锁，秒级 — 遍历+复制+尺寸解析）==========
+        // ========== Phase 2: 文件处理 + 分批保存到数据库（秒级）==========
+        // 无锁执行文件处理，每批完成时短暂获取锁保存到数据库
         let scan_result = media::process_media_folder(
-            project_id, &folder_path2, &periods, &existing_paths, &window2
+            project_id, &folder_path2, &periods, &existing_paths, &window2, &db
         )?;
-
-        // ========== Lock 2: 批量写入数据库（毫秒级）==========
-        let (photos, videos) = {
-            let db = db.lock().map_err(|e| e.to_string())?;
-            let photos = db.add_thumbnails(&scan_result.new_photos)
-                .unwrap_or_else(|e| { eprintln!("批量插入照片失败: {}", e); Vec::new() });
-            let videos = db.add_videos(&scan_result.new_videos)
-                .unwrap_or_else(|e| { eprintln!("批量插入视频失败: {}", e); Vec::new() });
-            (photos, videos)
-        }; // 锁释放
-
-        let recognized_photos = photos.len() as i64;
-        let recognized_videos = videos.len() as i64;
 
         // ========== Phase 3: 保存日志（无锁 IO）==========
         let total_files = scan_result.total_photos + scan_result.total_videos;
@@ -254,12 +243,12 @@ async fn scan_media_folder(
         }
 
         Ok(media::ScanResult {
-            photos,
-            videos,
+            photos: Vec::new(),
+            videos: Vec::new(),
             total_photos: scan_result.total_photos,
             total_videos: scan_result.total_videos,
-            recognized_photos,
-            recognized_videos,
+            recognized_photos: scan_result.new_photos.len() as i64,
+            recognized_videos: scan_result.new_videos.len() as i64,
             skipped_duplicate_photos: scan_result.skipped_duplicate_photos,
             skipped_duplicate_videos: scan_result.skipped_duplicate_videos,
             skipped_no_date_photos: scan_result.skipped_no_date_photos,
@@ -315,28 +304,41 @@ async fn scan_period_folder(
 
         // ========== 删除旧物理文件（无锁 IO）==========
         for path in &old_file_paths {
-            if let Err(e) = std::fs::remove_file(path) {
-                eprintln!("删除旧文件失败: {} -> {}", path, e);
+            let path_obj = std::path::Path::new(path);
+            if path_obj.is_dir() {
+                for entry in WalkDir::new(path_obj)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().is_file())
+                    .collect::<Vec<_>>()
+                {
+                    std::fs::remove_file(entry.path()).ok();
+                }
+                for entry in WalkDir::new(path_obj)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().is_dir())
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                {
+                    std::fs::remove_dir(entry.path()).ok();
+                }
+            } else {
+                if let Err(e) = std::fs::remove_file(path) {
+                    eprintln!("删除旧文件失败: {} -> {}", path, e);
+                }
             }
         }
 
-        // ========== Phase 2: 处理新文件（无锁，秒级）==========
+        // ========== Phase 2: 处理新文件 + 分批保存到数据库（秒级）==========
+        // 无锁执行文件处理，每批完成时短暂获取锁保存到数据库
         let scan_result = media::process_period_folder(
-            project_id, period_id, &folder_path2, &period, &window2
+            project_id, period_id, &folder_path2, &period, &window2, &db
         )?;
 
-        // ========== Lock 2: 批量写入数据库（毫秒级）==========
-        let (photos, videos) = {
-            let db = db.lock().map_err(|e| e.to_string())?;
-            let photos = db.add_thumbnails(&scan_result.new_photos)
-                .unwrap_or_else(|e| { eprintln!("批量插入照片失败: {}", e); Vec::new() });
-            let videos = db.add_videos(&scan_result.new_videos)
-                .unwrap_or_else(|e| { eprintln!("批量插入视频失败: {}", e); Vec::new() });
-            (photos, videos)
-        }; // 锁释放
-
-        let recognized_photos = photos.len() as i64;
-        let recognized_videos = videos.len() as i64;
+        let recognized_photos = scan_result.new_photos.len() as i64;
+        let recognized_videos = scan_result.new_videos.len() as i64;
 
         // ========== Phase 3: 保存日志（无锁 IO）==========
         let total_files = scan_result.total_photos + scan_result.total_videos;
@@ -345,8 +347,8 @@ async fn scan_period_folder(
         }
 
         Ok(media::ScanResult {
-            photos,
-            videos,
+            photos: Vec::new(),
+            videos: Vec::new(),
             total_photos: scan_result.total_photos,
             total_videos: scan_result.total_videos,
             recognized_photos,
@@ -426,14 +428,12 @@ fn generate_collage(
 ) -> Result<collage::CollageResult, String> {
     let result = collage::generate_collage(&request, project_id)?;
 
-    // Generate thumbnail for the collage output
+    // Generate thumbnail for the collage output (store as base64)
     let uuid = Uuid::new_v4().to_string();
-    let thumb_path = match crate::thumbnail::generate_thumbnail(
+    let thumb_path = match crate::thumbnail::generate_thumbnail_base64_fixed(
         &result.output_path,
-        project_id,
-        &uuid,
     ) {
-        Ok(p) => Some(p),
+        Ok(b) => Some(b),
         Err(e) => {
             eprintln!("Collage thumbnail generation failed: {}", e);
             None
@@ -545,10 +545,10 @@ fn get_image_base64(file_path: String) -> Result<String, String> {
 #[tauri::command]
 fn generate_thumbnail(
     source_path: String,
-    project_id: i64,
-    uuid: String,
+    _project_id: i64,
+    _uuid: String,
 ) -> Result<String, String> {
-    crate::thumbnail::generate_thumbnail(&source_path, project_id, &uuid)
+    crate::thumbnail::generate_thumbnail_base64_fixed(&source_path)
 }
 
 // ==================== 临时帧持久化 ====================

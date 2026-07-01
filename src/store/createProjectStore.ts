@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WizardStep, Baby, Period, ScanResult, ScanLog } from '../types';
+import type { WizardStep, Baby, Period, ScanResult, ScanLog, ScanResultsBatch } from '../types';
 
 interface CreateProjectState {
   // 当前步骤
@@ -55,6 +55,7 @@ interface CreateProjectState {
   toggleAutoScrollLog: () => void;
   setPeriods: (periods: Period[]) => void;
   setIsGeneratingPeriods: (generating: boolean) => void;
+  addScanResultBatch: (batch: ScanResultsBatch) => void;
   reset: () => void;
 }
 
@@ -93,7 +94,25 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   setFolderPath: (path) => set({ folderPath: path }),
   setScanProgress: (progress: { processed: number; total: number } | null) => set({ scanProgress: progress }),
 
-  setScanResult: (result) => set({ scanResult: result }),
+  setScanResult: (result) =>
+    set((state) => {
+      if (!result) {
+        return { scanResult: null };
+      }
+      const currentResult = state.scanResult;
+      if (!currentResult) {
+        return { scanResult: result };
+      }
+      return {
+        scanResult: {
+          ...result,
+          photos: currentResult.photos,
+          videos: currentResult.videos,
+          recognized_photos: result.recognized_photos || currentResult.recognized_photos,
+          recognized_videos: result.recognized_videos || currentResult.recognized_videos,
+        },
+      };
+    }),
 
   setIsScanning: (scanning) => set({ isScanning: scanning }),
 
@@ -142,6 +161,50 @@ export const useCreateProjectStore = create<CreateProjectState>((set) => ({
   setPeriods: (periods) => set({ periods }),
 
   setIsGeneratingPeriods: (generating) => set({ isGeneratingPeriods: generating }),
+
+  addScanResultBatch: (batch) =>
+    set((state) => {
+      const currentResult = state.scanResult;
+      if (!currentResult) {
+        return {
+          scanResult: {
+            photos: batch.photos,
+            videos: batch.videos,
+            total_photos: batch.total_photos || 0,
+            total_videos: batch.total_videos || 0,
+            recognized_photos: batch.recognized_photos,
+            recognized_videos: batch.recognized_videos,
+            skipped_duplicate_photos: batch.skipped_duplicate_photos || 0,
+            skipped_duplicate_videos: batch.skipped_duplicate_videos || 0,
+            skipped_no_date_photos: batch.skipped_no_date_photos || 0,
+            skipped_no_date_videos: batch.skipped_no_date_videos || 0,
+            skipped_no_period_photos: batch.skipped_no_period_photos || 0,
+            skipped_no_period_videos: batch.skipped_no_period_videos || 0,
+            skipped_copy_failed_photos: batch.skipped_copy_failed_photos || 0,
+            skipped_copy_failed_videos: batch.skipped_copy_failed_videos || 0,
+          },
+        };
+      }
+      return {
+        scanResult: {
+          ...currentResult,
+          photos: [...currentResult.photos, ...batch.photos],
+          videos: [...currentResult.videos, ...batch.videos],
+          total_photos: batch.total_photos || currentResult.total_photos,
+          total_videos: batch.total_videos || currentResult.total_videos,
+          recognized_photos: currentResult.recognized_photos + batch.recognized_photos,
+          recognized_videos: currentResult.recognized_videos + batch.recognized_videos,
+          skipped_duplicate_photos: batch.skipped_duplicate_photos || currentResult.skipped_duplicate_photos,
+          skipped_duplicate_videos: batch.skipped_duplicate_videos || currentResult.skipped_duplicate_videos,
+          skipped_no_date_photos: batch.skipped_no_date_photos || currentResult.skipped_no_date_photos,
+          skipped_no_date_videos: batch.skipped_no_date_videos || currentResult.skipped_no_date_videos,
+          skipped_no_period_photos: batch.skipped_no_period_photos || currentResult.skipped_no_period_photos,
+          skipped_no_period_videos: batch.skipped_no_period_videos || currentResult.skipped_no_period_videos,
+          skipped_copy_failed_photos: batch.skipped_copy_failed_photos || currentResult.skipped_copy_failed_photos,
+          skipped_copy_failed_videos: batch.skipped_copy_failed_videos || currentResult.skipped_copy_failed_videos,
+        },
+      };
+    }),
 
   reset: () =>
     set({

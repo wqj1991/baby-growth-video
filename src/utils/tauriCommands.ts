@@ -8,6 +8,7 @@ import type {
   Video,
   ExportRecord,
   ScanResult,
+  ScanResultsBatch,
   ScanLog,
   ScanLogFile,
   VideoConfig,
@@ -185,6 +186,17 @@ export async function onScanLog(
       timestamp: event.payload.timestamp,
       fileName: event.payload.file_name,
     });
+  });
+
+  return unlisten;
+}
+
+// 监听扫描结果批次事件（每10条记录推送一次）
+export async function onScanResultsBatch(
+  callback: (batch: ScanResultsBatch) => void
+): Promise<() => void> {
+  const unlisten = await listen<ScanResultsBatch>('scan://results-batch', (event) => {
+    callback(event.payload);
   });
 
   return unlisten;

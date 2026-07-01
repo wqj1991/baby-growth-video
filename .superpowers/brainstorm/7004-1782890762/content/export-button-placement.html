@@ -1,0 +1,136 @@
+<h2>导出按钮位置设计</h2>
+<p class="subtitle">两个页面各有一个导出入口，风格统一</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">周期选择页 (PeriodSelectPage)</div>
+    <div class="mockup-body" style="padding: 16px;">
+      <!-- 模拟页面顶部工具栏 -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(255,255,255,0.8); border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 24px; height: 24px; background: #f58b3d; border-radius: 6px;"></div>
+          <span style="font-weight: 600; color: #1e293b;">宝宝成长记录</span>
+          <span style="color: #94a3b8; font-size: 12px;">3 个周期 · 2 张最终确认</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <div style="padding: 6px 12px; border-radius: 8px; border: 1px solid #e2e8f0; color: #64748b; font-size: 13px; cursor: pointer;">扫描文件夹</div>
+          <div style="padding: 6px 16px; border-radius: 8px; background: linear-gradient(135deg, #f58b3d, #d44d68); color: white; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(245,139,61,0.3);">
+            📦 导出照片
+          </div>
+        </div>
+      </div>
+      
+      <!-- 模拟周期列表 -->
+      <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+        <div style="padding: 8px 16px; border-radius: 8px; background: linear-gradient(135deg, #f58b3d, #d44d68); color: white; font-size: 13px; font-weight: 500;">第1周</div>
+        <div style="padding: 8px 16px; border-radius: 8px; background: rgba(0,0,0,0.04); color: #64748b; font-size: 13px;">第2周</div>
+        <div style="padding: 8px 16px; border-radius: 8px; background: rgba(0,0,0,0.04); color: #64748b; font-size: 13px;">满月 ✓</div>
+      </div>
+      
+      <!-- 模拟照片网格 -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+        <div style="height: 80px; background: #f1f5f9; border-radius: 8px; border: 2px solid #7c5cbf; display: flex; align-items: center; justify-content: center; color: #7c5cbf; font-size: 11px;">待选区</div>
+        <div style="height: 80px; background: #f1f5f9; border-radius: 8px; border: 2px solid #2d9d5f; display: flex; align-items: center; justify-content: center; color: #2d9d5f; font-size: 11px; font-weight: 600;">✓ 最终</div>
+        <div style="height: 80px; background: #f1f5f9; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 11px;">未选</div>
+        <div style="height: 80px; background: #f1f5f9; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 11px;">未选</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">项目概览页 (ProjectOverviewPage)</div>
+    <div class="mockup-body" style="padding: 16px;">
+      <!-- 模拟项目概览卡片 -->
+      <div style="padding: 16px; background: rgba(255,255,255,0.8); border-radius: 16px; border: 1px solid rgba(0,0,0,0.08); margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #f58b3d, #d44d68); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px;">👶</div>
+          <div>
+            <div style="font-weight: 600; color: #1e293b;">宝宝成长记录</div>
+            <div style="color: #94a3b8; font-size: 12px;">小明的第1年</div>
+          </div>
+        </div>
+        
+        <!-- 统计卡片 -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px;">
+          <div style="padding: 8px; background: rgba(245,139,61,0.1); border-radius: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: 700; color: #f58b3d;">12</div>
+            <div style="font-size: 11px; color: #64748b;">周期</div>
+          </div>
+          <div style="padding: 8px; background: rgba(45,157,95,0.1); border-radius: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: 700; color: #2d9d5f;">48</div>
+            <div style="font-size: 11px; color: #64748b;">照片</div>
+          </div>
+          <div style="padding: 8px; background: rgba(125,92,191,0.1); border-radius: 8px; text-align: center;">
+            <div style="font-size: 18px; font-weight: 700; color: #7c5cbf;">8</div>
+            <div style="font-size: 11px; color: #64748b;">最终确认</div>
+          </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div style="display: flex; gap: 8px;">
+          <div style="padding: 8px 16px; border-radius: 8px; background: linear-gradient(135deg, #f58b3d, #d44d68); color: white; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 8px rgba(245,139,61,0.3); flex: 1; text-align: center;">
+            📦 导出确认照片
+          </div>
+          <div style="padding: 8px 16px; border-radius: 8px; border: 1px solid #e2e8f0; color: #64748b; font-size: 13px; flex: 1; text-align: center; cursor: pointer;">
+            ▶ 生成视频
+          </div>
+        </div>
+      </div>
+      
+      <!-- 模拟最近周期 -->
+      <div style="padding: 12px; background: rgba(255,255,255,0.5); border-radius: 12px; border: 1px solid rgba(0,0,0,0.06);">
+        <div style="font-weight: 600; color: #1e293b; font-size: 13px; margin-bottom: 8px;">最近周期</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="width: 60px; height: 60px; background: #f1f5f9; border-radius: 8px; border: 2px solid #2d9d5f; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #2d9d5f;">✓ 最终</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 500; color: #1e293b; font-size: 12px;">第1周</div>
+            <div style="color: #94a3b8; font-size: 11px;">20240115 - 20240214</div>
+            <div style="color: #94a3b8; font-size: 11px;">1 张确认照片</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>导出交互流程</h3>
+  <div class="mockup">
+    <div class="mockup-header">点击「导出照片」后的交互</div>
+    <div class="mockup-body" style="padding: 16px; display: flex; gap: 24px; align-items: center;">
+      <!-- Step 1: 点击导出 -->
+      <div style="flex: 1; text-align: center;">
+        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px;">① 点击导出</div>
+        <div style="padding: 10px 20px; border-radius: 10px; background: linear-gradient(135deg, #f58b3d, #d44d68); color: white; font-weight: 600; font-size: 14px; box-shadow: 0 2px 12px rgba(245,139,61,0.3);">📦 导出照片</div>
+      </div>
+      
+      <!-- Step 2: Loading -->
+      <div style="flex: 1; text-align: center;">
+        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px;">② Loading 状态</div>
+        <div style="padding: 16px; background: rgba(245,139,61,0.1); border-radius: 12px; border: 1px solid rgba(245,139,61,0.2);">
+          <div style="font-weight: 600; color: #f58b3d; font-size: 14px; margin-bottom: 4px;">正在打包导出...</div>
+          <div style="color: #64748b; font-size: 12px;">准备 8 张照片</div>
+        </div>
+      </div>
+      
+      <!-- Step 3: Save dialog -->
+      <div style="flex: 1; text-align: center;">
+        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px;">③ 选择保存位置</div>
+        <div style="padding: 16px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+          <div style="font-weight: 600; color: #1e293b; font-size: 13px;">保存文件</div>
+          <div style="background: #e2e8f0; border-radius: 6px; padding: 6px 10px; color: #64748b; font-size: 12px; margin: 8px 0;">宝宝成长-20240115-20241214.zip</div>
+          <div style="padding: 6px 12px; border-radius: 6px; background: #2d9d5f; color: white; font-size: 12px; text-align: center;">保存</div>
+        </div>
+      </div>
+      
+      <!-- Step 4: Success -->
+      <div style="flex: 1; text-align: center;">
+        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px;">④ 成功提示</div>
+        <div style="padding: 12px; background: rgba(45,157,95,0.1); border-radius: 12px; border: 1px solid rgba(45,157,95,0.2);">
+          <div style="font-weight: 600; color: #2d9d5f; font-size: 14px;">✓ 导出成功！</div>
+          <div style="color: #64748b; font-size: 12px;">8 张照片 · 2.3 MB</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

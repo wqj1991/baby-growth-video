@@ -8,6 +8,9 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use base64::Engine;
 use tauri::Emitter;
+use walkdir::WalkDir;
+use fast_image_resize::{FilterType, ResizeAlg, Resizer, ResizeOptions};
+use fast_image_resize::images::Image;
 
 fn get_ffmpeg_path() -> PathBuf {
     let exe_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
@@ -239,8 +242,11 @@ fn generate_ai_frames(
     }
 
     let ai_frames_dir = get_ai_frames_dir(project_id);
-    std::fs::create_dir_all(&ai_frames_dir)
-        .map_err(|e| format!("创建 AI 帧目录失败: {}", e))?;
+    
+    if !ai_frames_dir.exists() {
+        std::fs::create_dir_all(&ai_frames_dir)
+            .map_err(|e| format!("创建 AI 帧目录失败: {}", e))?;
+    }
 
     let image_size = format!(
         "{}x{}",
@@ -543,8 +549,21 @@ pub async fn generate_growth_video_agnes(
 
     // ── Phase 2: 文字预处理 ──
     let temp_dir = get_ai_frames_dir(project_id).join("agnes_temp");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| format!("创建临时目录失败: {}", e))?;
+    
+    if !temp_dir.exists() {
+        std::fs::create_dir_all(&temp_dir)
+            .map_err(|e| format!("创建临时目录失败: {}", e))?;
+    } else {
+        // 清理旧文件
+        for entry in WalkDir::new(&temp_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_file())
+            .collect::<Vec<_>>()
+        {
+            std::fs::remove_file(entry.path()).ok();
+        }
+    }
 
     let text_map: HashMap<i64, &str> = photo_texts
         .iter()
@@ -956,7 +975,6 @@ pub fn generate_video_frames(
     video_id: i64,
     count: i64,
 ) -> Result<Vec<crate::db::VideoFrameTemp>, String> {
-    use image::imageops::FilterType;
     use uuid::Uuid;
 
     // 获取视频信息
@@ -987,7 +1005,21 @@ pub fn generate_video_frames(
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("baby-growth-video")
         .join("temp_frames");
-    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+    
+    // 使用 walkdir 确保目录存在（如果不存在则创建）
+    if !temp_dir.exists() {
+        std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+    } else {
+        // 如果目录已存在，清理旧文件
+        for entry in WalkDir::new(&temp_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_file())
+            .collect::<Vec<_>>()
+        {
+            std::fs::remove_file(entry.path()).ok();
+        }
+    };
 
     let mut frames = Vec::new();
 
@@ -1023,12 +1055,31 @@ pub fn generate_video_frames(
         let thumb_result = (|| -> Result<(), String> {
             let img = image::open(&frame_path)
                 .map_err(|e| format!("读取帧图片失败: {}", e))?;
-            let ratio = 400.0 / img.width() as f64;
-            let new_height = (img.height() as f64 * ratio) as u32;
-            let scaled = img.resize(400, new_height, FilterType::Lanczos3);
+            let rgba_img = img.to_rgba8();
+            let ratio = 400.0 / rgba_img.width() as f64;
+            let new_height = (rgba_img.height() as f64 * ratio) as u32;
+
+            let mut dst_image = Image::new(400, new_height, fast_image_resize::PixelType::U8x4);
+            let mut resizer = Resizer::new();
+            let options = ResizeOptions {
+                algorithm: ResizeAlg::Interpolation(FilterType::Bilinear),
+                ..ResizeOptions::default()
+            };
+            resizer.resize(&rgba_img, &mut dst_image, Some(&options))
+                .map_err(|e| format!("Failed to resize image: {}", e))?;
+            let scaled_rgba = image::RgbaImage::from_raw(400, new_height, dst_image.buffer().to_vec())
+                .ok_or("Failed to create scaled image")?;
+
+            let mut rgb_data = Vec::with_capacity((400 * new_height * 3) as usize);
+            for pixel in scaled_rgba.pixels() {
+                rgb_data.extend_from_slice(&[pixel[0], pixel[1], pixel[2]]);
+            }
+            let scaled_rgb = image::RgbImage::from_raw(400, new_height, rgb_data)
+                .ok_or("Failed to create RGB image")?;
+
             let mut output = std::fs::File::create(&thumb_path)
                 .map_err(|e| format!("创建缩略图文件失败: {}", e))?;
-            scaled.write_to(&mut output, image::ImageFormat::Jpeg)
+            scaled_rgb.write_to(&mut output, image::ImageFormat::Jpeg)
                 .map_err(|e| format!("写入缩略图失败: {}", e))?;
             Ok(())
         })();

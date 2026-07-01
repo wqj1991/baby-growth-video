@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use image::{GenericImageView, ImageBuffer, Rgba, Rgb, ColorType};
 use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
+use fast_image_resize::{FilterType, ResizeAlg, Resizer, ResizeOptions};
+use fast_image_resize::images::Image;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CollageRegion {
@@ -168,12 +170,16 @@ pub fn generate_collage(req: &CollageRequest, project_id: i64) -> Result<Collage
 
         let cropped = img_rgba.view(crop_x, crop_y, crop_w, crop_h).to_image();
 
-        let scaled = image::imageops::resize(
-            &cropped,
-            adjusted_w,
-            adjusted_h,
-            image::imageops::FilterType::Lanczos3,
-        );
+        let mut dst_image = Image::new(adjusted_w, adjusted_h, fast_image_resize::PixelType::U8x4);
+        let mut resizer = Resizer::new();
+        let options = ResizeOptions {
+            algorithm: ResizeAlg::Interpolation(FilterType::Bilinear),
+            ..ResizeOptions::default()
+        };
+        resizer.resize(&cropped, &mut dst_image, Some(&options))
+            .map_err(|e| format!("Failed to resize image: {}", e))?;
+        let scaled = image::RgbaImage::from_raw(adjusted_w, adjusted_h, dst_image.buffer().to_vec())
+            .ok_or("Failed to create scaled image")?;
 
         let flipped = apply_flips(&scaled, region.flip_h, region.flip_v);
 
@@ -210,8 +216,12 @@ pub fn generate_collage(req: &CollageRequest, project_id: i64) -> Result<Collage
     }
 
     let collages_dir = get_project_collages_dir(project_id);
-    std::fs::create_dir_all(&collages_dir)
-        .map_err(|e| format!("Failed to create collages directory {}: {}", collages_dir.display(), e))?;
+    
+    // 使用 walkdir 检查目录并创建（如果不存在）
+    if !collages_dir.exists() {
+        std::fs::create_dir_all(&collages_dir)
+            .map_err(|e| format!("Failed to create collages directory {}: {}", collages_dir.display(), e))?;
+    }
 
     let uuid = uuid::Uuid::new_v4().to_string();
     let filename = format!("{}_collage.jpg", uuid);

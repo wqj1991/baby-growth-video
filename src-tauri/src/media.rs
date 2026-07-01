@@ -15,6 +15,9 @@ use walkdir::WalkDir;
 /// 每批次处理多少个文件后上报一次进度
 const PROGRESS_BATCH_SIZE: usize = 50;
 
+/// 每多少条结果推送一次前端
+const RESULTS_BATCH_SIZE: usize = 10;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScanResult {
     pub photos: Vec<Thumbnail>,
@@ -31,6 +34,26 @@ pub struct ScanResult {
     pub skipped_no_period_videos: i64,
     pub skipped_copy_failed_photos: i64,
     pub skipped_copy_failed_videos: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScanResultsBatch {
+    pub photos: Vec<Thumbnail>,
+    pub videos: Vec<Video>,
+    pub total_photos: i64,
+    pub total_videos: i64,
+    pub recognized_photos: i64,
+    pub recognized_videos: i64,
+    pub skipped_duplicate_photos: i64,
+    pub skipped_duplicate_videos: i64,
+    pub skipped_no_date_photos: i64,
+    pub skipped_no_date_videos: i64,
+    pub skipped_no_period_photos: i64,
+    pub skipped_no_period_videos: i64,
+    pub skipped_copy_failed_photos: i64,
+    pub skipped_copy_failed_videos: i64,
+    pub processed_files: i64,
+    pub total_files: i64,
 }
 
 /// 文件处理阶段的输出 — 尚未写入数据库
@@ -81,6 +104,15 @@ fn emit_scan_log(
     
     // 收集到日志列表（用于持久化）
     logs.push(entry);
+}
+
+fn emit_results_batch(
+    window: &tauri::Window,
+    batch: &ScanResultsBatch,
+) {
+    if let Err(e) = window.emit("scan://results-batch", batch) {
+        eprintln!("Failed to emit results batch event: {}", e);
+    }
 }
 
 // ==================== 日志持久化 ====================
@@ -506,9 +538,30 @@ fn copy_file_to_project_dir_atomic(
 
 pub fn delete_project_dir(project_id: i64) -> Result<(), String> {
     let project_dir = get_project_data_dir().join(project_id.to_string());
-    if project_dir.exists() {
-        fs::remove_dir_all(&project_dir).map_err(|e| e.to_string())?;
+    if !project_dir.exists() {
+        return Ok(());
     }
+
+    for entry in WalkDir::new(&project_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .collect::<Vec<_>>()
+    {
+        fs::remove_file(entry.path()).ok();
+    }
+
+    for entry in WalkDir::new(&project_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+    {
+        fs::remove_dir(entry.path()).ok();
+    }
+
     Ok(())
 }
 
@@ -709,15 +762,15 @@ fn process_single_entry(
     }
 }
 
-/// 纯文件处理阶段 — 无数据库依赖，不持锁
-/// 遍历文件夹、提取日期、匹配周期、复制文件、解析尺寸、emit 进度事件
-/// 返回尚未写入数据库的 NewPhoto/NewVideo 列表和统计信息
+/// 处理文件夹 — 遍历、提取日期、匹配周期、复制文件、解析尺寸、分批保存到数据库、emit 进度事件
+/// 返回已写入数据库的 NewPhoto/NewVideo 列表和统计信息
 pub fn process_media_folder(
     project_id: i64,
     folder_path: &str,
     periods: &[crate::db::Period],
     existing_paths: &HashSet<String>,
     window: &tauri::Window,
+    db: &std::sync::Arc<std::sync::Mutex<crate::db::Database>>,
 ) -> Result<ProcessResult, String> {
     let folder = Path::new(folder_path);
     if !folder.exists() {
@@ -794,7 +847,7 @@ pub fn process_media_folder(
         })
         .collect();
 
-    // ==================== Phase 3: 统计结果 ====================
+    // ==================== Phase 3: 统计结果并分批推送 ====================
     let mut new_photos: Vec<NewThumbnail> = Vec::new();
     let mut new_videos: Vec<NewVideo> = Vec::new();
     let mut processed_count = 0usize;
@@ -808,13 +861,15 @@ pub fn process_media_folder(
     let mut skipped_copy_failed_photos = 0i64;
     let mut skipped_copy_failed_videos = 0i64;
 
-    // 用于批量生成缩略图的任务列表 (dest_path, uuid, project_id, photo_index)
-    let mut thumb_tasks: Vec<(String, String, i64, usize)> = Vec::new();
+    // 当前批次的临时数据
+    let mut batch_photos: Vec<(ProcessedFile, String)> = Vec::new();
+    let mut batch_videos: Vec<NewVideo> = Vec::new();
+    let mut batch_thumb_tasks: Vec<(String, String, i64, usize)> = Vec::new();
 
     for result in &processed_results {
         processed_count += 1;
 
-        // 每 BATCH 个文件 emit 一条进度
+        // 每 PROGRESS_BATCH_SIZE 个文件 emit 一条进度
         if processed_count % PROGRESS_BATCH_SIZE == 0 {
             emit_scan_log(
                 window,
@@ -825,9 +880,8 @@ pub fn process_media_folder(
             );
         }
 
-        let _skip_reason = match &result.skip_reason {
+        match &result.skip_reason {
             Some(reason) => {
-                // 统计 skip
                 match reason {
                     SkipReason::NoDate => {
                         if result.is_photo {
@@ -866,14 +920,10 @@ pub fn process_media_folder(
                         }
                     }
                 }
-                Some(reason)
             }
             None => {
-                // 成功处理
                 if result.is_photo {
                     let dest_path_str = result.dest_path.to_string_lossy().to_string();
-
-                    // Extract UUID from dest filename — format is {uuid}_{original_name}
                     let uuid = result.dest_path
                         .file_name()
                         .and_then(|n| n.to_str())
@@ -881,16 +931,13 @@ pub fn process_media_folder(
                         .unwrap_or("unknown")
                         .to_string();
 
-                    // 添加到批量生成任务列表 (dest_path, uuid, project_id, photo_index)
-                    thumb_tasks.push((dest_path_str.clone(), uuid.clone(), project_id, new_photos.len()));
+                    batch_thumb_tasks.push((dest_path_str.clone(), uuid.clone(), project_id, batch_photos.len()));
+                    batch_photos.push((result.clone(), uuid));
 
                     emit_scan_log(
                         window,
                         "success",
-                        format!(
-                            "✓ 已识别照片: {} ({})",
-                            result.file_name, result.date_str
-                        ),
+                        format!("✓ 已识别照片: {} ({})", result.file_name, result.date_str),
                         Some(result.file_name.clone()),
                         &mut scan_logs,
                     );
@@ -905,57 +952,71 @@ pub fn process_media_folder(
                         height: result.height,
                         taken_at: Some(result.date_str.clone()),
                     };
-                    new_videos.push(new_video);
+                    batch_videos.push(new_video);
 
                     emit_scan_log(
                         window,
                         "success",
-                        format!(
-                            "✓ 已识别视频: {} ({})",
-                            result.file_name, result.date_str
-                        ),
+                        format!("✓ 已识别视频: {} ({})", result.file_name, result.date_str),
                         Some(result.file_name.clone()),
                         &mut scan_logs,
                     );
                 }
-                None
+
+                // 每 RESULTS_BATCH_SIZE 条成功记录推送一次前端并保存到数据库
+                let success_count = batch_photos.len() + batch_videos.len();
+                if success_count >= RESULTS_BATCH_SIZE {
+                    flush_batch(
+                        &mut batch_photos,
+                        &mut batch_videos,
+                        &mut batch_thumb_tasks,
+                        &mut new_photos,
+                        &mut new_videos,
+                        window,
+                        db,
+                        project_id,
+                        total_photos,
+                        total_videos,
+                        skipped_duplicate_photos,
+                        skipped_duplicate_videos,
+                        skipped_no_date_photos,
+                        skipped_no_date_videos,
+                        skipped_no_period_photos,
+                        skipped_no_period_videos,
+                        skipped_copy_failed_photos,
+                        skipped_copy_failed_videos,
+                        processed_count as i64,
+                        total_count,
+                    );
+                }
             }
-        };
+        }
     }
 
-    // 批量并行生成缩略图
-    let thumb_results = batch_generate_thumbnails(&thumb_tasks);
-
-    // 第二次循环：使用批量生成的缩略图构建 NewPhoto
-    for result in &processed_results {
-        if result.skip_reason.is_none() && result.is_photo {
-            let dest_path_str = result.dest_path.to_string_lossy().to_string();
-            let uuid = result.dest_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .and_then(|s| s.split('_').next())
-                .unwrap_or("unknown")
-                .to_string();
-
-            let thumb_path = thumb_results.get(&uuid).cloned().flatten();
-
-            let new_thumbnail = NewThumbnail {
-                project_id,
-                period_id: result.period_id,
-                source_type: "scan".to_string(),
-                source_id: None,
-                original_path: dest_path_str,
-                original_file_name: result.file_name.clone(),
-                original_width: result.width,
-                original_height: result.height,
-                original_file_size: result.file_size,
-                base64_data: thumb_path,
-                width: 0,
-                height: 0,
-                taken_at: Some(result.date_str.clone()),
-            };
-            new_photos.push(new_thumbnail);
-        }
+    // 推送剩余的记录并保存到数据库
+    if !batch_photos.is_empty() || !batch_videos.is_empty() {
+        flush_batch(
+            &mut batch_photos,
+            &mut batch_videos,
+            &mut batch_thumb_tasks,
+            &mut new_photos,
+            &mut new_videos,
+            window,
+            db,
+            project_id,
+            total_photos,
+            total_videos,
+            skipped_duplicate_photos,
+            skipped_duplicate_videos,
+            skipped_no_date_photos,
+            skipped_no_date_videos,
+            skipped_no_period_photos,
+            skipped_no_period_videos,
+            skipped_copy_failed_photos,
+            skipped_copy_failed_videos,
+            processed_count as i64,
+            total_count,
+        );
     }
 
     let total_files = total_photos + total_videos;
@@ -978,17 +1039,147 @@ pub fn process_media_folder(
     })
 }
 
+fn flush_batch(
+    batch_photos: &mut Vec<(ProcessedFile, String)>,
+    batch_videos: &mut Vec<NewVideo>,
+    batch_thumb_tasks: &mut Vec<(String, String, i64, usize)>,
+    new_photos: &mut Vec<NewThumbnail>,
+    new_videos: &mut Vec<NewVideo>,
+    window: &tauri::Window,
+    db: &std::sync::Arc<std::sync::Mutex<crate::db::Database>>,
+    project_id: i64,
+    total_photos: i64,
+    total_videos: i64,
+    skipped_duplicate_photos: i64,
+    skipped_duplicate_videos: i64,
+    skipped_no_date_photos: i64,
+    skipped_no_date_videos: i64,
+    skipped_no_period_photos: i64,
+    skipped_no_period_videos: i64,
+    skipped_copy_failed_photos: i64,
+    skipped_copy_failed_videos: i64,
+    processed_files: i64,
+    total_files: i64,
+) {
+    let thumb_results = batch_generate_thumbnails(batch_thumb_tasks);
+
+    let mut batch_new_photos: Vec<NewThumbnail> = Vec::new();
+    let mut batch_result_photos: Vec<Thumbnail> = Vec::new();
+    for (result, uuid) in batch_photos.drain(..) {
+        let dest_path_str = result.dest_path.to_string_lossy().to_string();
+        let thumb_path = thumb_results.get(&uuid).cloned().flatten();
+
+        let new_thumbnail = NewThumbnail {
+            project_id,
+            period_id: result.period_id,
+            source_type: "scan".to_string(),
+            source_id: None,
+            original_path: dest_path_str,
+            original_file_name: result.file_name,
+            original_width: result.width,
+            original_height: result.height,
+            original_file_size: result.file_size,
+            base64_data: thumb_path,
+            width: 0,
+            height: 0,
+            taken_at: Some(result.date_str),
+        };
+        batch_new_photos.push(new_thumbnail.clone());
+        new_photos.push(new_thumbnail.clone());
+
+        batch_result_photos.push(Thumbnail {
+            id: 0,
+            project_id: new_thumbnail.project_id,
+            period_id: new_thumbnail.period_id,
+            source_type: new_thumbnail.source_type,
+            source_id: new_thumbnail.source_id,
+            original_path: new_thumbnail.original_path,
+            original_file_name: new_thumbnail.original_file_name,
+            original_width: new_thumbnail.original_width,
+            original_height: new_thumbnail.original_height,
+            original_file_size: new_thumbnail.original_file_size,
+            base64_data: new_thumbnail.base64_data,
+            width: new_thumbnail.width,
+            height: new_thumbnail.height,
+            taken_at: new_thumbnail.taken_at,
+            is_selected: false,
+            is_final: false,
+            created_at: chrono::Local::now().to_rfc3339(),
+        });
+    }
+
+    let mut batch_new_videos: Vec<NewVideo> = Vec::new();
+    let mut batch_result_videos: Vec<Video> = Vec::new();
+    while let Some(v) = batch_videos.pop() {
+        batch_new_videos.push(v.clone());
+        new_videos.push(v.clone());
+        batch_result_videos.push(Video {
+            id: 0,
+            period_id: v.period_id,
+            file_path: v.file_path,
+            file_name: v.file_name,
+            file_size: v.file_size,
+            duration: v.duration,
+            width: v.width,
+            height: v.height,
+            taken_at: v.taken_at,
+            created_at: chrono::Local::now().to_rfc3339(),
+        });
+    }
+    batch_result_videos.reverse();
+
+    // 短暂获取锁保存到数据库
+    if !batch_new_photos.is_empty() || !batch_new_videos.is_empty() {
+        if let Ok(db_lock) = db.lock() {
+            if !batch_new_photos.is_empty() {
+                if let Err(e) = db_lock.add_thumbnails(&batch_new_photos) {
+                    eprintln!("批次保存照片失败: {}", e);
+                }
+            }
+            if !batch_new_videos.is_empty() {
+                if let Err(e) = db_lock.add_videos(&batch_new_videos) {
+                    eprintln!("批次保存视频失败: {}", e);
+                }
+            }
+        }
+    }
+
+    let recognized_photos_count = batch_result_photos.len() as i64;
+    let recognized_videos_count = batch_result_videos.len() as i64;
+
+    emit_results_batch(window, &ScanResultsBatch {
+        photos: batch_result_photos,
+        videos: batch_result_videos,
+        total_photos,
+        total_videos,
+        recognized_photos: recognized_photos_count,
+        recognized_videos: recognized_videos_count,
+        skipped_duplicate_photos,
+        skipped_duplicate_videos,
+        skipped_no_date_photos,
+        skipped_no_date_videos,
+        skipped_no_period_photos,
+        skipped_no_period_videos,
+        skipped_copy_failed_photos,
+        skipped_copy_failed_videos,
+        processed_files,
+        total_files,
+    });
+
+    batch_thumb_tasks.clear();
+}
+
 // ==================== 按周期扫描（并行版）====================
 
-/// 按周期处理文件夹 — 无数据库依赖，不持锁
+/// 按周期处理文件夹 — 遍历、日期过滤、复制、尺寸解析、分批保存到数据库
 /// 调用前由 main.rs 预取 Period 数据并删除旧 DB 记录 + 旧文件
-/// 本函数只做遍历、日期过滤、复制、尺寸解析
 pub fn process_period_folder(
     project_id: i64,
     period_id: i64,
     folder_path: &str,
     period: &crate::db::Period,
     window: &tauri::Window,
+    db: &std::sync::Arc<std::sync::Mutex<crate::db::Database>>,
 ) -> Result<ProcessResult, String> {
     let folder = Path::new(folder_path);
     if !folder.exists() {
@@ -1094,9 +1285,11 @@ pub fn process_period_folder(
         })
         .collect();
 
-    // 统计结果
+    // 统计结果并分批推送
     let mut new_photos: Vec<NewThumbnail> = Vec::new();
     let mut new_videos: Vec<NewVideo> = Vec::new();
+    let mut processed_count = 0usize;
+    let total_count = total_photos + total_videos;
 
     let mut skipped_duplicate_photos = 0i64;
     let mut skipped_duplicate_videos = 0i64;
@@ -1107,16 +1300,17 @@ pub fn process_period_folder(
     let mut skipped_copy_failed_photos = 0i64;
     let mut skipped_copy_failed_videos = 0i64;
 
-    // 用于批量生成缩略图的任务列表
-    let mut thumb_tasks: Vec<(String, String, i64, usize)> = Vec::new();
+    // 当前批次的临时数据
+    let mut batch_photos: Vec<(ProcessedFile, String)> = Vec::new();
+    let mut batch_videos: Vec<NewVideo> = Vec::new();
+    let mut batch_thumb_tasks: Vec<(String, String, i64, usize)> = Vec::new();
 
     for result in &results {
+        processed_count += 1;
         match &result.skip_reason {
             None => {
                 if result.is_photo {
                     let dest_path_str = result.dest_path.to_string_lossy().to_string();
-
-                    // Extract UUID from dest filename — format is {uuid}_{original_name}
                     let uuid = result.dest_path
                         .file_name()
                         .and_then(|n| n.to_str())
@@ -1124,27 +1318,8 @@ pub fn process_period_folder(
                         .unwrap_or("unknown")
                         .to_string();
 
-                    // 添加到批量生成任务列表
-                    thumb_tasks.push((dest_path_str.clone(), uuid.clone(), project_id, new_photos.len()));
-
-                    // 暂时用 None，缩略图路径将在批量生成后从结果中获取
-                    let thumb_path: Option<String> = None;
-
-                    new_photos.push(NewThumbnail {
-                        project_id,
-                        period_id: result.period_id,
-                        source_type: "scan".to_string(),
-                        source_id: None,
-                        original_path: dest_path_str,
-                        original_file_name: result.file_name.clone(),
-                        original_width: result.width,
-                        original_height: result.height,
-                        original_file_size: result.file_size,
-                        base64_data: thumb_path,
-                        width: 0,
-                        height: 0,
-                        taken_at: Some(result.date_str.clone()),
-                    });
+                    batch_thumb_tasks.push((dest_path_str.clone(), uuid.clone(), project_id, batch_photos.len()));
+                    batch_photos.push((result.clone(), uuid));
 
                     emit_scan_log(
                         window,
@@ -1154,7 +1329,7 @@ pub fn process_period_folder(
                         &mut scan_logs,
                     );
                 } else if result.is_video {
-                    new_videos.push(NewVideo {
+                    let new_video = NewVideo {
                         period_id: result.period_id,
                         file_path: result.dest_path.to_string_lossy().to_string(),
                         file_name: result.file_name.clone(),
@@ -1163,7 +1338,8 @@ pub fn process_period_folder(
                         width: result.width,
                         height: result.height,
                         taken_at: Some(result.date_str.clone()),
-                    });
+                    };
+                    batch_videos.push(new_video);
 
                     emit_scan_log(
                         window,
@@ -1171,6 +1347,33 @@ pub fn process_period_folder(
                         format!("✓ 已识别视频: {} ({})", result.file_name, result.date_str),
                         Some(result.file_name.clone()),
                         &mut scan_logs,
+                    );
+                }
+
+                // 每 RESULTS_BATCH_SIZE 条成功记录推送一次前端并保存到数据库
+                let success_count = batch_photos.len() + batch_videos.len();
+                if success_count >= RESULTS_BATCH_SIZE {
+                    flush_batch(
+                        &mut batch_photos,
+                        &mut batch_videos,
+                        &mut batch_thumb_tasks,
+                        &mut new_photos,
+                        &mut new_videos,
+                        window,
+                        db,
+                        project_id,
+                        total_photos,
+                        total_videos,
+                        skipped_duplicate_photos,
+                        skipped_duplicate_videos,
+                        skipped_no_date_photos,
+                        skipped_no_date_videos,
+                        skipped_no_period_photos,
+                        skipped_no_period_videos,
+                        skipped_copy_failed_photos,
+                        skipped_copy_failed_videos,
+                        processed_count as i64,
+                        total_count,
                     );
                 }
             }
@@ -1217,39 +1420,30 @@ pub fn process_period_folder(
         }
     }
 
-    // 批量并行生成缩略图
-    let thumb_results = batch_generate_thumbnails(&thumb_tasks);
-
-    // 第二次循环：使用批量生成的缩略图构建 NewThumbnail
-    let mut updated_photos: Vec<NewThumbnail> = Vec::new();
-    for result in &results {
-        if result.skip_reason.is_none() && result.is_photo {
-            let dest_path_str = result.dest_path.to_string_lossy().to_string();
-            let uuid = result.dest_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .and_then(|s| s.split('_').next())
-                .unwrap_or("unknown")
-                .to_string();
-
-            let thumb_path = thumb_results.get(&uuid).cloned().flatten();
-
-            updated_photos.push(NewThumbnail {
-                project_id,
-                period_id: result.period_id,
-                source_type: "scan".to_string(),
-                source_id: None,
-                original_path: dest_path_str,
-                original_file_name: result.file_name.clone(),
-                original_width: result.width,
-                original_height: result.height,
-                original_file_size: result.file_size,
-                base64_data: thumb_path,
-                width: 0,
-                height: 0,
-                taken_at: Some(result.date_str.clone()),
-            });
-        }
+    // 推送剩余的记录并保存到数据库
+    if !batch_photos.is_empty() || !batch_videos.is_empty() {
+        flush_batch(
+            &mut batch_photos,
+            &mut batch_videos,
+            &mut batch_thumb_tasks,
+            &mut new_photos,
+            &mut new_videos,
+            window,
+            db,
+            project_id,
+            total_photos,
+            total_videos,
+            skipped_duplicate_photos,
+            skipped_duplicate_videos,
+            skipped_no_date_photos,
+            skipped_no_date_videos,
+            skipped_no_period_photos,
+            skipped_no_period_videos,
+            skipped_copy_failed_photos,
+            skipped_copy_failed_videos,
+            processed_count as i64,
+            total_count,
+        );
     }
 
     let total_files = total_photos + total_videos;
@@ -1265,7 +1459,7 @@ pub fn process_period_folder(
     );
 
     Ok(ProcessResult {
-        new_photos: updated_photos,
+        new_photos,
         new_videos,
         scan_logs,
         total_photos,
@@ -1283,16 +1477,16 @@ pub fn process_period_folder(
 
 /// 批量并行生成缩略图
 /// 输入: Vec<(dest_path, uuid, project_id, photo_index)>
-/// 输出: HashMap<uuid, thumbnail_path或None>
+/// 输出: HashMap<uuid, base64_data或None>
 pub fn batch_generate_thumbnails(
     photos: &[(String, String, i64, usize)],  // (dest_path, uuid, project_id, photo_index)
 ) -> HashMap<String, Option<String>> {
     photos.par_iter()
         .map_init(
             || (),  // 每个线程独立的资源（当前无需预分配）
-            |(), (dest_path, uuid, project_id, _idx)| {
-                match thumbnail::generate_thumbnail(dest_path, *project_id, uuid) {
-                    Ok(path) => (uuid.clone(), Some(path)),
+            |(), (dest_path, uuid, _project_id, _idx)| {
+                match thumbnail::generate_thumbnail_base64_fixed(dest_path) {
+                    Ok(base64_data) => (uuid.clone(), Some(base64_data)),
                     Err(e) => {
                         eprintln!("缩略图生成失败 {}: {}", dest_path, e);
                         (uuid.clone(), None)
