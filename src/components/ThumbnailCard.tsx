@@ -38,7 +38,7 @@ export default function ThumbnailCard({
 
   return (
     <div
-      className={`photo-card relative group ${is_final ? 'ring-2 ring-success' : ''}`}
+      className={`photo-card relative group ${is_final ? 'ring-2 ring-success' : ''} ${is_selected && !is_final ? 'ring-2 ring-orange-500' : ''}`}
       onDoubleClick={() => onPreview?.(thumbnail)}
     >
       <div className="photo-thumb" style={{ aspectRatio: '4/3' }}>
@@ -52,11 +52,11 @@ export default function ThumbnailCard({
       </div>
 
       {/* 操作按钮 */}
-      <div className={`photo-actions absolute top-1.5 left-1.5 right-1.5 flex flex-col gap-1 transition-opacity ${is_final ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+      <div className={`photo-actions absolute top-1.5 left-1.5 right-1.5 flex flex-row gap-1 transition-opacity ${is_final ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
         {!is_final && (
           <>
             <button
-              className="photo-action-btn bg-stash-600 hover:bg-[#6345a8] text-white text-xs px-2 py-1 rounded flex items-center justify-center"
+              className={`photo-action-btn text-white text-xs px-2 py-1 rounded flex items-center justify-center ${is_selected ? 'bg-red-400 hover:bg-red-500' : 'bg-orange-500 hover:bg-orange-600'}`}
               onClick={handleAction}
             >
               {is_selected ? (

@@ -100,6 +100,7 @@ export default function PeriodSelectPage() {
 
   // Template selector state
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [collagePhotoCount, setCollagePhotoCount] = useState(0);
 
   // Draggable pending panel state
   const [pendingPanelWidth, setPendingPanelWidth] = useState(320);
@@ -433,9 +434,10 @@ export default function PeriodSelectPage() {
     cancelThumbFinal();
   };
 
-  const handleEnterCollage = () => {
-    const selectedThumbs = pendingThumbnails;
-    setCollagePhotoOrder(selectedThumbs.map((_, i) => i));
+  const handleEnterCollage = (selectedThumbs: Thumbnail[] = []) => {
+    const thumbs = selectedThumbs.length > 0 ? selectedThumbs : pendingThumbnails;
+    setCollagePhotoCount(thumbs.length);
+    setCollagePhotoOrder(thumbs.map((_, i) => i));
     resetRegionTransforms();
     setShowTemplateSelector(true);
   };
@@ -975,7 +977,7 @@ export default function PeriodSelectPage() {
       {/* ===== GLOBAL MODALS ===== */}      {/* ===== TEMPLATE SELECTOR MODAL ===== */}
       {showTemplateSelector && (
         <TemplateSelector
-          photoCount={pendingThumbnails.length}
+          photoCount={collagePhotoCount}
           onConfirm={handleTemplateConfirm}
           onCancel={handleTemplateCancel}
         />

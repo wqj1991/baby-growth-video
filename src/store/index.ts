@@ -487,8 +487,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setThumbAsFinal: async (id: number) => {
     const state = get();
     if (!state.currentPeriod) return;
+    const currentPeriodId = state.currentPeriod.id;
     try {
-      await setFinalThumbnail(state.currentPeriod.id, id);
+      await setFinalThumbnail(currentPeriodId, id);
       set((state) => ({
         thumbnails: state.thumbnails.map(t => ({
           ...t,
@@ -497,7 +498,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         pendingThumbnails: state.pendingThumbnails.map(t => ({
           ...t,
           is_final: t.id === id
-        }))
+        })),
+        periods: state.periods.map(p => 
+          p.id === currentPeriodId
+            ? { ...p, selected_photo_id: id }
+            : p
+        ),
+        periodStats: {
+          ...state.periodStats,
+          [currentPeriodId]: {
+            ...(state.periodStats[currentPeriodId] || {}),
+            has_final: true
+          }
+        }
       }));
     } catch (e) {
       console.error('Failed to set final:', e);
@@ -507,11 +520,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   cancelThumbFinal: async () => {
     const state = get();
     if (!state.currentPeriod) return;
+    const currentPeriodId = state.currentPeriod.id;
     try {
-      await cancelFinalThumbnail(state.currentPeriod.id);
+      await cancelFinalThumbnail(currentPeriodId);
       set((state) => ({
         thumbnails: state.thumbnails.map(t => ({ ...t, is_final: false })),
-        pendingThumbnails: state.pendingThumbnails.map(t => ({ ...t, is_final: false }))
+        pendingThumbnails: state.pendingThumbnails.map(t => ({ ...t, is_final: false })),
+        periods: state.periods.map(p => 
+          p.id === currentPeriodId
+            ? { ...p, selected_photo_id: undefined }
+            : p
+        ),
+        periodStats: {
+          ...state.periodStats,
+          [currentPeriodId]: {
+            ...(state.periodStats[currentPeriodId] || {}),
+            has_final: false
+          }
+        }
       }));
     } catch (e) {
       console.error('Failed to cancel final:', e);

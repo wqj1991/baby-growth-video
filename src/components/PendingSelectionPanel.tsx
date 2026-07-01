@@ -4,7 +4,7 @@ import { useAppStore } from '../store';
 import type { Thumbnail } from '../types';
 
 interface PendingSelectionPanelProps {
-  onGenerateCollage?: () => void;
+  onGenerateCollage?: (selectedThumbnails: Thumbnail[]) => void;
   onPreview?: (thumbnail: Thumbnail) => void;
 }
 
@@ -34,7 +34,8 @@ export default function PendingSelectionPanel({
     }
   }, [currentPeriod?.id]);
 
-  const multiSelectedCount = pendingThumbnails.filter(t => selectedIds.has(t.id)).length;
+  const selectedThumbnails = pendingThumbnails.filter(t => selectedIds.has(t.id));
+  const multiSelectedCount = selectedThumbnails.length;
   const canCollage = multiSelectedCount >= 2;
 
   const handleToggleMultiSelect = (thumb: Thumbnail) => {
@@ -83,7 +84,7 @@ export default function PendingSelectionPanel({
               return (
                 <div
                   key={thumb.id}
-                  className={`stash-compare-item relative cursor-pointer group ${isFinal ? 'ring-2 ring-success' : isMultiSelected ? 'ring-2 ring-warning' : ''}`}
+                  className={`stash-compare-item relative cursor-pointer group ${isFinal ? 'ring-2 ring-success' : isMultiSelected ? 'multi-selected' : ''}`}
                   onClick={() => handleToggleMultiSelect(thumb)}
                   onDoubleClick={() => onPreview?.(thumb)}
                 >
@@ -96,7 +97,7 @@ export default function PendingSelectionPanel({
                   </div>
 
                   {/* 操作按钮区域 — 参照全部照片 */}
-                  <div className={`photo-actions absolute top-1.5 left-1.5 right-1.5 flex flex-col gap-1 transition-opacity ${isFinal ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                  <div className={`photo-actions absolute top-1.5 left-1.5 right-1.5 flex flex-row gap-1 transition-opacity ${isFinal ? 'opacity-100' : 'opacity-100'}`}>
                     {!isFinal && (
                       <>
                         {/* 取消待选（scan）或 删除（video_frame/collage） */}
@@ -107,10 +108,10 @@ export default function PendingSelectionPanel({
                               e.stopPropagation();
                               removeThumbFromPending(thumb.id);
                             }}
-                            title="取消待选"
+                            title="回退"
                           >
                             <X className="w-3 h-3 inline mr-1" />
-                            取消待选
+                            回退
                           </button>
                         ) : (
                           <button
@@ -154,6 +155,11 @@ export default function PendingSelectionPanel({
 
                   {/* 状态标记 */}
                   <div className="photo-status absolute bottom-1.5 right-1.5 flex gap-1">
+                    {isMultiSelected && (
+                      <div className="w-5 h-5 rounded-full bg-stash-600 flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
                     {isFinal && (
                       <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center">
                         <Check className="w-3 h-3 text-white" />
@@ -180,34 +186,39 @@ export default function PendingSelectionPanel({
 
       {pendingThumbnails.length > 0 && (
         <div className="p-3 border-t border-stone-200 bg-white">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => {
-                if (pendingThumbnails.length > 0 && !finalThumbnail) {
-                  setThumbAsFinal(pendingThumbnails[0].id);
-                }
-              }}
-              disabled={!!finalThumbnail || pendingThumbnails.length === 0}
-              className="btn btn-secondary w-full !justify-center text-xs"
-            >
-              <Check className="w-3 h-3" />
-              选定首张
-            </button>
-            <button
-              onClick={() => {
-                if (canCollage) {
-                  setGeneratingCollage(true);
-                  onGenerateCollage?.();
-                  setGeneratingCollage(false);
-                  setSelectedIds(new Set()); // 生成拼图后清除选中状态
-                }
-              }}
-              disabled={!canCollage || generatingCollage}
-              className="btn btn-primary w-full !justify-center text-xs"
-            >
-              <Wand2 className="w-3 h-3" />
-              生成拼图
-            </button>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-stone-500">
+              已选 {multiSelectedCount} 张
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  if (pendingThumbnails.length > 0 && !finalThumbnail) {
+                    setThumbAsFinal(pendingThumbnails[0].id);
+                  }
+                }}
+                disabled={!!finalThumbnail || pendingThumbnails.length === 0}
+                className="btn btn-secondary btn-sm !justify-center text-xs"
+              >
+                <Check className="w-3 h-3" />
+                选定首张
+              </button>
+              <button
+                onClick={() => {
+                  if (canCollage) {
+                    setGeneratingCollage(true);
+                    onGenerateCollage?.(selectedThumbnails);
+                    setGeneratingCollage(false);
+                    setSelectedIds(new Set()); // 生成拼图后清除选中状态
+                  }
+                }}
+                disabled={!canCollage || generatingCollage}
+                className="btn btn-primary btn-sm !justify-center text-xs"
+              >
+                <Wand2 className="w-3 h-3" />
+                生成拼图
+              </button>
+            </div>
           </div>
         </div>
       )}
