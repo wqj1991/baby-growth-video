@@ -1,5 +1,4 @@
 use base64::Engine;
-use fast_image_resize::{ResizeAlg, Resizer, ImageView, ImageViewMut, PixelType};
 use std::path::Path;
 
 const THUMB_WIDTH: u32 = 300;
@@ -20,27 +19,7 @@ pub fn generate_thumbnail(
     let ratio = THUMB_WIDTH as f64 / width as f64;
     let new_height = (height as f64 * ratio) as u32;
 
-    let mut pixels = img.to_rgba8().into_vec();
-    let src_view = ImageView::new(
-        width,
-        height,
-        &pixels,
-        PixelType::U8x4,
-    ).map_err(|e| format!("Failed to create source view: {}", e))?;
-
-    let mut dst_pixels = vec![0u8; 4 * THUMB_WIDTH as usize * new_height as usize];
-    let mut dst_view = ImageViewMut::new(
-        THUMB_WIDTH,
-        new_height,
-        &mut dst_pixels,
-        PixelType::U8x4,
-    ).map_err(|e| format!("Failed to create destination view: {}", e))?;
-
-    let mut resizer = Resizer::new(ResizeAlg::Bilinear);
-    resizer.resize(&src_view, &mut dst_view).map_err(|e| format!("Failed to resize: {}", e))?;
-
-    let scaled = image::RgbaImage::from_raw(THUMB_WIDTH, new_height, dst_pixels)
-        .ok_or("Failed to create scaled image")?;
+    let scaled = image::imageops::resize(&img, THUMB_WIDTH, new_height, image::imageops::FilterType::Lanczos3);
 
     let data_dir = dirs_next::data_dir()
         .ok_or("Cannot get data directory".to_string())?;
@@ -80,27 +59,7 @@ pub fn generate_thumbnail_base64(source_path: &str, thumb_width: u32, _thumb_hei
     let ratio = thumb_width as f64 / width as f64;
     let new_height = (height as f64 * ratio) as u32;
 
-    let mut pixels = img.to_rgba8().into_vec();
-    let src_view = ImageView::new(
-        width,
-        height,
-        &pixels,
-        PixelType::U8x4,
-    ).map_err(|e| format!("Failed to create source view: {}", e))?;
-
-    let mut dst_pixels = vec![0u8; 4 * thumb_width as usize * new_height as usize];
-    let mut dst_view = ImageViewMut::new(
-        thumb_width,
-        new_height,
-        &mut dst_pixels,
-        PixelType::U8x4,
-    ).map_err(|e| format!("Failed to create destination view: {}", e))?;
-
-    let mut resizer = Resizer::new(ResizeAlg::Bilinear);
-    resizer.resize(&src_view, &mut dst_view).map_err(|e| format!("Failed to resize: {}", e))?;
-
-    let scaled = image::RgbaImage::from_raw(thumb_width, new_height, dst_pixels)
-        .ok_or("Failed to create scaled image")?;
+    let scaled = image::imageops::resize(&img, thumb_width, new_height, image::imageops::FilterType::Lanczos3);
 
     let mut buffer = std::io::Cursor::new(Vec::new());
     scaled.write_to(&mut buffer, image::ImageFormat::Jpeg)
