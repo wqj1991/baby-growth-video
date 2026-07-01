@@ -96,8 +96,8 @@ export default function PendingSelectionPanel({
                     )}
                   </div>
 
-                  {/* 操作按钮区域 — 参照全部照片 */}
-                  <div className={`photo-actions absolute top-1.5 left-1.5 right-1.5 flex flex-row gap-1 transition-opacity ${isFinal ? 'opacity-100' : 'opacity-100'}`}>
+                  {/* 操作按钮区域 */}
+                  <div className={`photo-actions absolute top-1.5 left-1.5 right-1.5 flex flex-row gap-1 transition-opacity ${isFinal ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                     {!isFinal && (
                       <>
                         {/* 取消待选（scan）或 删除（video_frame/collage） */}
@@ -108,7 +108,6 @@ export default function PendingSelectionPanel({
                               e.stopPropagation();
                               removeThumbFromPending(thumb.id);
                             }}
-                            title="回退"
                           >
                             <X className="w-3 h-3 inline mr-1" />
                             回退
