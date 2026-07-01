@@ -1,12 +1,9 @@
-use image::imageops::FilterType;
+use base64::Engine;
+use fast_image_resize::{ResizeAlg, Resizer, ImageView, ImageViewMut, PixelType};
 use std::path::Path;
 
-const THUMB_WIDTH: u32 = 400;
-#[allow(dead_code)]
-const THUMB_QUALITY: u8 = 75; // Reserved for future JPEG quality control
+const THUMB_WIDTH: u32 = 300;
 
-/// Generate a thumbnail, saved to projects/{project_id}/thumbnails/{uuid}_thumb.jpg
-/// Returns the absolute path of the thumbnail
 pub fn generate_thumbnail(
     source_path: &str,
     project_id: i64,
@@ -17,15 +14,34 @@ pub fn generate_thumbnail(
         return Err(format!("Source file does not exist: {}", source_path));
     }
 
-    // Open source image
     let img = image::open(source).map_err(|e| format!("Failed to open image: {}", e))?;
 
-    // Scale to width 400px, maintaining aspect ratio
-    let ratio = THUMB_WIDTH as f64 / img.width() as f64;
-    let new_height = (img.height() as f64 * ratio) as u32;
-    let scaled = img.resize(THUMB_WIDTH, new_height, FilterType::CatmullRom);
+    let (width, height) = (img.width(), img.height());
+    let ratio = THUMB_WIDTH as f64 / width as f64;
+    let new_height = (height as f64 * ratio) as u32;
 
-    // Output path
+    let mut pixels = img.to_rgba8().into_vec();
+    let src_view = ImageView::new(
+        width,
+        height,
+        &pixels,
+        PixelType::U8x4,
+    ).map_err(|e| format!("Failed to create source view: {}", e))?;
+
+    let mut dst_pixels = vec![0u8; 4 * THUMB_WIDTH as usize * new_height as usize];
+    let mut dst_view = ImageViewMut::new(
+        THUMB_WIDTH,
+        new_height,
+        &mut dst_pixels,
+        PixelType::U8x4,
+    ).map_err(|e| format!("Failed to create destination view: {}", e))?;
+
+    let mut resizer = Resizer::new(ResizeAlg::Bilinear);
+    resizer.resize(&src_view, &mut dst_view).map_err(|e| format!("Failed to resize: {}", e))?;
+
+    let scaled = image::RgbaImage::from_raw(THUMB_WIDTH, new_height, dst_pixels)
+        .ok_or("Failed to create scaled image")?;
+
     let data_dir = dirs_next::data_dir()
         .ok_or("Cannot get data directory".to_string())?;
     let thumb_dir = data_dir
@@ -38,7 +54,6 @@ pub fn generate_thumbnail(
 
     let thumb_path = thumb_dir.join(format!("{}_thumb.jpg", uuid));
 
-    // Save as JPEG with quality 75
     let mut output = std::fs::File::create(&thumb_path)
         .map_err(|e| format!("Failed to create thumbnail file: {}", e))?;
 
@@ -48,8 +63,54 @@ pub fn generate_thumbnail(
     Ok(thumb_path.to_string_lossy().to_string())
 }
 
-/// Get image dimensions (helper for collage/video frame scenarios)
 pub fn get_image_dimensions(path: &str) -> Result<(u32, u32), String> {
     let img = image::open(path).map_err(|e| format!("Failed to open image: {}", e))?;
     Ok((img.width(), img.height()))
+}
+
+pub fn generate_thumbnail_base64(source_path: &str, thumb_width: u32, _thumb_height: u32) -> Result<String, String> {
+    let source = Path::new(source_path);
+    if !source.exists() {
+        return Err(format!("Source file does not exist: {}", source_path));
+    }
+
+    let img = image::open(source).map_err(|e| format!("Failed to open image: {}", e))?;
+
+    let (width, height) = (img.width(), img.height());
+    let ratio = thumb_width as f64 / width as f64;
+    let new_height = (height as f64 * ratio) as u32;
+
+    let mut pixels = img.to_rgba8().into_vec();
+    let src_view = ImageView::new(
+        width,
+        height,
+        &pixels,
+        PixelType::U8x4,
+    ).map_err(|e| format!("Failed to create source view: {}", e))?;
+
+    let mut dst_pixels = vec![0u8; 4 * thumb_width as usize * new_height as usize];
+    let mut dst_view = ImageViewMut::new(
+        thumb_width,
+        new_height,
+        &mut dst_pixels,
+        PixelType::U8x4,
+    ).map_err(|e| format!("Failed to create destination view: {}", e))?;
+
+    let mut resizer = Resizer::new(ResizeAlg::Bilinear);
+    resizer.resize(&src_view, &mut dst_view).map_err(|e| format!("Failed to resize: {}", e))?;
+
+    let scaled = image::RgbaImage::from_raw(thumb_width, new_height, dst_pixels)
+        .ok_or("Failed to create scaled image")?;
+
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    scaled.write_to(&mut buffer, image::ImageFormat::Jpeg)
+        .map_err(|e| format!("Failed to encode thumbnail: {}", e))?;
+
+    let base64_str = base64::engine::general_purpose::STANDARD.encode(buffer.into_inner());
+    
+    Ok(format!("data:image/jpeg;base64,{}", base64_str))
+}
+
+pub fn generate_thumbnail_base64_fixed(source_path: &str) -> Result<String, String> {
+    generate_thumbnail_base64(source_path, THUMB_WIDTH, (THUMB_WIDTH as f64 * 0.75) as u32)
 }
