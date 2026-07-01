@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { Video, Play, Settings, Download, Music, Image, Sparkles, AlertCircle, ExternalLink, AlertTriangle, CheckCircle2, Loader2, Film, Type, Wand2, Clock, ChevronRight, Volume2, X } from 'lucide-react';
 import { useAppStore, isAiConfigured } from '../store';
-import { saveFile, generateGrowthVideo, getImageBase64, selectFile, getPeriodPhotos } from '../utils/tauriCommands';
+import { saveFile, generateGrowthVideo, getImageBase64, selectFile, getPeriodThumbnails } from '../utils/tauriCommands';
 import { showToast } from '../store/toastStore';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigate } from 'react-router-dom';
-import type { VideoConfig, PhotoText } from '../types';
+import type { VideoConfig, PhotoText, Thumbnail } from '../types';
 
 export default function VideoGeneratePage() {
   const navigate = useNavigate();
@@ -59,10 +59,10 @@ export default function VideoGeneratePage() {
         if (photoId != null && !photoThumbnails[period.id]) {
           setLoadingThumbnails(prev => new Set([...prev, photoId]));
           try {
-            const photos = await getPeriodPhotos(period.id);
-            const photo = photos.find((p) => p.id === photoId);
-            if (photo) {
-              const base64 = await getImageBase64(photo.file_path);
+            const thumbs: Thumbnail[] = await getPeriodThumbnails(period.id);
+            const thumb = thumbs.find((t: Thumbnail) => t.id === photoId);
+            if (thumb) {
+              const base64 = await getImageBase64(thumb.original_path);
               setPhotoThumbnails(prev => ({ ...prev, [period.id]: base64 }));
             }
           } catch (e) {

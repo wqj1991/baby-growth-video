@@ -126,61 +126,59 @@ fn get_period_stats(project_id: i64, state: State<AppState>) -> Result<Vec<db::P
     db.get_period_stats(project_id).map_err(|e| e.to_string())
 }
 
-// ==================== 照片相关 ====================
+// ==================== 缩略图相关 ====================
 
 #[tauri::command]
-fn get_period_photos(period_id: i64, state: State<AppState>) -> Result<Vec<db::Photo>, String> {
+fn get_period_thumbnails(period_id: i64, state: State<AppState>) -> Result<Vec<db::Thumbnail>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_period_photos(period_id).map_err(|e| e.to_string())
+    db.get_period_thumbnails(period_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn update_photo(photo: db::Photo, state: State<AppState>) -> Result<db::Photo, String> {
+fn update_thumbnail(thumbnail: db::Thumbnail, state: State<AppState>) -> Result<db::Thumbnail, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.update_photo(&photo).map_err(|e| e.to_string())
+    db.update_thumbnail(&thumbnail).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn set_final_photo(period_id: i64, photo_id: i64, state: State<AppState>) -> Result<(), String> {
+fn set_final_thumbnail(period_id: i64, thumbnail_id: i64, state: State<AppState>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.set_final_photo(period_id, photo_id).map_err(|e| e.to_string())
+    db.set_final_thumbnail(period_id, thumbnail_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn cancel_final_photo(period_id: i64, state: State<AppState>) -> Result<(), String> {
+fn cancel_final_thumbnail(period_id: i64, state: State<AppState>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.cancel_final_photo(period_id).map_err(|e| e.to_string())
+    db.cancel_final_thumbnail(period_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn create_collage_photo(
-    period_id: i64,
-    file_path: String,
-    file_name: String,
-    file_size: i64,
-    width: i64,
-    height: i64,
-    description: String,
-    state: State<AppState>,
-) -> Result<db::Photo, String> {
+fn delete_thumbnail(thumbnail_id: i64, state: State<AppState>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.create_collage_photo(
-        period_id,
-        &file_path,
-        &file_name,
-        file_size,
-        width,
-        height,
-        None, // thumbnail_path: 暂无缩略图，后续由 thumbnail 模块补充
-        &description,
-    )
-    .map_err(|e| e.to_string())
+    db.delete_thumbnail(thumbnail_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn delete_photo(photo_id: i64, state: State<AppState>) -> Result<(), String> {
+fn get_original_file(thumbnail_id: i64, state: State<AppState>) -> Result<String, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.delete_photo(photo_id).map_err(|e| e.to_string())
+    let thumbnail = db.get_thumbnail_by_id(thumbnail_id).map_err(|e| e.to_string())?;
+    thumbnail::generate_thumbnail_base64_fixed(&thumbnail.original_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn add_to_pending(thumbnail_id: i64, state: State<AppState>) -> Result<db::Thumbnail, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let mut thumbnail = db.get_thumbnail_by_id(thumbnail_id).map_err(|e| e.to_string())?;
+    thumbnail.is_selected = true;
+    db.update_thumbnail(&thumbnail).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn remove_from_pending(thumbnail_id: i64, state: State<AppState>) -> Result<db::Thumbnail, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let mut thumbnail = db.get_thumbnail_by_id(thumbnail_id).map_err(|e| e.to_string())?;
+    thumbnail.is_selected = false;
+    db.update_thumbnail(&thumbnail).map_err(|e| e.to_string())
 }
 
 // ==================== 视频相关 ====================
@@ -192,18 +190,6 @@ fn get_period_videos(period_id: i64, state: State<AppState>) -> Result<Vec<db::V
 }
 
 #[tauri::command]
-fn get_video_frames(video_id: i64, state: State<AppState>) -> Result<Vec<db::VideoFrame>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_video_frames(video_id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn get_period_video_frames(period_id: i64, state: State<AppState>) -> Result<Vec<db::VideoFrame>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_period_video_frames(period_id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 fn generate_video_frames(
     video_id: i64,
     count: i64,
@@ -211,17 +197,6 @@ fn generate_video_frames(
 ) -> Result<Vec<db::VideoFrameTemp>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     video::generate_video_frames(&db, video_id, count).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn set_final_video_frame(
-    period_id: i64,
-    frame_id: i64,
-    state: State<AppState>,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.set_final_video_frame(period_id, frame_id)
-        .map_err(|e| e.to_string())
 }
 
 // ==================== 扫描文件 ====================
@@ -244,8 +219,8 @@ async fn scan_media_folder(
             let periods = db.get_periods(project_id).map_err(|e| e.to_string())?;
             let mut paths = std::collections::HashSet::new();
             for period in &periods {
-                if let Ok(photos) = db.get_period_photos(period.id) {
-                    for p in photos { paths.insert(p.file_path); }
+                if let Ok(thumbnails) = db.get_period_thumbnails(period.id) {
+                    for t in thumbnails { paths.insert(t.original_path); }
                 }
                 if let Ok(videos) = db.get_period_videos(period.id) {
                     for v in videos { paths.insert(v.file_path); }
@@ -262,7 +237,7 @@ async fn scan_media_folder(
         // ========== Lock 2: 批量写入数据库（毫秒级）==========
         let (photos, videos) = {
             let db = db.lock().map_err(|e| e.to_string())?;
-            let photos = db.add_photos(&scan_result.new_photos)
+            let photos = db.add_thumbnails(&scan_result.new_photos)
                 .unwrap_or_else(|e| { eprintln!("批量插入照片失败: {}", e); Vec::new() });
             let videos = db.add_videos(&scan_result.new_videos)
                 .unwrap_or_else(|e| { eprintln!("批量插入视频失败: {}", e); Vec::new() });
@@ -300,24 +275,6 @@ async fn scan_media_folder(
 }
 
 #[tauri::command]
-fn update_video_frame(
-    frame: db::VideoFrame,
-    state: State<AppState>,
-) -> Result<db::VideoFrame, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.update_video_frame(&frame).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn cancel_final_video_frame(
-    period_id: i64,
-    state: State<AppState>,
-) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.cancel_final_video_frame(period_id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 fn get_video_thumbnail(video_path: String) -> Result<String, String> {
     video::get_video_thumbnail(&video_path)
 }
@@ -342,15 +299,15 @@ async fn scan_period_folder(
 
             // 收集旧文件路径（用于后续删除文件）
             let mut paths = Vec::new();
-            if let Ok(photos) = db.get_period_photos(period_id) {
-                for p in &photos { paths.push(p.file_path.clone()); }
+            if let Ok(thumbnails) = db.get_period_thumbnails(period_id) {
+                for t in &thumbnails { paths.push(t.original_path.clone()); }
             }
             if let Ok(videos) = db.get_period_videos(period_id) {
                 for v in &videos { paths.push(v.file_path.clone()); }
             }
 
             // 删除旧 DB 记录
-            db.delete_period_photos(period_id).ok();
+            db.delete_period_thumbnails(period_id).ok();
             db.delete_period_videos(period_id).ok();
 
             Ok::<_, String>((period, paths))
@@ -371,7 +328,7 @@ async fn scan_period_folder(
         // ========== Lock 2: 批量写入数据库（毫秒级）==========
         let (photos, videos) = {
             let db = db.lock().map_err(|e| e.to_string())?;
-            let photos = db.add_photos(&scan_result.new_photos)
+            let photos = db.add_thumbnails(&scan_result.new_photos)
                 .unwrap_or_else(|e| { eprintln!("批量插入照片失败: {}", e); Vec::new() });
             let videos = db.add_videos(&scan_result.new_videos)
                 .unwrap_or_else(|e| { eprintln!("批量插入视频失败: {}", e); Vec::new() });
@@ -494,16 +451,21 @@ fn generate_collage(
 
     // Persist to DB
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.create_collage_photo(
-        request.period_id,
-        &result.output_path,
-        &format!("collage_{}.jpg", uuid),
-        file_size,
-        w as i64,
-        h as i64,
-        thumb_path,
-        "拼图合成",
-    )
+    db.add_thumbnails(&[db::NewThumbnail {
+        project_id,
+        period_id: request.period_id,
+        source_type: "collage".to_string(),
+        source_id: None,
+        original_path: result.output_path.clone(),
+        original_file_name: format!("collage_{}.jpg", uuid),
+        original_width: w as i64,
+        original_height: h as i64,
+        original_file_size: file_size,
+        base64_data: thumb_path,
+        width: 0,
+        height: 0,
+        taken_at: None,
+    }])
     .map_err(|e| e.to_string())?;
 
     Ok(result)
@@ -596,7 +558,7 @@ fn persist_video_frame(
     temp_id: i64,
     project_id: i64,
     state: State<'_, AppState>,
-) -> Result<db::VideoFrame, String> {
+) -> Result<db::Thumbnail, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     
     let temp = db.get_temp_frame_by_id(temp_id).map_err(|e| e.to_string())?;
@@ -630,18 +592,26 @@ fn persist_video_frame(
             .map_err(|e| format!("Failed to move frame: {}", e))?;
     }
     
-    let new_frame = db::NewVideoFrame {
-        video_id: temp.video_id,
+    let new_thumbnail = db::NewThumbnail {
+        project_id,
         period_id: temp.period_id,
-        file_path: Some(dest_frame.to_string_lossy().to_string()),
-        time_seconds: temp.time_seconds,
-        thumbnail_path: Some(dest_thumb.to_string_lossy().to_string()),
+        source_type: "video".to_string(),
+        source_id: Some(temp.video_id),
+        original_path: dest_frame.to_string_lossy().to_string(),
+        original_file_name: format!("{}_frame.jpg", uuid),
+        original_width: 0,
+        original_height: 0,
+        original_file_size: 0,
+        base64_data: Some(dest_thumb.to_string_lossy().to_string()),
+        width: 0,
+        height: 0,
+        taken_at: None,
     };
     
-    let frame = db.add_video_frame(&new_frame).map_err(|e| e.to_string())?;
+    let mut thumbnails = db.add_thumbnails(&[new_thumbnail]).map_err(|e| e.to_string())?;
     db.delete_temp_frame(temp_id).map_err(|e| e.to_string())?;
     
-    Ok(frame)
+    thumbnails.pop().ok_or("Failed to persist thumbnail".to_string())
 }
 
 #[tauri::command]
@@ -735,19 +705,16 @@ pub fn run() {
             update_period,
             delete_period,
             get_period_stats,
-            get_period_photos,
-            update_photo,
-            set_final_photo,
-            cancel_final_photo,
-            create_collage_photo,
-            delete_photo,
+            get_period_thumbnails,
+            update_thumbnail,
+            set_final_thumbnail,
+            cancel_final_thumbnail,
+            delete_thumbnail,
+            get_original_file,
+            add_to_pending,
+            remove_from_pending,
             get_period_videos,
-            get_video_frames,
-            get_period_video_frames,
             generate_video_frames,
-            set_final_video_frame,
-            update_video_frame,
-            cancel_final_video_frame,
             get_video_thumbnail,
             scan_media_folder,
             scan_period_folder,

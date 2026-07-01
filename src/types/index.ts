@@ -37,23 +37,6 @@ export interface Period {
   updated_at: string;
 }
 
-// 照片
-export interface Photo {
-  id: number;
-  period_id: number;
-  file_path: string;
-  file_name: string;
-  file_size: number;
-  width: number;
-  height: number;
-  taken_at?: string; // 拍摄时间
-  description?: string;
-  is_selected: boolean; // 是否被标记为候选
-  is_multi_selected: boolean; // 是否被选中用于拼图
-  is_final: boolean; // 是否最终选中
-  created_at: string;
-}
-
 // 视频
 export interface Video {
   id: number;
@@ -65,19 +48,6 @@ export interface Video {
   width: number;
   height: number;
   taken_at?: string;
-  created_at: string;
-}
-
-// 视频截图
-export interface VideoFrame {
-  id: number;
-  video_id: number;
-  period_id: number;
-  file_path: string; // 截图保存路径
-  time_seconds: number; // 在视频中的时间点
-  is_selected: boolean;
-  is_multi_selected: boolean;
-  is_final: boolean;
   created_at: string;
 }
 
@@ -97,7 +67,7 @@ export interface ExportRecord {
 
 // 扫描结果
 export interface ScanResult {
-  photos: Photo[];
+  thumbnails: Thumbnail[];
   videos: Video[];
   total_photos: number;
   total_videos: number;
@@ -154,11 +124,6 @@ export interface ProjectInfo {
   period_days: number;
   include_special_dates: boolean;
 }
-
-// 待选区项目（照片 + 视频帧）
-export type SelectableItem = 
-  | { type: 'photo'; item: Photo }
-  | { type: 'video_frame'; item: VideoFrame };
 
 // 周期统计信息
 export interface PeriodStats {

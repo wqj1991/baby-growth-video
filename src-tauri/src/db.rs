@@ -120,24 +120,6 @@ pub struct NewPeriod {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Photo {
-    pub id: i64,
-    pub period_id: i64,
-    pub file_path: String,
-    pub file_name: String,
-    pub file_size: i64,
-    pub width: i64,
-    pub height: i64,
-    pub taken_at: Option<String>,
-    pub description: Option<String>,
-    pub is_selected: bool,
-    pub is_final: bool,
-    pub thumbnail_path: Option<String>,
-    pub source: String,
-    pub created_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Video {
     pub id: i64,
     pub period_id: i64,
@@ -148,19 +130,6 @@ pub struct Video {
     pub width: i64,
     pub height: i64,
     pub taken_at: Option<String>,
-    pub created_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct VideoFrame {
-    pub id: i64,
-    pub video_id: i64,
-    pub period_id: i64,
-    pub file_path: Option<String>,
-    pub time_seconds: f64,
-    pub is_selected: bool,
-    pub is_final: bool,
-    pub thumbnail_path: Option<String>,
     pub created_at: String,
 }
 
@@ -231,17 +200,7 @@ impl Database {
     fn run_migrations(&self) -> Result<()> {
         let conn = self.get_conn();
 
-        // Migration 1: photos 表添加 thumbnail_path（如果还不存在）
-        // SQLite 不支持 ADD COLUMN IF NOT EXISTS，忽略重复列的错误即可
-        let _ = conn.execute("ALTER TABLE photos ADD COLUMN thumbnail_path TEXT", []);
-
-        // Migration 2: video_frames 表添加 thumbnail_path
-        let _ = conn.execute("ALTER TABLE video_frames ADD COLUMN thumbnail_path TEXT", []);
-
-        // Migration 3: photos 表添加 source 列
-        let _ = conn.execute("ALTER TABLE photos ADD COLUMN source TEXT NOT NULL DEFAULT 'scan'", []);
-
-        // Migration 4: 修复 videos 表结构（旧版本可能有多余的列或不正确的外键）
+        // Migration 1: 修复 videos 表结构（旧版本可能有多余的列或不正确的外键）
         // 检查 videos 表是否有多余的列（如 project_id），如果有则重建表
         let mut stmt = conn.prepare("PRAGMA table_info(videos)")?;
         let columns: Vec<String> = stmt.query_map([], |row| row.get::<_, String>(1))?
@@ -672,7 +631,7 @@ impl Database {
 
         for period in periods {
             let photo_count: i64 = conn.query_row(
-                "SELECT COUNT(*) FROM photos WHERE period_id = ?1",
+                "SELECT COUNT(*) FROM thumbnails WHERE period_id = ?1 AND source_type = 'scan'",
                 params![period.id],
                 |row| row.get(0),
             ).unwrap_or(0);
@@ -684,13 +643,16 @@ impl Database {
             ).unwrap_or(0);
 
             let pending_count: i64 = conn.query_row(
-                "SELECT COALESCE((SELECT COUNT(*) FROM photos WHERE period_id = ?1 AND is_selected = 1), 0) +
-                        COALESCE((SELECT COUNT(*) FROM video_frames WHERE period_id = ?1 AND is_selected = 1), 0)",
+                "SELECT COUNT(*) FROM thumbnails WHERE period_id = ?1 AND is_selected = 1",
                 params![period.id],
                 |row| row.get(0),
             ).unwrap_or(0);
 
-            let has_final = period.selected_photo_id.is_some();
+            let has_final: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM thumbnails WHERE period_id = ?1 AND is_final = 1)",
+                params![period.id],
+                |row| row.get(0),
+            ).unwrap_or(false);
 
             stats.push(PeriodStats {
                 period_id: period.id,
@@ -946,7 +908,7 @@ impl Database {
         Ok(())
     }
 
-    fn get_thumbnail_by_id(&self, id: i64) -> Result<Thumbnail> {
+    pub fn get_thumbnail_by_id(&self, id: i64) -> Result<Thumbnail> {
         let conn = self.get_conn();
         conn.query_row("SELECT * FROM thumbnails WHERE id = ?1", params![id], |row| {
             Ok(Thumbnail {
@@ -975,64 +937,37 @@ impl Database {
         let conn = self.get_conn();
         let mut items = Vec::new();
 
-        // 查询 photos (is_selected = 1)
-        {
-            let mut stmt = conn.prepare(
-                "SELECT id, period_id, file_path, file_name, thumbnail_path, width, height,
-                        taken_at, is_final, source
-                 FROM photos
-                 WHERE period_id = ?1 AND is_selected = 1
-                 ORDER BY created_at ASC"
-            )?;
-            let photo_rows = stmt.query_map(params![period_id], |row| {
-                let source: String = row.get(9)?;
-                Ok(PendingItem {
-                    item_type: if source == "collage" { "collage".to_string() } else { "photo".to_string() },
-                    id: row.get(0)?,
-                    period_id: row.get(1)?,
-                    file_path: Some(row.get::<_, String>(2)?),
-                    file_name: Some(row.get(3)?),
-                    thumbnail_path: row.get(4)?,
-                    width: row.get(5)?,
-                    height: row.get(6)?,
-                    time_seconds: None,
-                    taken_at: row.get(7)?,
-                    is_final: row.get::<_, i64>(8)? != 0,
-                    source: Some(source),
-                })
-            })?;
-            for row in photo_rows {
-                items.push(row?);
-            }
-        }
-
-        // 查询 video_frames (is_selected = 1)
-        {
-            let mut stmt = conn.prepare(
-                "SELECT id, period_id, file_path, thumbnail_path, time_seconds, is_final
-                 FROM video_frames
-                 WHERE period_id = ?1 AND is_selected = 1
-                 ORDER BY created_at ASC"
-            )?;
-            let frame_rows = stmt.query_map(params![period_id], |row| {
-                Ok(PendingItem {
-                    item_type: "video_frame".to_string(),
-                    id: row.get(0)?,
-                    period_id: row.get(1)?,
-                    file_path: row.get(2)?,
-                    file_name: None,
-                    thumbnail_path: row.get(3)?,
-                    width: 0,
-                    height: 0,
-                    time_seconds: Some(row.get(4)?),
-                    taken_at: None,
-                    is_final: row.get::<_, i64>(5)? != 0,
-                    source: None,
-                })
-            })?;
-            for row in frame_rows {
-                items.push(row?);
-            }
+        let mut stmt = conn.prepare(
+            "SELECT id, period_id, original_path, original_file_name, base64_data, width, height,
+                    taken_at, is_final, source_type
+             FROM thumbnails
+             WHERE period_id = ?1 AND is_selected = 1
+             ORDER BY created_at ASC"
+        )?;
+        let rows = stmt.query_map(params![period_id], |row| {
+            let source_type: String = row.get(9)?;
+            let item_type = match source_type.as_str() {
+                "collage" => "collage".to_string(),
+                "video_frame" => "video_frame".to_string(),
+                _ => "photo".to_string(),
+            };
+            Ok(PendingItem {
+                item_type,
+                id: row.get(0)?,
+                period_id: row.get(1)?,
+                file_path: Some(row.get::<_, String>(2)?),
+                file_name: Some(row.get(3)?),
+                thumbnail_path: row.get(4)?,
+                width: row.get(5)?,
+                height: row.get(6)?,
+                time_seconds: None,
+                taken_at: row.get(7)?,
+                is_final: row.get::<_, i64>(8)? != 0,
+                source: Some(source_type),
+            })
+        })?;
+        for row in rows {
+            items.push(row?);
         }
 
         Ok(items)
@@ -1042,38 +977,29 @@ impl Database {
         let conn = self.get_conn();
         match item_type {
             "photo" => {
-                // 扫描照片: 仅取消 is_selected，不删文件
                 conn.execute(
-                    "UPDATE photos SET is_selected = 0 WHERE id = ?1 AND source = 'scan'",
+                    "UPDATE thumbnails SET is_selected = 0 WHERE id = ?1 AND source_type = 'scan'",
                     params![item_id],
                 )?;
                 Ok(None)
             }
             "collage" => {
-                // 拼图: 删 DB + 返回文件路径供调用方删除
                 let paths: (String, Option<String>) = conn.query_row(
-                    "SELECT file_path, thumbnail_path FROM photos WHERE id = ?1 AND source = 'collage'",
+                    "SELECT original_path, base64_data FROM thumbnails WHERE id = ?1 AND source_type = 'collage'",
                     params![item_id],
                     |row| Ok((row.get(0)?, row.get(1)?)),
                 )?;
-                conn.execute("DELETE FROM photos WHERE id = ?1", params![item_id])?;
+                conn.execute("DELETE FROM thumbnails WHERE id = ?1", params![item_id])?;
                 Ok(Some(paths))
             }
             "video_frame" => {
-                // 视频帧: 删 DB + 返回文件路径供调用方删除
-                let paths: (Option<String>, Option<String>) = conn.query_row(
-                    "SELECT file_path, thumbnail_path FROM video_frames WHERE id = ?1",
+                let paths: (String, Option<String>) = conn.query_row(
+                    "SELECT original_path, base64_data FROM thumbnails WHERE id = ?1 AND source_type = 'video_frame'",
                     params![item_id],
                     |row| Ok((row.get(0)?, row.get(1)?)),
                 )?;
-                conn.execute("DELETE FROM video_frames WHERE id = ?1", params![item_id])?;
-                // flatten Option
-                let fp = paths.0.unwrap_or_default();
-                if fp.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some((fp, paths.1)))
-                }
+                conn.execute("DELETE FROM thumbnails WHERE id = ?1", params![item_id])?;
+                Ok(Some(paths))
             }
             _ => Err(rusqlite::Error::InvalidParameterName("unknown item_type".to_string())),
         }
@@ -1153,77 +1079,6 @@ impl Database {
             .collect();
         conn.execute("DELETE FROM video_frame_temp WHERE video_id = ?1", params![video_id])?;
         Ok(paths)
-    }
-
-    pub fn update_photo(&self, photo: &Photo) -> Result<Photo> {
-        let conn = self.get_conn();
-        conn.execute(
-            "UPDATE photos SET description = ?1, is_selected = ?2, is_final = ?3 WHERE id = ?4",
-            params![
-                photo.description,
-                photo.is_selected as i64,
-                photo.is_final as i64,
-                photo.id,
-            ],
-        )?;
-        self.get_photo_by_id(photo.id)
-    }
-
-    pub fn set_final_photo(&self, period_id: i64, photo_id: i64) -> Result<()> {
-        let conn = self.get_conn();
-        // 先取消该周期所有照片的final状态
-        conn.execute(
-            "UPDATE photos SET is_final = 0 WHERE period_id = ?1",
-            params![period_id],
-        )?;
-        // 设置选中的照片为final
-        conn.execute(
-            "UPDATE photos SET is_final = 1 WHERE id = ?1",
-            params![photo_id],
-        )?;
-        // 更新周期的selected_photo_id
-        conn.execute(
-            "UPDATE periods SET selected_photo_id = ?1 WHERE id = ?2",
-            params![photo_id, period_id],
-        )?;
-        Ok(())
-    }
-
-    pub fn cancel_final_photo(&self, period_id: i64) -> Result<()> {
-        let conn = self.get_conn();
-        // 取消该周期所有照片的final状态
-        conn.execute(
-            "UPDATE photos SET is_final = 0 WHERE period_id = ?1",
-            params![period_id],
-        )?;
-        // 将周期的selected_photo_id设为null
-        conn.execute(
-            "UPDATE periods SET selected_photo_id = NULL WHERE id = ?1",
-            params![period_id],
-        )?;
-        Ok(())
-    }
-
-    fn get_photo_by_id(&self, id: i64) -> Result<Photo> {
-        let conn = self.get_conn();
-        conn.query_row("SELECT * FROM photos WHERE id = ?1", params![id], |row| {
-            Ok(Photo {
-                id: row.get(0)?,
-                period_id: row.get(1)?,
-                file_path: row.get(2)?,
-                file_name: row.get(3)?,
-                file_size: row.get(4)?,
-                width: row.get(5)?,
-                height: row.get(6)?,
-                taken_at: row.get(7)?,
-                description: row.get(8)?,
-                is_selected: row.get::<_, i64>(9)? != 0,
-                is_final: row.get::<_, i64>(10)? != 0,
-                thumbnail_path: row.get(11)?,
-                source: row.get::<_, String>(12)?,
-                created_at: row.get(13)?,
-            })
-        })
     }
 
     // ==================== 视频操作 ====================
@@ -1322,123 +1177,7 @@ impl Database {
         })
     }
 
-    // ==================== 视频截图操作 ====================
-
-    pub fn get_video_frames(&self, video_id: i64) -> Result<Vec<VideoFrame>> {
-        let conn = self.get_conn();
-        let mut stmt = conn.prepare(
-            "SELECT * FROM video_frames WHERE video_id = ?1 ORDER BY time_seconds ASC",
-        )?;
-        let frames = stmt.query_map(params![video_id], |row| {
-            Ok(VideoFrame {
-                id: row.get(0)?,
-                video_id: row.get(1)?,
-                period_id: row.get(2)?,
-                file_path: row.get(3)?,
-                time_seconds: row.get(4)?,
-                is_selected: row.get::<_, i64>(5)? != 0,
-                is_final: row.get::<_, i64>(6)? != 0,
-                thumbnail_path: row.get(7)?,
-                created_at: row.get(8)?,
-            })
-        })?;
-        frames.collect()
-    }
-
-    pub fn get_period_video_frames(&self, period_id: i64) -> Result<Vec<VideoFrame>> {
-        let conn = self.get_conn();
-        let mut stmt = conn.prepare(
-            "SELECT * FROM video_frames WHERE period_id = ?1 ORDER BY time_seconds ASC",
-        )?;
-        let frames = stmt.query_map(params![period_id], |row| {
-            Ok(VideoFrame {
-                id: row.get(0)?,
-                video_id: row.get(1)?,
-                period_id: row.get(2)?,
-                file_path: row.get(3)?,
-                time_seconds: row.get(4)?,
-                is_selected: row.get::<_, i64>(5)? != 0,
-                is_final: row.get::<_, i64>(6)? != 0,
-                thumbnail_path: row.get(7)?,
-                created_at: row.get(8)?,
-            })
-        })?;
-        frames.collect()
-    }
-
-    pub fn set_final_video_frame(&self, period_id: i64, frame_id: i64) -> Result<()> {
-        let conn = self.get_conn();
-        // 先取消该周期所有截图的final状态
-        conn.execute(
-            "UPDATE video_frames SET is_final = 0 WHERE period_id = ?1",
-            params![period_id],
-        )?;
-        // 设置选中的截图为final
-        conn.execute(
-            "UPDATE video_frames SET is_final = 1 WHERE id = ?1",
-            params![frame_id],
-        )?;
-        Ok(())
-    }
-
-    pub fn cancel_final_video_frame(&self, period_id: i64) -> Result<()> {
-        let conn = self.get_conn();
-        // 取消该周期所有截图的final状态
-        conn.execute(
-            "UPDATE video_frames SET is_final = 0 WHERE period_id = ?1",
-            params![period_id],
-        )?;
-        Ok(())
-    }
-
-    pub fn add_video_frame(&self, frame: &NewVideoFrame) -> Result<VideoFrame> {
-        let conn = self.get_conn();
-        let now = Self::now();
-        conn.execute(
-            "INSERT INTO video_frames (video_id, period_id, file_path, time_seconds, thumbnail_path, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                frame.video_id,
-                frame.period_id,
-                frame.file_path,
-                frame.time_seconds,
-                frame.thumbnail_path,
-                &now,
-            ],
-        )?;
-        let id = conn.last_insert_rowid();
-        self.get_video_frame_by_id(id)
-    }
-
-    fn get_video_frame_by_id(&self, id: i64) -> Result<VideoFrame> {
-        let conn = self.get_conn();
-        conn.query_row("SELECT * FROM video_frames WHERE id = ?1", params![id], |row| {
-            Ok(VideoFrame {
-                id: row.get(0)?,
-                video_id: row.get(1)?,
-                period_id: row.get(2)?,
-                file_path: row.get(3)?,
-                time_seconds: row.get(4)?,
-                is_selected: row.get::<_, i64>(5)? != 0,
-                is_final: row.get::<_, i64>(6)? != 0,
-                thumbnail_path: row.get(7)?,
-                created_at: row.get(8)?,
-            })
-        })
-    }
-
-    pub fn update_video_frame(&self, frame: &VideoFrame) -> Result<VideoFrame> {
-        let conn = self.get_conn();
-        conn.execute(
-            "UPDATE video_frames SET is_selected = ?1, is_final = ?2 WHERE id = ?3",
-            params![
-                frame.is_selected as i64,
-                frame.is_final as i64,
-                frame.id,
-            ],
-        )?;
-        self.get_video_frame_by_id(frame.id)
-    }
+    
 
     // ==================== 导出记录操作 ====================
 
@@ -1578,18 +1317,6 @@ pub struct PendingItem {
     pub source: Option<String>,
 }
 
-pub struct NewPhoto {
-    pub period_id: i64,
-    pub file_path: String,
-    pub file_name: String,
-    pub file_size: i64,
-    pub width: i64,
-    pub height: i64,
-    pub taken_at: Option<String>,
-    pub thumbnail_path: Option<String>,
-    pub source: String,
-}
-
 pub struct NewVideo {
     pub period_id: i64,
     pub file_path: String,
@@ -1599,14 +1326,6 @@ pub struct NewVideo {
     pub width: i64,
     pub height: i64,
     pub taken_at: Option<String>,
-}
-
-pub struct NewVideoFrame {
-    pub video_id: i64,
-    pub period_id: i64,
-    pub file_path: Option<String>,
-    pub time_seconds: f64,
-    pub thumbnail_path: Option<String>,
 }
 
 pub struct NewExportRecord {

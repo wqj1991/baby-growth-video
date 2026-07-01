@@ -5,9 +5,7 @@ import type {
   Baby,
   Project,
   Period,
-  Photo,
   Video,
-  VideoFrame,
   ExportRecord,
   ScanResult,
   ScanLog,
@@ -18,28 +16,10 @@ import type {
   PhotoText,
   PendingItem,
   VideoFrameTemp,
+  Thumbnail,
 } from '../types';
 
-// 本地 Thumbnail 类型定义（用于前端）
-interface Thumbnail {
-  id: number;
-  project_id: number;
-  period_id: number;
-  source_type: 'scan' | 'video_frame' | 'collage';
-  source_id?: number;
-  original_path: string;
-  original_file_name: string;
-  original_width: number;
-  original_height: number;
-  original_file_size: number;
-  base64_data: string;
-  width: number;
-  height: number;
-  is_selected: boolean;
-  is_final: boolean;
-  taken_at?: string;
-  created_at: string;
-}
+
 
 /**
  * 将本地文件路径转换为可在 WebView 中加载的 media 协议 URL
@@ -146,69 +126,13 @@ export async function getPeriodStats(projectId: number): Promise<PeriodStats[]> 
   return invoke('get_period_stats', { projectId });
 }
 
-// ==================== 照片相关 ====================
 
-// 获取周期的所有照片
-export async function getPeriodPhotos(periodId: number): Promise<Photo[]> {
-  return invoke('get_period_photos', { periodId });
-}
-
-// 更新照片
-export async function updatePhoto(photo: Photo): Promise<Photo> {
-  return invoke('update_photo', { photo });
-}
-
-// 设置最终选中的照片
-export async function setFinalPhoto(periodId: number, photoId: number): Promise<void> {
-  return invoke('set_final_photo', { periodId, photoId });
-}
-
-// 取消最终选中的照片
-export async function cancelFinalPhoto(periodId: number): Promise<void> {
-  return invoke('cancel_final_photo', { periodId });
-}
-
-// 创建拼图照片（持久化到数据库）
-export async function createCollagePhoto(
-  periodId: number,
-  filePath: string,
-  fileName: string,
-  fileSize: number,
-  width: number,
-  height: number,
-  description: string,
-): Promise<Photo> {
-  return invoke('create_collage_photo', {
-    periodId,
-    filePath,
-    fileName,
-    fileSize,
-    width,
-    height,
-    description,
-  });
-}
-
-// 删除照片（从数据库移除）
-export async function deletePhoto(photoId: number): Promise<void> {
-  return invoke('delete_photo', { photoId });
-}
 
 // ==================== 视频相关 ====================
 
 // 获取周期的所有视频
 export async function getPeriodVideos(periodId: number): Promise<Video[]> {
   return invoke('get_period_videos', { periodId });
-}
-
-// 获取视频截图
-export async function getVideoFrames(videoId: number): Promise<VideoFrame[]> {
-  return invoke('get_video_frames', { videoId });
-}
-
-// 获取周期的所有视频帧
-export async function getPeriodVideoFrames(periodId: number): Promise<VideoFrame[]> {
-  return invoke('get_period_video_frames', { periodId });
 }
 
 // 生成视频截图（按数量）
@@ -219,21 +143,6 @@ export async function generateVideoFrames(videoId: number, count: number): Promi
 // 生成视频截图（按间隔）
 export async function generateVideoFramesByInterval(videoId: number, intervalSeconds: number): Promise<VideoFrameTemp[]> {
   return invoke('generate_video_frames_by_interval', { videoId, intervalSeconds });
-}
-
-// 设置最终选中的视频截图
-export async function setFinalVideoFrame(periodId: number, frameId: number): Promise<void> {
-  return invoke('set_final_video_frame', { periodId, frameId });
-}
-
-// 更新视频帧
-export async function updateVideoFrame(frame: VideoFrame): Promise<VideoFrame> {
-  return invoke('update_video_frame', { frame });
-}
-
-// 取消最终选中的视频帧
-export async function cancelFinalVideoFrame(periodId: number): Promise<void> {
-  return invoke('cancel_final_video_frame', { periodId });
 }
 
 // 获取视频缩略图

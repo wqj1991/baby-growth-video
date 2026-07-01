@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem, PeriodStats, AiSettings, PendingItem, VideoFrameTemp, Thumbnail } from '../types';
+import type { Baby, Project, Period, Video, VideoFrame, ExportRecord, ScanLog, PeriodStats, AiSettings, PendingItem, VideoFrameTemp, Thumbnail } from '../types';
 import type { CollageTemplate, RegionTransform } from '../utils/collageTemplates';
 import { getTemplateById, DEFAULT_TRANSFORM } from '../utils/collageTemplates';
 import { getPeriodThumbnails, addToPending, removeFromPending, setFinalThumbnail, cancelFinalThumbnail, deleteThumbnail, getOriginalFile } from '../utils/tauriCommands';
@@ -25,18 +25,9 @@ interface AppState {
   currentPeriod: Period | null;
   setCurrentPeriod: (period: Period | null) => void;
 
-  // 当前周期的照片
-  currentPhotos: Photo[];
-  setCurrentPhotos: (photos: Photo[]) => void;
-  updatePhoto: (photo: Photo) => void;
-
   // 当前周期的视频
   currentVideos: Video[];
   setCurrentVideos: (videos: Video[]) => void;
-
-  // 视频截图
-  currentVideoFrames: VideoFrame[];
-  setCurrentVideoFrames: (frames: VideoFrame[]) => void;
 
   // 导出记录
   exportRecords: ExportRecord[];
@@ -73,11 +64,6 @@ interface AppState {
 
   fallbackReason: string;
   setFallbackReason: (reason: string) => void;
-
-  selectedItems: SelectableItem[];
-  setSelectedItems: (items: SelectableItem[]) => void;
-  addToSelectedItems: (item: SelectableItem) => void;
-  removeFromSelectedItems: (item: SelectableItem) => void;
 
   periodStats: Record<number, PeriodStats>;
   setPeriodStats: (stats: PeriodStats[]) => void;
@@ -178,17 +164,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentPeriod: null,
   setCurrentPeriod: (period) => set({ currentPeriod: period }),
 
-  currentPhotos: [],
-  setCurrentPhotos: (photos) => set({ currentPhotos: photos }),
-  updatePhoto: (photo) => set((state) => ({
-    currentPhotos: state.currentPhotos.map(p => p.id === photo.id ? photo : p)
-  })),
-
   currentVideos: [],
   setCurrentVideos: (videos) => set({ currentVideos: videos }),
-
-  currentVideoFrames: [],
-  setCurrentVideoFrames: (frames) => set({ currentVideoFrames: frames }),
 
   exportRecords: [],
   setExportRecords: (records) => set({ exportRecords: records }),
@@ -258,21 +235,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   fallbackReason: '',
   setFallbackReason: (reason) => set({ fallbackReason: reason }),
-
-  selectedItems: [],
-  setSelectedItems: (items) => set({ selectedItems: items }),
-  addToSelectedItems: (item) => set((state) => {
-    const exists = state.selectedItems.some(
-      i => i.type === item.type && i.item.id === item.item.id
-    );
-    if (exists) return state;
-    return { selectedItems: [...state.selectedItems, item] };
-  }),
-  removeFromSelectedItems: (item) => set((state) => ({
-    selectedItems: state.selectedItems.filter(
-      i => !(i.type === item.type && i.item.id === item.item.id)
-    )
-  })),
 
   periodStats: {},
   setPeriodStats: (stats) => set((state) => {

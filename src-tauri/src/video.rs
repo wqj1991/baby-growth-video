@@ -1,4 +1,4 @@
-use crate::db::{Database, ExportRecord, NewExportRecord, Photo, Period};
+use crate::db::{Database, ExportRecord, NewExportRecord, Period, Thumbnail};
 use crate::ai;
 use crate::agnes;
 use serde::{Deserialize, Serialize};
@@ -80,15 +80,15 @@ fn get_resolution_size(resolution: &str) -> (i64, i64) {
     }
 }
 
-fn get_final_photos_for_project(db: &Database, project_id: i64) -> Result<Vec<(Period, Photo)>, String> {
+fn get_final_photos_for_project(db: &Database, project_id: i64) -> Result<Vec<(Period, Thumbnail)>, String> {
     let periods = db.get_periods(project_id).map_err(|e| e.to_string())?;
     let mut result = Vec::new();
 
     for period in periods {
         if let Some(photo_id) = period.selected_photo_id {
-            let photos = db.get_period_photos(period.id).map_err(|e| e.to_string())?;
-            if let Some(photo) = photos.into_iter().find(|p| p.id == photo_id) {
-                result.push((period, photo));
+            let thumbnails = db.get_period_thumbnails(period.id).map_err(|e| e.to_string())?;
+            if let Some(thumbnail) = thumbnails.into_iter().find(|t| t.id == photo_id) {
+                result.push((period, thumbnail));
             }
         }
     }
@@ -98,7 +98,7 @@ fn get_final_photos_for_project(db: &Database, project_id: i64) -> Result<Vec<(P
 }
 
 fn generate_ffmpeg_command(
-    photos: &[(Period, Photo)],
+    photos: &[(Period, Thumbnail)],
     config: &VideoConfig,
     output_path: &str,
 ) -> Vec<String> {
@@ -112,7 +112,7 @@ fn generate_ffmpeg_command(
         args.push("-t".to_string());
         args.push(config.photo_duration.to_string());
         args.push("-i".to_string());
-        args.push(photo.file_path.clone());
+        args.push(photo.original_path.clone());
     }
 
     // 背景音乐
@@ -220,7 +220,7 @@ fn get_ai_frames_dir(project_id: i64) -> PathBuf {
 fn generate_ai_frames(
     db: &Database,
     project_id: i64,
-    photos: &[(Period, Photo)],
+    photos: &[(Period, Thumbnail)],
     app_handle: &tauri::AppHandle,
 ) -> Result<(Vec<String>, f64), String> {
     let settings = db
@@ -287,7 +287,7 @@ fn generate_ai_frames(
 
 /// 构建含 AI 过渡帧的 FFmpeg 命令（concat 模式，不用 xfade）
 fn build_ffmpeg_command_with_ai(
-    photos: &[(Period, Photo)],
+    photos: &[(Period, Thumbnail)],
     ai_frames: &[String],
     ai_frame_duration: f64,
     config: &VideoConfig,
@@ -305,7 +305,7 @@ fn build_ffmpeg_command_with_ai(
         args.push("-t".to_string());
         args.push(config.photo_duration.to_string());
         args.push("-i".to_string());
-        args.push(photos[i].1.file_path.clone());
+        args.push(photos[i].1.original_path.clone());
         total_inputs += 1;
 
         // AI 帧（最后一张照片后面不加）
@@ -558,7 +558,7 @@ pub async fn generate_growth_video_agnes(
 
         if text.is_empty() {
             // 不需要文字叠加，直接 base64 编码
-            let uri = photo_to_base64_uri(&photo.file_path)?;
+            let uri = photo_to_base64_uri(&photo.original_path)?;
             processed_images.push(uri);
         } else {
             let rendered_path = temp_dir
@@ -566,7 +566,7 @@ pub async fn generate_growth_video_agnes(
                 .to_string_lossy()
                 .to_string();
 
-            render_text_on_photo(&photo.file_path, &rendered_path, text)?;
+            render_text_on_photo(&photo.original_path, &rendered_path, text)?;
 
             let uri = photo_to_base64_uri(&rendered_path)?;
             processed_images.push(uri);

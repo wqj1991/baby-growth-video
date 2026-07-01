@@ -16,34 +16,25 @@ import {
   getPeriods,
   generatePeriods,
   createPeriod,
-  getPeriodPhotos,
   getPeriodVideos,
-  getPeriodVideoFrames,
   scanPeriodFolder,
   selectFolder,
-  updatePhoto,
-  setFinalPhoto,
-  cancelFinalPhoto,
-  getImageBase64,
   generateVideoFrames,
   generateVideoFramesByInterval,
   getVideoThumbnail,
   getPeriodStats,
   generateCollage,
-  createCollagePhoto,
 } from '../utils/tauriCommands';
-import type { Photo, Video, VideoFrame, Thumbnail } from '../types';
+import type { Video, Thumbnail } from '../types';
 import ThumbnailGrid from '../components/ThumbnailGrid';
 import ThumbnailPreviewModal from '../components/ThumbnailPreviewModal';
-import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
 import VideoFrameSettingsModal from '../components/VideoFrameSettingsModal';
-import VideoFrameViewerModal from '../components/VideoFrameViewerModal';
 import PeriodTimeline from '../components/PeriodTimeline';
 import PendingSelectionPanel from '../components/PendingSelectionPanel';
 import CollageWorkspace from '../components/CollageWorkspace';
 import VideoFramePlayer from '../components/VideoFramePlayer';
 import TemplateSelector from '../components/TemplateSelector';
-import { getTemplateById, estimateFileSize } from '../utils/collageTemplates';
+import { getTemplateById } from '../utils/collageTemplates';
 
 export default function PeriodSelectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -52,22 +43,13 @@ export default function PeriodSelectPage() {
     setPeriods,
     currentPeriod,
     setCurrentPeriod,
-    currentPhotos,
-    setCurrentPhotos,
     currentVideos,
     setCurrentVideos,
-    currentVideoFrames,
-    setCurrentVideoFrames,
     isScanning,
     setIsScanning,
     currentBaby,
-    selectedItems,
-    setSelectedItems,
-    addToSelectedItems,
-    removeFromSelectedItems,
     periodStats,
     setPeriodStats,
-    updatePeriodStat,
     loadPendingItems,
     loadTempFrames,
     // Collage state
@@ -101,7 +83,6 @@ export default function PeriodSelectPage() {
 
   const [currentVideoForFrames, setCurrentVideoForFrames] = useState<Video | null>(null);
   const [showFrameSettings, setShowFrameSettings] = useState(false);
-  const [showFrameViewer, setShowFrameViewer] = useState(false);
   const [isExtractingFrames, setIsExtractingFrames] = useState(false);
   const [videoFrameCounts, setVideoFrameCounts] = useState<Record<number, number>>({});
   const [videoThumbnails, setVideoThumbnails] = useState<Record<number, string>>({});
@@ -150,8 +131,6 @@ export default function PeriodSelectPage() {
     };
   }, [isDragging]);
 
-  const gridWrapperRef = useRef<HTMLDivElement>(null);
-
   // Load periods
   useEffect(() => {
     if (projectId) loadPeriods(parseInt(projectId));
@@ -167,7 +146,6 @@ export default function PeriodSelectPage() {
       setPreviewIndex(0);
       setPendingPreviewUrl(null);
       setShowFrameSettings(false);
-      setShowFrameViewer(false);
       setShowInlinePlayer(false);
       setCollageMode(false);
       resetRegionTransforms();
@@ -178,63 +156,16 @@ export default function PeriodSelectPage() {
     }
   }, [currentPeriod?.id]);
 
-  // Load photo base64 images
+  // Load thumbnail base64 images
   useEffect(() => {
-    const loadImages = async () => {
-      const photosToLoad = currentPhotos.filter(photo => !loadedImageIds.current.has(photo.id));
-      if (photosToLoad.length === 0) return;
-      photosToLoad.forEach(photo => loadedImageIds.current.add(photo.id));
-
-      const batchSize = 5;
-      for (let i = 0; i < photosToLoad.length; i += batchSize) {
-        const batch = photosToLoad.slice(i, i + batchSize);
-        const results = await Promise.all(
-          batch.map(async (photo) => {
-            try {
-              const base64 = await getImageBase64(photo.file_path);
-              return { id: photo.id, url: base64 };
-            } catch (error) {
-              loadedImageIds.current.delete(photo.id);
-              return { id: photo.id, url: '' };
-            }
-          })
-        );
-        const newLoadedImages: Record<number, string> = {};
-        results.forEach(({ id, url }) => { if (url) newLoadedImages[id] = url; });
-        setLoadedImages(prev => ({ ...prev, ...newLoadedImages }));
+    const newLoadedImages: Record<number, string> = {};
+    thumbnails.forEach(thumb => {
+      if (thumb.base64_data) {
+        newLoadedImages[thumb.id] = thumb.base64_data;
       }
-    };
-    loadImages();
-  }, [currentPhotos]);
-
-  // Load video frame images
-  useEffect(() => {
-    const loadFrameImages = async () => {
-      const framesToLoad = currentVideoFrames.filter(frame => !loadedImageIds.current.has(frame.id));
-      if (framesToLoad.length === 0) return;
-      framesToLoad.forEach(frame => loadedImageIds.current.add(frame.id));
-
-      const batchSize = 5;
-      for (let i = 0; i < framesToLoad.length; i += batchSize) {
-        const batch = framesToLoad.slice(i, i + batchSize);
-        const results = await Promise.all(
-          batch.map(async (frame) => {
-            try {
-              const base64 = await getImageBase64(frame.file_path!);
-              return { id: frame.id, url: base64 };
-            } catch (error) {
-              loadedImageIds.current.delete(frame.id);
-              return { id: frame.id, url: '' };
-            }
-          })
-        );
-        const newLoadedImages: Record<number, string> = {};
-        results.forEach(({ id, url }) => { if (url) newLoadedImages[id] = url; });
-        setLoadedImages(prev => ({ ...prev, ...newLoadedImages }));
-      }
-    };
-    loadFrameImages();
-  }, [currentVideoFrames]);
+    });
+    setLoadedImages(newLoadedImages);
+  }, [thumbnails]);
 
   // Load video thumbnails
   useEffect(() => {
@@ -296,22 +227,8 @@ export default function PeriodSelectPage() {
     try {
       setLoadedImages({});
       loadedImageIds.current.clear();
-      setSelectedItems([]);
-      const [photos, videos] = await Promise.all([
-        getPeriodPhotos(periodId),
-        getPeriodVideos(periodId),
-      ]);
-      setCurrentPhotos(photos);
+      const videos = await getPeriodVideos(periodId);
       setCurrentVideos(videos);
-
-      try {
-        const frames = await getPeriodVideoFrames(periodId);
-        setCurrentVideoFrames(frames);
-      } catch (frameError) {
-        console.error('加载视频帧失败:', frameError);
-        setCurrentVideoFrames([]);
-      }
-
       setSelectedTab('photos');
     } catch (error) { console.error('加载周期媒体失败:', error); }
     finally { setLoadingMedia(false); }
@@ -406,67 +323,8 @@ export default function PeriodSelectPage() {
   };
 
   // ============================
-  // PHOTO ACTIONS
+  // PHOTO ACTIONS (now using thumbnails)
   // ============================
-
-  const handleTogglePhotoSelect = async (photo: Photo) => {
-    try {
-      const newSelected = !photo.is_selected;
-      const updated = await updatePhoto({ ...photo, is_selected: newSelected });
-      const localUpdated = { ...updated, is_multi_selected: newSelected ? photo.is_multi_selected : false };
-      setCurrentPhotos(currentPhotos.map(p => p.id === updated.id ? localUpdated : p));
-      if (newSelected) {
-        addToSelectedItems({ type: 'photo', item: localUpdated });
-      } else {
-        removeFromSelectedItems({ type: 'photo', item: localUpdated });
-      }
-      if (currentPeriod) {
-        const currentStat = periodStats[currentPeriod.id];
-        updatePeriodStat(currentPeriod.id, {
-          pending_count: (currentStat?.pending_count || 0) + (newSelected ? 1 : -1),
-        });
-      }
-    } catch (error) { console.error('更新照片失败:', error); }
-  };
-
-  const handleSetFinalPhoto = async (photo: Photo) => {
-    if (!currentPeriod) return;
-    try {
-      await setFinalPhoto(currentPeriod.id, photo.id);
-      setCurrentPhotos(currentPhotos.map(p => ({ ...p, is_final: p.id === photo.id })));
-      // 同步待选区中的 is_final 状态，确保照片留在待选区中
-      setSelectedItems(selectedItems.map(item =>
-        item.type === 'photo' && item.item.id === photo.id
-          ? { ...item, item: { ...item.item, is_final: true } }
-          : item
-      ));
-      const updatedPeriods = periods.map(p =>
-        p.id === currentPeriod.id ? { ...p, selected_photo_id: photo.id } : p
-      );
-      setPeriods(updatedPeriods);
-      setCurrentPeriod({ ...currentPeriod, selected_photo_id: photo.id });
-      updatePeriodStat(currentPeriod.id, { has_final: true });
-    } catch (error) { console.error('设置最终照片失败:', error); }
-  };
-
-  const handleCancelFinalPhoto = async () => {
-    if (!currentPeriod) return;
-    try {
-      await cancelFinalPhoto(currentPeriod.id);
-      setCurrentPhotos(currentPhotos.map(p => ({ ...p, is_final: false })));
-      // 同步待选区中所有照片的 is_final 状态
-      setSelectedItems(selectedItems.map(item =>
-        item.type === 'photo'
-          ? { ...item, item: { ...item.item, is_final: false } }
-          : item
-      ));
-      setPeriods(periods.map(p =>
-        p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
-      ));
-      setCurrentPeriod({ ...currentPeriod, selected_photo_id: undefined });
-      updatePeriodStat(currentPeriod.id, { has_final: false });
-    } catch (error) { console.error('取消最终照片失败:', error); }
-  };
 
   // ============================
   // VIDEO / FRAME ACTIONS
@@ -498,15 +356,14 @@ export default function PeriodSelectPage() {
   // PREVIEW
   // ============================
 
-  const handleOpenPreview = (index: number) => { setPreviewIndex(index); setPreviewingPendingItem(null); setPendingPreviewUrl(null); setShowPreview(true); };
   const handleClosePreview = () => { setShowPreview(false); setPreviewingPendingItem(null); setPendingPreviewUrl(null); };
   const handlePrevPhoto = () => {
-    if (previewingPendingItem || currentPhotos.length === 0) return;
-    setPreviewIndex(prev => (prev - 1 + currentPhotos.length) % currentPhotos.length);
+    if (previewingPendingItem || thumbnails.length === 0) return;
+    setPreviewIndex(prev => (prev - 1 + thumbnails.length) % thumbnails.length);
   };
   const handleNextPhoto = () => {
-    if (previewingPendingItem || currentPhotos.length === 0) return;
-    setPreviewIndex(prev => (prev + 1) % currentPhotos.length);
+    if (previewingPendingItem || thumbnails.length === 0) return;
+    setPreviewIndex(prev => (prev + 1) % thumbnails.length);
   };
 
   // ============================
@@ -545,16 +402,9 @@ export default function PeriodSelectPage() {
   };
 
   const handleEnterCollage = () => {
-    // 获取已勾选的照片
-    const multiSelected = selectedItems.filter(i => i.item.is_multi_selected);
-
-    // 补全 photoOrder 为初始顺序
-    setCollagePhotoOrder(multiSelected.map((_, i) => i));
-
-    // 重置区域编辑状态
+    const selectedThumbs = thumbnails.filter(t => t.is_selected);
+    setCollagePhotoOrder(selectedThumbs.map((_, i) => i));
     resetRegionTransforms();
-
-    // 显示模板选择器（内部会自动匹配 count 数量的模板）
     setShowTemplateSelector(true);
   };
 
@@ -577,23 +427,20 @@ export default function PeriodSelectPage() {
     projectIdParam: number,
     periodIdParam: number,
   ) => {
-    // Build the payload for Rust backend
+    const selectedThumbs = thumbnails.filter(t => t.is_selected);
     const photoPaths = order.map(idx => {
-      const item = selectedItems[idx];
-      if (!item) {
+      const thumb = selectedThumbs[idx];
+      if (!thumb) {
         showToast('error', '拼图生成失败', '照片索引错误');
         return '';
       }
-      return item.type === 'photo'
-        ? (item.item as Photo).file_path
-        : (item.item as VideoFrame).file_path || '';
+      return thumb.original_path;
     });
 
     if (photoPaths.some(p => p === '')) {
       return;
     }
 
-    // Build region definitions from the template
     const template = getTemplateById(templateId);
     if (!template) {
       showToast('error', '模板错误', '未找到模板，请重试');
@@ -620,46 +467,16 @@ export default function PeriodSelectPage() {
       })),
     };
 
-    const pId = projectIdParam;
-
     setGeneratingCollage(true);
     try {
-      const result = await generateCollage(collagePayload, pId);
+      const result = await generateCollage(collagePayload, projectIdParam);
 
       if (!result.output_path) {
         showToast('error', '拼图生成失败', '返回的输出路径为空');
         return;
       }
 
-      const fileName = `collage_${Date.now()}.jpg`;
-      const fileSize = estimateFileSize(outputSize * outputSize, quality).bytes;
-      const periodId = periodIdParam;
-
-      // 持久化到数据库
-      const persistedPhoto = await createCollagePhoto(
-        periodId,
-        result.output_path,
-        fileName,
-        fileSize,
-        outputSize,
-        outputSize,
-        `拼图 (${template.name})`,
-      );
-      const newPhoto = {
-        ...persistedPhoto,
-        is_multi_selected: true,
-      };
-
-      const newItem = { type: 'photo' as const, item: newPhoto };
-      setSelectedItems([newItem, ...selectedItems]);
-
-      try {
-        const base64 = await getImageBase64(result.output_path);
-        loadedImageIds.current.add(persistedPhoto.id);
-        setLoadedImages(prev => ({ ...prev, [persistedPhoto.id]: base64 }));
-      } catch (loadError) {
-        console.error('加载拼图图片失败:', loadError);
-      }
+      await loadThumbnails(periodIdParam);
 
       showToast(
         'success',
@@ -704,12 +521,13 @@ export default function PeriodSelectPage() {
   // ============================
 
   if (collageMode) {
+    const selectedThumbs = thumbnails.filter(t => t.is_selected);
     return (
       <div className="flex h-full flex-col">
         <CollageWorkspace
-          selectedItems={selectedItems.filter(i => i.item.is_multi_selected)}
+          selectedItems={selectedThumbs}
           loadedImages={loadedImages}
-          pendingItems={selectedItems}
+          pendingItems={thumbnails}
           onBack={handleExitCollage}
           onGenerate={handleGenerateCollage}
           generating={generatingCollage}
@@ -908,42 +726,12 @@ export default function PeriodSelectPage() {
                         onSetFinal={handleSetThumbFinal}
                         onCancelFinal={handleCancelThumbFinal}
                       />
-                    ) : currentPhotos.length === 0 ? (
+                    ) : (
                       <div className="empty-state-v2 flex-1 h-full flex flex-col items-center justify-center">
                         <div className="empty-icon">📷</div>
                         <h4>暂无照片</h4>
                         <p>扫描文件夹或从视频中截取帧来添加照片</p>
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between px-5 py-3">
-                          <span className="text-xs text-stone-600">
-                            显示 <strong className="text-stone-900">{currentPhotos.length}</strong> 张照片
-                            {currentPeriod && (
-                              <span className="ml-2 text-stone-400">
-                                · {currentPeriod.start_date} ~ {currentPeriod.end_date}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <div 
-                          ref={gridWrapperRef} 
-                          className="h-full overflow-y-auto px-5 pb-5"
-                        >
-                          <VirtualPhotoGrid
-                            photos={currentPhotos}
-                            loadedImages={loadedImages}
-                            onDoubleClick={(photo) => {
-                              const index = currentPhotos.findIndex(p => p.id === photo.id);
-                              if (index !== -1) handleOpenPreview(index);
-                            }}
-                            onToggleSelect={handleTogglePhotoSelect}
-                            onSetFinal={handleSetFinalPhoto}
-                            onCancelFinal={() => handleCancelFinalPhoto()}
-                            onOpenPreview={handleOpenPreview}
-                          />
-                        </div>
-                      </>
                     )}
                   </div>
                 )}
@@ -1024,7 +812,7 @@ export default function PeriodSelectPage() {
                 <div className="w-4 h-4 rounded-full bg-stash-600 flex items-center justify-center">
                   <Plus className="w-2.5 h-2.5 text-white" />
                 </div>
-                <span className="text-xs text-stone-600">待选区 <strong className="text-stash-600">{selectedItems.length}</strong></span>
+                <span className="text-xs text-stone-600">待选区 <strong className="text-stash-600">{thumbnails.filter(t => t.is_selected).length}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Image className="w-4 h-4 text-warmth-500" />
@@ -1040,7 +828,7 @@ export default function PeriodSelectPage() {
       </div>
 
       {/* ===== IMAGE PREVIEW MODAL ===== */}
-      {showPreview && (previewingPendingItem || currentPhotos[previewIndex]) && (
+      {showPreview && (previewingPendingItem || thumbnails[previewIndex]) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 animate-fade-in"
           onClick={handleClosePreview}
@@ -1072,8 +860,8 @@ export default function PeriodSelectPage() {
 
           <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             <img
-              src={previewingPendingItem ? pendingPreviewUrl || '' : loadedImages[currentPhotos[previewIndex].id] || ''}
-              alt={previewingPendingItem ? previewingPendingItem.original_file_name : currentPhotos[previewIndex].file_name}
+              src={previewingPendingItem ? pendingPreviewUrl || '' : loadedImages[thumbnails[previewIndex]?.id] || ''}
+              alt={previewingPendingItem ? previewingPendingItem.original_file_name : thumbnails[previewIndex]?.original_file_name || ''}
               className="max-w-full max-h-[85vh] object-contain"
             />
           </div>
@@ -1082,12 +870,12 @@ export default function PeriodSelectPage() {
             <span className="font-medium">
               {previewingPendingItem
                 ? previewingPendingItem.original_file_name
-                : currentPhotos[previewIndex].file_name}
+                : thumbnails[previewIndex]?.original_file_name || ''}
             </span>
             {!previewingPendingItem && (
               <>
                 <span className="mx-2">·</span>
-                <span>{previewIndex + 1} / {currentPhotos.length}</span>
+                <span>{previewIndex + 1} / {thumbnails.length}</span>
               </>
             )}
           </div>
@@ -1098,9 +886,7 @@ export default function PeriodSelectPage() {
       {/* ===== GLOBAL MODALS ===== */}      {/* ===== TEMPLATE SELECTOR MODAL ===== */}
       {showTemplateSelector && (
         <TemplateSelector
-          photoCount={
-            selectedItems.filter(i => i.item.is_multi_selected).length
-          }
+          photoCount={thumbnails.filter(t => t.is_selected).length}
           onConfirm={handleTemplateConfirm}
           onCancel={handleTemplateCancel}
         />
@@ -1112,25 +898,6 @@ export default function PeriodSelectPage() {
         video={currentVideoForFrames}
         onClose={() => setShowFrameSettings(false)}
         onGenerate={handleGenerateFrames}
-      />
-
-      {/* ===== VIDEO FRAME VIEWER MODAL ===== */}
-      <VideoFrameViewerModal
-        visible={showFrameViewer}
-        video={currentVideoForFrames}
-        frames={currentVideoFrames}
-        onClose={() => setShowFrameViewer(false)}
-        onReExtract={() => { setShowFrameViewer(false); setShowFrameSettings(true); }}
-        onPreview={() => {}}
-        onAddSingle={(frame) => {
-          addToSelectedItems({ type: 'video_frame', item: { ...frame, is_selected: true, is_multi_selected: false } });
-        }}
-        onConfirmSelection={(selectedFrames) => {
-          selectedFrames.forEach(frame => {
-            addToSelectedItems({ type: 'video_frame', item: { ...frame, is_selected: true, is_multi_selected: false } });
-          });
-          setShowFrameViewer(false);
-        }}
       />
 
       {/* ===== THUMBNAIL PREVIEW MODAL ===== */}

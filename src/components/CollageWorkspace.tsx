@@ -17,15 +17,14 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { showToast } from '../store/toastStore';
-import type { SelectableItem } from '../types';
+import type { Thumbnail } from '../types';
 import { PREVIEW_COLORS } from './TemplateSelector';
 import { estimateFileSize, QUALITY_PRESETS, OUTPUT_SIZE_PRESETS, DEFAULT_TRANSFORM } from '../utils/collageTemplates';
 
 interface CollageWorkspaceProps {
-  selectedItems: SelectableItem[];
+  selectedItems: Thumbnail[];
   loadedImages: Record<number, string>;
-  /** 待选区全部项目（含非多选），用于替换照片时选择来源 */
-  pendingItems: SelectableItem[];
+  pendingItems: Thumbnail[];
   onBack: () => void;
   onGenerate: (
     templateId: string,
@@ -70,7 +69,6 @@ export default function CollageWorkspace({
     setCollageQuality,
     collageOutputSize,
     setCollageOutputSize,
-    addToSelectedItems,
     currentProject,
     currentPeriod,
   } = useAppStore();
@@ -312,7 +310,7 @@ export default function CollageWorkspace({
     const current = regionTransforms[regionIndex] ?? DEFAULT_TRANSFORM;
     const itemIdx = order[template?.regions[regionIndex]?.order ?? regionIndex];
     const item = selectedItems[itemIdx];
-    const imgSize = item ? imageSizes.current[item.item.id] : null;
+    const imgSize = item ? imageSizes.current[item.id] : null;
     
     if (imgSize && imgSize.width > 0 && imgSize.height > 0) {
       const regionWidth = regionEl.offsetWidth;
@@ -404,24 +402,17 @@ export default function CollageWorkspace({
   }, [selectedRegionIndex]);
 
   /** 替换照片：从待选区 pendingItems 中选择 */
-  const handleReplacePhoto = (pendingItem: SelectableItem) => {
+  const handleReplacePhoto = (pendingItem: Thumbnail) => {
     if (selectedRegionIndex === null || !template) return;
     const region = template.regions[selectedRegionIndex];
     if (!region) return;
 
-    // 查找该 pending 项是否已在拼图列表中
     let newIdx = selectedItems.findIndex(
-      (si) => si.item.id === pendingItem.item.id && si.type === pendingItem.type,
+      (si) => si.id === pendingItem.id,
     );
 
     if (newIdx === -1) {
-      // 不在拼图中 → 先加入（标记为 multi_selected），再更新顺序
-      addToSelectedItems({
-        type: pendingItem.type,
-        item: { ...pendingItem.item, is_multi_selected: true },
-      } as SelectableItem);
-      // 新增项索引为当前拼图列表末尾
-      newIdx = selectedItems.length;
+      return;
     }
 
     const newOrder = [...order];
@@ -461,7 +452,7 @@ export default function CollageWorkspace({
 
   // 当前画布上已有的 photo IDs
   const usedPhotoIds = useMemo(
-    () => new Set(order.map((oi) => selectedItems[oi]?.item.id).filter(Boolean)),
+    () => new Set(order.map((oi) => selectedItems[oi]?.id).filter(Boolean)),
     [order, selectedItems],
   );
 
@@ -568,7 +559,7 @@ export default function CollageWorkspace({
                   {template.regions.map((region, idx) => {
                     const itemIdx = order[region.order] ?? region.order;
                     const item = selectedItems[itemIdx];
-                    const imageUrl = item ? loadedImages[item.item.id] : null;
+                    const imageUrl = item ? loadedImages[item.id] : null;
                     const padding = collageGap / 2;
                     const isSelected = selectedRegionIndex === idx;
                     const currentTf = regionTransforms[idx] ?? DEFAULT_TRANSFORM;
@@ -647,7 +638,7 @@ export default function CollageWorkspace({
                                 userSelect: 'none',
                                 pointerEvents: 'none',
                               }}
-                              onLoad={(e) => handleImageLoad(item.item.id, e)}
+                              onLoad={(e) => handleImageLoad(item.id, e)}
                               draggable={false}
                             />
                           </div>
@@ -707,9 +698,7 @@ export default function CollageWorkspace({
                   区域 #{selectedRegionIndex + 1}
                 </div>
                 <span className="text-[11px] text-stone-600 truncate flex-1">
-                  {('file_name' in selectedPhoto.item
-                    ? (selectedPhoto.item as { file_name: string }).file_name
-                    : `视频截帧 #${selectedPhoto.item.id}`)}
+                  {selectedPhoto.original_file_name}
                 </span>
               </div>
 
@@ -798,15 +787,12 @@ export default function CollageWorkspace({
                   <div className="max-h-[160px] overflow-y-auto p-1.5">
                     <div className="grid grid-cols-4 gap-1">
                       {pendingItems.map((pendingItem) => {
-                        const thumbUrl = loadedImages[pendingItem.item.id];
-                        const isUsed = usedPhotoIds.has(pendingItem.item.id);
-                        const displayName =
-                          'file_name' in pendingItem.item
-                            ? (pendingItem.item as { file_name: string }).file_name
-                            : `帧 #${pendingItem.item.id}`;
+                        const thumbUrl = loadedImages[pendingItem.id];
+                        const isUsed = usedPhotoIds.has(pendingItem.id);
+                        const displayName = pendingItem.original_file_name;
                         return (
                           <button
-                            key={`${pendingItem.type}-${pendingItem.item.id}`}
+                            key={`${pendingItem.source_type}-${pendingItem.id}`}
                             onClick={() => handleReplacePhoto(pendingItem)}
                             className={`relative aspect-square rounded overflow-hidden border-2 transition-all ${
                               isUsed
@@ -879,8 +865,7 @@ export default function CollageWorkspace({
             <p className="text-[10px] text-stone-400 mb-2">拖拽排序 · 也可直接在画布中拖拽照片到另一区域</p>
             <div className="flex flex-col gap-1">
               {selectedItems.map((selItem, idx) => {
-                const item = selItem.item;
-                const imageUrl = loadedImages[item.id];
+                const imageUrl = loadedImages[selItem.id];
                 const regionIdx = template?.regions.find(
                   (r) => r.order === idx
                 );
@@ -892,7 +877,7 @@ export default function CollageWorkspace({
 
                 return (
                   <div
-                    key={`${selItem.type}-${item.id}`}
+                    key={`${selItem.source_type}-${selItem.id}`}
                     draggable={true}
                     onDragStart={(e) => handleOrderDragStart(idx, e)}
                     onDragOver={(e) => handleOrderDragOver(idx, e)}
@@ -936,12 +921,10 @@ export default function CollageWorkspace({
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-[11px] text-stone-600 truncate">
-                        {'file_name' in item
-                          ? (item as { file_name: string }).file_name
-                          : `帧 #${item.id}`}
+                        {selItem.original_file_name}
                       </div>
                       <div className="text-[9px] text-stone-400">
-                        {selItem.type === 'photo' ? '扫描照片' : '视频截帧'}
+                        {selItem.source_type === 'scan' ? '扫描照片' : selItem.source_type === 'video_frame' ? '视频截帧' : '拼图'}
                         {regionIdx !== undefined && (
                           <span className="ml-1">· 区域 #{idx + 1}</span>
                         )}

@@ -1,4 +1,4 @@
-use crate::db::{NewPhoto, NewVideo, Photo, Video};
+use crate::db::{NewThumbnail, NewVideo, Thumbnail, Video};
 use crate::thumbnail;
 use crate::video;
 use regex::Regex;
@@ -17,7 +17,7 @@ const PROGRESS_BATCH_SIZE: usize = 50;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScanResult {
-    pub photos: Vec<Photo>,
+    pub photos: Vec<Thumbnail>,
     pub videos: Vec<Video>,
     pub total_photos: i64,
     pub total_videos: i64,
@@ -35,7 +35,7 @@ pub struct ScanResult {
 
 /// 文件处理阶段的输出 — 尚未写入数据库
 pub struct ProcessResult {
-    pub new_photos: Vec<NewPhoto>,
+    pub new_photos: Vec<NewThumbnail>,
     pub new_videos: Vec<NewVideo>,
     pub scan_logs: Vec<ScanLogEntry>,
     pub total_photos: i64,
@@ -795,7 +795,7 @@ pub fn process_media_folder(
         .collect();
 
     // ==================== Phase 3: 统计结果 ====================
-    let mut new_photos: Vec<NewPhoto> = Vec::new();
+    let mut new_photos: Vec<NewThumbnail> = Vec::new();
     let mut new_videos: Vec<NewVideo> = Vec::new();
     let mut processed_count = 0usize;
 
@@ -939,18 +939,22 @@ pub fn process_media_folder(
 
             let thumb_path = thumb_results.get(&uuid).cloned().flatten();
 
-            let new_photo = NewPhoto {
+            let new_thumbnail = NewThumbnail {
+                project_id,
                 period_id: result.period_id,
-                file_path: dest_path_str,
-                file_name: result.file_name.clone(),
-                file_size: result.file_size,
-                width: result.width,
-                height: result.height,
+                source_type: "scan".to_string(),
+                source_id: None,
+                original_path: dest_path_str,
+                original_file_name: result.file_name.clone(),
+                original_width: result.width,
+                original_height: result.height,
+                original_file_size: result.file_size,
+                base64_data: thumb_path,
+                width: 0,
+                height: 0,
                 taken_at: Some(result.date_str.clone()),
-                thumbnail_path: thumb_path,
-                source: "scan".to_string(),
             };
-            new_photos.push(new_photo);
+            new_photos.push(new_thumbnail);
         }
     }
 
@@ -1091,7 +1095,7 @@ pub fn process_period_folder(
         .collect();
 
     // 统计结果
-    let mut new_photos: Vec<NewPhoto> = Vec::new();
+    let mut new_photos: Vec<NewThumbnail> = Vec::new();
     let mut new_videos: Vec<NewVideo> = Vec::new();
 
     let mut skipped_duplicate_photos = 0i64;
@@ -1126,16 +1130,20 @@ pub fn process_period_folder(
                     // 暂时用 None，缩略图路径将在批量生成后从结果中获取
                     let thumb_path: Option<String> = None;
 
-                    new_photos.push(NewPhoto {
+                    new_photos.push(NewThumbnail {
+                        project_id,
                         period_id: result.period_id,
-                        file_path: dest_path_str,
-                        file_name: result.file_name.clone(),
-                        file_size: result.file_size,
-                        width: result.width,
-                        height: result.height,
+                        source_type: "scan".to_string(),
+                        source_id: None,
+                        original_path: dest_path_str,
+                        original_file_name: result.file_name.clone(),
+                        original_width: result.width,
+                        original_height: result.height,
+                        original_file_size: result.file_size,
+                        base64_data: thumb_path,
+                        width: 0,
+                        height: 0,
                         taken_at: Some(result.date_str.clone()),
-                        thumbnail_path: thumb_path,
-                        source: "scan".to_string(),
                     });
 
                     emit_scan_log(
@@ -1212,8 +1220,8 @@ pub fn process_period_folder(
     // 批量并行生成缩略图
     let thumb_results = batch_generate_thumbnails(&thumb_tasks);
 
-    // 第二次循环：使用批量生成的缩略图构建 NewPhoto
-    let mut updated_photos: Vec<NewPhoto> = Vec::new();
+    // 第二次循环：使用批量生成的缩略图构建 NewThumbnail
+    let mut updated_photos: Vec<NewThumbnail> = Vec::new();
     for result in &results {
         if result.skip_reason.is_none() && result.is_photo {
             let dest_path_str = result.dest_path.to_string_lossy().to_string();
@@ -1226,16 +1234,20 @@ pub fn process_period_folder(
 
             let thumb_path = thumb_results.get(&uuid).cloned().flatten();
 
-            updated_photos.push(NewPhoto {
+            updated_photos.push(NewThumbnail {
+                project_id,
                 period_id: result.period_id,
-                file_path: dest_path_str,
-                file_name: result.file_name.clone(),
-                file_size: result.file_size,
-                width: result.width,
-                height: result.height,
+                source_type: "scan".to_string(),
+                source_id: None,
+                original_path: dest_path_str,
+                original_file_name: result.file_name.clone(),
+                original_width: result.width,
+                original_height: result.height,
+                original_file_size: result.file_size,
+                base64_data: thumb_path,
+                width: 0,
+                height: 0,
                 taken_at: Some(result.date_str.clone()),
-                thumbnail_path: thumb_path,
-                source: "scan".to_string(),
             });
         }
     }
