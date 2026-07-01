@@ -147,6 +147,12 @@ fn get_period_thumbnails(period_id: i64, state: State<AppState>) -> Result<Vec<d
 }
 
 #[tauri::command]
+fn get_period_pending_thumbnails(period_id: i64, state: State<AppState>) -> Result<Vec<db::Thumbnail>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_period_pending_thumbnails(period_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn update_thumbnail(thumbnail: db::Thumbnail, state: State<AppState>) -> Result<db::Thumbnail, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.update_thumbnail(&thumbnail).map_err(|e| e.to_string())
@@ -167,6 +173,12 @@ fn cancel_final_thumbnail(period_id: i64, state: State<AppState>) -> Result<(), 
 #[tauri::command]
 fn delete_thumbnail(thumbnail_id: i64, state: State<AppState>) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
+    // 先取出记录，以便删除源文件
+    let thumb = db.get_thumbnail_by_id(thumbnail_id).map_err(|e| e.to_string())?;
+    // 删除源文件（忽略文件不存在的错误，可能是已经被移动或删除）
+    if let Err(e) = std::fs::remove_file(&thumb.original_path) {
+        eprintln!("Warning: Failed to delete source file {}: {}", thumb.original_path, e);
+    }
     db.delete_thumbnail(thumbnail_id).map_err(|e| e.to_string())
 }
 
@@ -174,7 +186,7 @@ fn delete_thumbnail(thumbnail_id: i64, state: State<AppState>) -> Result<(), Str
 fn get_original_file(thumbnail_id: i64, state: State<AppState>) -> Result<String, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let thumbnail = db.get_thumbnail_by_id(thumbnail_id).map_err(|e| e.to_string())?;
-    thumbnail::generate_thumbnail_base64_fixed(&thumbnail.original_path).map_err(|e| e.to_string())
+    thumbnail::read_file_base64(&thumbnail.original_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -462,7 +474,7 @@ fn generate_collage(
 
     // Persist to DB
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.add_thumbnails(&[db::NewThumbnail {
+    let inserted = db.add_thumbnails(&[db::NewThumbnail {
         project_id,
         period_id: request.period_id,
         source_type: "collage".to_string(),
@@ -478,6 +490,13 @@ fn generate_collage(
         taken_at: None,
     }])
     .map_err(|e| e.to_string())?;
+
+    // Auto-add to pending selection
+    if let Some(thumb) = inserted.first() {
+        let mut t = thumb.clone();
+        t.is_selected = true;
+        db.update_thumbnail(&t).map_err(|e| e.to_string())?;
+    }
 
     Ok(result)
 }
@@ -843,6 +862,7 @@ pub fn run() {
             delete_period,
             get_period_stats,
             get_period_thumbnails,
+            get_period_pending_thumbnails,
             update_thumbnail,
             set_final_thumbnail,
             cancel_final_thumbnail,

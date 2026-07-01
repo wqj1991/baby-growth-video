@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Thumbnail } from '../types';
 import { getOriginalFile } from '../utils/tauriCommands';
@@ -20,19 +20,41 @@ export default function ThumbnailPreviewModal({
 }: ThumbnailPreviewModalProps) {
   const [originalUrl, setOriginalUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if (visible && thumbnail) {
-      setLoading(true);
+    if (!visible || !thumbnail) {
+      requestIdRef.current += 1;
+      setLoading(false);
       setOriginalUrl('');
-      getOriginalFile(thumbnail.id)
-        .then(url => setOriginalUrl(url))
-        .catch(err => {
-          console.error('Failed to load original:', err);
-          setOriginalUrl(thumbnail.base64_data);
-        })
-        .finally(() => setLoading(false));
+      return;
     }
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    setLoading(true);
+    setOriginalUrl('');
+
+    getOriginalFile(thumbnail.id)
+      .then(url => {
+        if (requestIdRef.current !== requestId) return;
+        setOriginalUrl(url);
+      })
+      .catch(err => {
+        if (requestIdRef.current !== requestId) return;
+        console.error('Failed to load original:', err);
+        setOriginalUrl(thumbnail.base64_data);
+      })
+      .finally(() => {
+        if (requestIdRef.current !== requestId) return;
+        setLoading(false);
+      });
+
+    return () => {
+      if (requestIdRef.current === requestId) {
+        requestIdRef.current += 1;
+      }
+    };
   }, [visible, thumbnail?.id]);
 
   if (!visible) return null;

@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { Baby, Project, Period, Video, VideoFrame, ExportRecord, ScanLog, PeriodStats, AiSettings, PendingItem, VideoFrameTemp, Thumbnail } from '../types';
 import type { CollageTemplate, RegionTransform } from '../utils/collageTemplates';
 import { getTemplateById, DEFAULT_TRANSFORM } from '../utils/collageTemplates';
-import { getPeriodThumbnails, addToPending, removeFromPending, setFinalThumbnail, cancelFinalThumbnail, deleteThumbnail, getOriginalFile } from '../utils/tauriCommands';
+import { getPeriodThumbnails, getPeriodPendingThumbnails, addToPending, removeFromPending, setFinalThumbnail, cancelFinalThumbnail, deleteThumbnail, getOriginalFile } from '../utils/tauriCommands';
 
 interface AppState {
   // 当前选中的宝宝
@@ -125,6 +125,8 @@ interface AppState {
   thumbnails: Thumbnail[];
   setThumbnails: (thumbnails: Thumbnail[]) => void;
   loadThumbnails: (periodId: number) => Promise<void>;
+  pendingThumbnails: Thumbnail[];
+  loadPendingThumbnails: (periodId: number) => Promise<void>;
   addThumbToPending: (id: number) => Promise<void>;
   removeThumbFromPending: (id: number) => Promise<void>;
   setThumbAsFinal: (id: number) => Promise<void>;
@@ -371,6 +373,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   // 缩略图相关
   thumbnails: [],
   setThumbnails: (thumbnails) => set({ thumbnails }),
+  // 待选区缩略图（不限 source_type）
+  pendingThumbnails: [],
+
 
   loadThumbnails: async (periodId: number) => {
     try {
@@ -379,14 +384,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         const newPeriodStats = { ...state.periodStats };
         const existing = newPeriodStats[periodId];
         const photoCount = thumbs.filter(t => t.source_type === 'scan').length;
-        const pendingCount = thumbs.filter(t => t.is_selected).length;
         const hasFinal = thumbs.some(t => t.is_final);
+        // pending_count 来自后端 stats 或后续 loadPendingThumbnails，不在此用 scan-only 数据覆盖
 
         if (existing) {
           newPeriodStats[periodId] = {
             ...existing,
             photo_count: photoCount,
-            pending_count: pendingCount,
             has_final: hasFinal,
           };
         } else {
@@ -394,7 +398,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             period_id: periodId,
             photo_count: photoCount,
             video_count: 0,
-            pending_count: pendingCount,
+            pending_count: 0,
             has_final: hasFinal,
           };
         }
@@ -405,13 +409,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  loadPendingThumbnails: async (periodId: number) => {
+    try {
+      const thumbs = await getPeriodPendingThumbnails(periodId);
+      set((state) => {
+        const newPeriodStats = { ...state.periodStats };
+        if (newPeriodStats[periodId]) {
+          newPeriodStats[periodId] = {
+            ...newPeriodStats[periodId],
+            pending_count: thumbs.length,
+          };
+        }
+        return { pendingThumbnails: thumbs, periodStats: newPeriodStats };
+      });
+    } catch (e) {
+      console.error('Failed to load pending thumbnails:', e);
+    }
+  },
+
   addThumbToPending: async (id: number) => {
     try {
       await addToPending(id);
       set((state) => {
         const thumb = state.thumbnails.find(t => t.id === id);
         // 如果已经选中，不重复计数
-        if (!thumb || thumb.is_selected) return { thumbnails: state.thumbnails };
+        if (!thumb || thumb.is_selected) return {};
         const periodId = thumb.period_id;
         const newThumbnails = state.thumbnails.map(t => 
           t.id === id ? { ...t, is_selected: true } : t
@@ -423,7 +445,12 @@ export const useAppStore = create<AppState>((set, get) => ({
             pending_count: (newPeriodStats[periodId].pending_count || 0) + 1,
           };
         }
-        return { thumbnails: newThumbnails, periodStats: newPeriodStats };
+        // Also add to pendingThumbnails
+        const selectedThumb = newThumbnails.find(t => t.id === id);
+        const newPendingThumbnails = selectedThumb && !state.pendingThumbnails.some(t => t.id === id)
+          ? [...state.pendingThumbnails, selectedThumb]
+          : state.pendingThumbnails;
+        return { thumbnails: newThumbnails, periodStats: newPeriodStats, pendingThumbnails: newPendingThumbnails };
       });
     } catch (e) {
       console.error('Failed to add to pending:', e);
@@ -434,9 +461,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       await removeFromPending(id);
       set((state) => {
-        const thumb = state.thumbnails.find(t => t.id === id);
+        const thumb = state.thumbnails.find(t => t.id === id) ?? state.pendingThumbnails.find(t => t.id === id);
         // 如果已经取消选中，不重复减计数
-        if (!thumb || !thumb.is_selected) return { thumbnails: state.thumbnails };
+        if (!thumb || !thumb.is_selected) return {};
         const periodId = thumb.period_id;
         const newThumbnails = state.thumbnails.map(t => 
           t.id === id ? { ...t, is_selected: false } : t
@@ -448,7 +475,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             pending_count: Math.max(0, (newPeriodStats[periodId].pending_count || 0) - 1),
           };
         }
-        return { thumbnails: newThumbnails, periodStats: newPeriodStats };
+        // Also remove from pendingThumbnails
+        const newPendingThumbnails = state.pendingThumbnails.filter(t => t.id !== id);
+        return { thumbnails: newThumbnails, periodStats: newPeriodStats, pendingThumbnails: newPendingThumbnails };
       });
     } catch (e) {
       console.error('Failed to remove from pending:', e);
@@ -464,6 +493,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         thumbnails: state.thumbnails.map(t => ({
           ...t,
           is_final: t.id === id
+        })),
+        pendingThumbnails: state.pendingThumbnails.map(t => ({
+          ...t,
+          is_final: t.id === id
         }))
       }));
     } catch (e) {
@@ -477,7 +510,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       await cancelFinalThumbnail(state.currentPeriod.id);
       set((state) => ({
-        thumbnails: state.thumbnails.map(t => ({ ...t, is_final: false }))
+        thumbnails: state.thumbnails.map(t => ({ ...t, is_final: false })),
+        pendingThumbnails: state.pendingThumbnails.map(t => ({ ...t, is_final: false }))
       }));
     } catch (e) {
       console.error('Failed to cancel final:', e);
@@ -488,7 +522,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       await deleteThumbnail(id);
       set((state) => ({
-        thumbnails: state.thumbnails.filter(t => t.id !== id)
+        thumbnails: state.thumbnails.filter(t => t.id !== id),
+        pendingThumbnails: state.pendingThumbnails.filter(t => t.id !== id),
       }));
     } catch (e) {
       console.error('Failed to delete thumbnail:', e);

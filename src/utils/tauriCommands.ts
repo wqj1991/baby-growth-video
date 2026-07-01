@@ -308,7 +308,7 @@ export async function generateCollage(
   req: CollageRequest,
   projectId: number,
 ): Promise<CollageResult> {
-  return invoke('generate_collage', { req, projectId });
+  return invoke('generate_collage', { request: req, projectId });
 }
 
 // ==================== 设置相关 ====================
@@ -363,6 +363,10 @@ export async function getTempFrames(videoId: number): Promise<VideoFrameTemp[]> 
 
 export async function getPeriodThumbnails(periodId: number): Promise<Thumbnail[]> {
   return invoke('get_period_thumbnails', { periodId });
+}
+
+export async function getPeriodPendingThumbnails(periodId: number): Promise<Thumbnail[]> {
+  return invoke('get_period_pending_thumbnails', { periodId });
 }
 
 export async function addToPending(thumbnailId: number): Promise<void> {

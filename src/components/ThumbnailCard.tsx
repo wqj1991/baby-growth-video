@@ -56,7 +56,7 @@ export default function ThumbnailCard({
         {!is_final && (
           <>
             <button
-              className="photo-action-btn bg-black/60 hover:bg-black/80 text-white text-xs px-2 py-1 rounded flex items-center justify-center"
+              className="photo-action-btn bg-stash-600 hover:bg-[#6345a8] text-white text-xs px-2 py-1 rounded flex items-center justify-center"
               onClick={handleAction}
             >
               {is_selected ? (

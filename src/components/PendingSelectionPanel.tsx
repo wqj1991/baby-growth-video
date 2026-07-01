@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, X, Grid3X3, Wand2 } from 'lucide-react';
+import { Check, X, Grid3X3, Wand2, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store';
 import type { Thumbnail } from '../types';
 
@@ -13,25 +13,24 @@ export default function PendingSelectionPanel({
   onPreview,
 }: PendingSelectionPanelProps) {
   const { 
-    thumbnails, 
-    loadThumbnails, 
+    pendingThumbnails,
+    loadPendingThumbnails, 
     removeThumbFromPending,
+    deleteThumb,
     setThumbAsFinal,
     cancelThumbFinal,
     currentPeriod,
   } = useAppStore();
 
-  // 筛选候选区中的缩略图（is_selected=true）
-  const pendingThumbnails = thumbnails.filter(t => t.is_selected);
-  const finalThumbnail = thumbnails.find(t => t.is_final);
+  const finalThumbnail = pendingThumbnails.find(t => t.is_final);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [generatingCollage, setGeneratingCollage] = useState(false);
 
-  // 加载缩略图
+  // 加载待选区缩略图
   useEffect(() => {
     if (currentPeriod) {
-      loadThumbnails(currentPeriod.id);
+      loadPendingThumbnails(currentPeriod.id);
     }
   }, [currentPeriod?.id]);
 
@@ -84,7 +83,7 @@ export default function PendingSelectionPanel({
               return (
                 <div
                   key={thumb.id}
-                  className={`stash-compare-item relative cursor-pointer group ${isFinal ? 'ring-2 ring-success' : isMultiSelected ? 'ring-2 ring-stash-600' : ''}`}
+                  className={`stash-compare-item relative cursor-pointer group ${isFinal ? 'ring-2 ring-success' : isMultiSelected ? 'ring-2 ring-warning' : ''}`}
                   onClick={() => handleToggleMultiSelect(thumb)}
                   onDoubleClick={() => onPreview?.(thumb)}
                 >
@@ -96,29 +95,71 @@ export default function PendingSelectionPanel({
                     )}
                   </div>
 
-                  {/* 移除按钮 */}
-                  <button
-                    className="stash-remove-btn absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeThumbFromPending(thumb.id);
-                    }}
-                    title="从候选区移除"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  {/* 操作按钮区域 — 参照全部照片 */}
+                  <div className={`photo-actions absolute top-1.5 left-1.5 right-1.5 flex flex-col gap-1 transition-opacity ${isFinal ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    {!isFinal && (
+                      <>
+                        {/* 取消待选（scan）或 删除（video_frame/collage） */}
+                        {thumb.source_type === 'scan' ? (
+                          <button
+                            className="photo-action-btn bg-stash-600 hover:bg-[#6345a8] text-white text-xs px-2 py-1 rounded flex items-center justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeThumbFromPending(thumb.id);
+                            }}
+                            title="取消待选"
+                          >
+                            <X className="w-3 h-3 inline mr-1" />
+                            取消待选
+                          </button>
+                        ) : (
+                          <button
+                            className="photo-action-btn bg-error hover:bg-rose-600 text-white text-xs px-2 py-1 rounded flex items-center justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteThumb(thumb.id);
+                            }}
+                            title="删除照片（含源文件）"
+                          >
+                            <Trash2 className="w-3 h-3 inline mr-1" />
+                            删除
+                          </button>
+                        )}
+                        {/* 设为最终 */}
+                        <button
+                          className="photo-action-btn bg-success hover:bg-success-dark text-white text-xs px-2 py-1 rounded font-medium flex items-center justify-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setThumbAsFinal(thumb.id);
+                          }}
+                        >
+                          <Check className="w-3 h-3 inline mr-1" />
+                          最终
+                        </button>
+                      </>
+                    )}
+                    {isFinal && (
+                      <button
+                        className="photo-action-btn bg-error hover:bg-rose-600 text-white text-xs px-2 py-1.5 rounded font-semibold flex items-center justify-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cancelThumbFinal();
+                        }}
+                      >
+                        <X className="w-3 h-3 inline mr-1" />
+                        取消最终
+                      </button>
+                    )}
+                  </div>
 
-                  {isFinal && (
-                    <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-success flex items-center justify-center">
-                      <Check className="w-3 h-3 text-white" />
-                    </div>
-                  )}
-
-                  {isMultiSelected && !isFinal && (
-                    <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-stash-600 flex items-center justify-center">
-                      <Check className="w-3 h-3 text-white" />
-                    </div>
-                  )}
+                  {/* 状态标记 */}
+                  <div className="photo-status absolute bottom-1.5 right-1.5 flex gap-1">
+                    {isFinal && (
+                      <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+                  </div>
 
                   <div className="mt-1.5 px-1">
                     <div className="text-[10px] font-medium text-stone-900 truncate">
@@ -130,46 +171,6 @@ export default function PendingSelectionPanel({
                       </span>
                     </div>
                   </div>
-
-                  {/* 设为最终按钮 */}
-                  {!isFinal && (
-                    <div
-                      className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      <button
-                        className="w-full bg-success hover:bg-success-dark text-white text-[10px] font-semibold px-2.5 py-1 rounded-md transition-colors"
-                        style={{ pointerEvents: 'auto' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setThumbAsFinal(thumb.id);
-                        }}
-                      >
-                        <Check className="w-3 h-3 inline mr-1" />
-                        设为最终
-                      </button>
-                    </div>
-                  )}
-
-                  {/* 取消最终按钮 */}
-                  {isFinal && (
-                    <div
-                      className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent"
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      <button
-                        className="w-full bg-error hover:bg-error/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-md transition-colors"
-                        style={{ pointerEvents: 'auto' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          cancelThumbFinal();
-                        }}
-                      >
-                        <X className="w-3 h-3 inline mr-1" />
-                        取消最终
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -198,6 +199,7 @@ export default function PendingSelectionPanel({
                   setGeneratingCollage(true);
                   onGenerateCollage?.();
                   setGeneratingCollage(false);
+                  setSelectedIds(new Set()); // 生成拼图后清除选中状态
                 }
               }}
               disabled={!canCollage || generatingCollage}

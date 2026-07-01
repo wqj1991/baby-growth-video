@@ -1,8 +1,25 @@
 use base64::Engine;
 use fast_image_resize::{FilterType, ResizeAlg, Resizer, ResizeOptions};
 use fast_image_resize::images::Image;
+use std::fs;
 use std::path::Path;
 const THUMB_WIDTH: u32 = 300;
+
+fn image_mime_type(source_path: &str) -> &'static str {
+    match Path::new(source_path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("png") => "image/png",
+        Some("webp") => "image/webp",
+        Some("gif") => "image/gif",
+        Some("bmp") => "image/bmp",
+        _ => "image/jpeg",
+    }
+}
 
 pub fn get_image_dimensions(path: &str) -> Result<(u32, u32), String> {
     let img = image::open(path).map_err(|e| format!("Failed to open image: {}", e))?;
@@ -53,4 +70,20 @@ pub fn generate_thumbnail_base64(source_path: &str, thumb_width: u32, _thumb_hei
 
 pub fn generate_thumbnail_base64_fixed(source_path: &str) -> Result<String, String> {
     generate_thumbnail_base64(source_path, THUMB_WIDTH, (THUMB_WIDTH as f64 * 0.75) as u32)
+}
+
+pub fn read_file_base64(source_path: &str) -> Result<String, String> {
+    let source = Path::new(source_path);
+    if !source.exists() {
+        return Err(format!("Source file does not exist: {}", source_path));
+    }
+
+    let bytes = fs::read(source).map_err(|e| format!("Failed to read source file: {}", e))?;
+    let base64_str = base64::engine::general_purpose::STANDARD.encode(bytes);
+
+    Ok(format!(
+        "data:{};base64,{}",
+        image_mime_type(source_path),
+        base64_str
+    ))
 }

@@ -27,6 +27,7 @@ import {
   generateCollage,
   exportProjectPhotos,
   saveFile,
+  getOriginalFile,
 } from '../utils/tauriCommands';
 import type { Video, Thumbnail } from '../types';
 import ThumbnailGrid from '../components/ThumbnailGrid';
@@ -66,10 +67,12 @@ export default function PeriodSelectPage() {
     setCurrentPlayingVideo,
     // Thumbnail state
     thumbnails,
+    pendingThumbnails,
     loadThumbnails,
     addThumbToPending,
     setThumbAsFinal,
     cancelThumbFinal,
+    currentProject,
   } = useAppStore();
 
   // ---- Local State ----
@@ -82,7 +85,9 @@ export default function PeriodSelectPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
+  const [pendingPreviewLoading, setPendingPreviewLoading] = useState(false);
   const [previewingPendingItem, setPreviewingPendingItem] = useState<Thumbnail | null>(null);
+  const pendingPreviewRequestIdRef = useRef(0);
 
   const [currentVideoForFrames, setCurrentVideoForFrames] = useState<Video | null>(null);
   const [showFrameSettings, setShowFrameSettings] = useState(false);
@@ -149,6 +154,7 @@ export default function PeriodSelectPage() {
       setShowPreview(false);
       setPreviewIndex(0);
       setPendingPreviewUrl(null);
+      setPendingPreviewLoading(false);
       setShowFrameSettings(false);
       setShowInlinePlayer(false);
       setCollageMode(false);
@@ -360,7 +366,13 @@ export default function PeriodSelectPage() {
   // PREVIEW
   // ============================
 
-  const handleClosePreview = () => { setShowPreview(false); setPreviewingPendingItem(null); setPendingPreviewUrl(null); };
+  const handleClosePreview = () => {
+    pendingPreviewRequestIdRef.current += 1;
+    setShowPreview(false);
+    setPreviewingPendingItem(null);
+    setPendingPreviewUrl(null);
+    setPendingPreviewLoading(false);
+  };
   const handlePrevPhoto = () => {
     if (previewingPendingItem || thumbnails.length === 0) return;
     setPreviewIndex(prev => (prev - 1 + thumbnails.length) % thumbnails.length);
@@ -374,10 +386,26 @@ export default function PeriodSelectPage() {
   // PENDING / COLLAGE ACTIONS
   // ============================
 
-  const handlePendingPreview = (thumb: Thumbnail) => {
-    setPendingPreviewUrl(thumb.base64_data);
+  const handlePendingPreview = async (thumb: Thumbnail) => {
+    const requestId = pendingPreviewRequestIdRef.current + 1;
+    pendingPreviewRequestIdRef.current = requestId;
     setPreviewingPendingItem(thumb);
+    setPendingPreviewUrl(null);
+    setPendingPreviewLoading(true);
     setShowPreview(true);
+
+    try {
+      const originalUrl = await getOriginalFile(thumb.id);
+      if (pendingPreviewRequestIdRef.current !== requestId) return;
+      setPendingPreviewUrl(originalUrl);
+    } catch (error) {
+      if (pendingPreviewRequestIdRef.current !== requestId) return;
+      console.error('Failed to load pending original:', error);
+      setPendingPreviewUrl(thumb.base64_data);
+    } finally {
+      if (pendingPreviewRequestIdRef.current !== requestId) return;
+      setPendingPreviewLoading(false);
+    }
   };
 
   // ============================
@@ -406,7 +434,7 @@ export default function PeriodSelectPage() {
   };
 
   const handleEnterCollage = () => {
-    const selectedThumbs = thumbnails.filter(t => t.is_selected);
+    const selectedThumbs = pendingThumbnails;
     setCollagePhotoOrder(selectedThumbs.map((_, i) => i));
     resetRegionTransforms();
     setShowTemplateSelector(true);
@@ -431,7 +459,7 @@ export default function PeriodSelectPage() {
     projectIdParam: number,
     periodIdParam: number,
   ) => {
-    const selectedThumbs = thumbnails.filter(t => t.is_selected);
+    const selectedThumbs = pendingThumbnails;
     const photoPaths = order.map(idx => {
       const thumb = selectedThumbs[idx];
       if (!thumb) {
@@ -525,13 +553,13 @@ export default function PeriodSelectPage() {
   // ============================
 
   if (collageMode) {
-    const selectedThumbs = thumbnails.filter(t => t.is_selected);
+    const selectedThumbs = pendingThumbnails;
     return (
       <div className="flex h-full flex-col">
         <CollageWorkspace
           selectedItems={selectedThumbs}
           loadedImages={loadedImages}
-          pendingItems={thumbnails}
+          pendingItems={pendingThumbnails}
           onBack={handleExitCollage}
           onGenerate={handleGenerateCollage}
           generating={generatingCollage}
@@ -560,7 +588,6 @@ export default function PeriodSelectPage() {
   // ============================
 
   const completedCount = periods.filter(p => p.selected_photo_id).length;
-  const currentProject = useAppStore(s => s.currentProject);
 
   const handleExport = async () => {
     if (!projectId || isExporting) return;
@@ -870,7 +897,7 @@ export default function PeriodSelectPage() {
                 <div className="w-4 h-4 rounded-full bg-stash-600 flex items-center justify-center">
                   <Plus className="w-2.5 h-2.5 text-white" />
                 </div>
-                <span className="text-xs text-stone-600">待选区 <strong className="text-stash-600">{thumbnails.filter(t => t.is_selected).length}</strong></span>
+                <span className="text-xs text-stone-600">待选区 <strong className="text-stash-600">{pendingThumbnails.length}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Image className="w-4 h-4 text-warmth-500" />
@@ -917,11 +944,15 @@ export default function PeriodSelectPage() {
           )}
 
           <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={previewingPendingItem ? pendingPreviewUrl || '' : loadedImages[thumbnails[previewIndex]?.id] || ''}
-              alt={previewingPendingItem ? previewingPendingItem.original_file_name : thumbnails[previewIndex]?.original_file_name || ''}
-              className="max-w-full max-h-[85vh] object-contain"
-            />
+            {previewingPendingItem && pendingPreviewLoading ? (
+              <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : (
+              <img
+                src={previewingPendingItem ? pendingPreviewUrl || '' : loadedImages[thumbnails[previewIndex]?.id] || ''}
+                alt={previewingPendingItem ? previewingPendingItem.original_file_name : thumbnails[previewIndex]?.original_file_name || ''}
+                className="max-w-full max-h-[85vh] object-contain"
+              />
+            )}
           </div>
 
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 text-sm">
@@ -944,7 +975,7 @@ export default function PeriodSelectPage() {
       {/* ===== GLOBAL MODALS ===== */}      {/* ===== TEMPLATE SELECTOR MODAL ===== */}
       {showTemplateSelector && (
         <TemplateSelector
-          photoCount={thumbnails.filter(t => t.is_selected).length}
+          photoCount={pendingThumbnails.length}
           onConfirm={handleTemplateConfirm}
           onCancel={handleTemplateCancel}
         />

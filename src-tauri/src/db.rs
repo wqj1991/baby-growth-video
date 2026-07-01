@@ -791,7 +791,37 @@ impl Database {
     pub fn get_period_thumbnails(&self, period_id: i64) -> Result<Vec<Thumbnail>> {
         let conn = self.get_conn();
         let mut stmt = conn.prepare(
-            "SELECT * FROM thumbnails WHERE period_id = ?1 ORDER BY taken_at ASC, id ASC",
+            "SELECT * FROM thumbnails WHERE period_id = ?1 AND source_type = 'scan' ORDER BY taken_at ASC, id ASC",
+        )?;
+        let thumbnails = stmt.query_map(params![period_id], |row| {
+            Ok(Thumbnail {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                period_id: row.get(2)?,
+                source_type: row.get(3)?,
+                source_id: row.get(4)?,
+                original_path: row.get(5)?,
+                original_file_name: row.get(6)?,
+                original_width: row.get(7)?,
+                original_height: row.get(8)?,
+                original_file_size: row.get(9)?,
+                base64_data: row.get(10)?,
+                width: row.get(11)?,
+                height: row.get(12)?,
+                is_selected: row.get::<_, i64>(13)? != 0,
+                is_final: row.get::<_, i64>(14)? != 0,
+                taken_at: row.get(15)?,
+                created_at: row.get(16)?,
+            })
+        })?;
+        thumbnails.collect()
+    }
+
+    /// Get all thumbnails with is_selected = 1 for the pending panel (no source_type filter)
+    pub fn get_period_pending_thumbnails(&self, period_id: i64) -> Result<Vec<Thumbnail>> {
+        let conn = self.get_conn();
+        let mut stmt = conn.prepare(
+            "SELECT * FROM thumbnails WHERE period_id = ?1 AND is_selected = 1 ORDER BY created_at ASC, id ASC",
         )?;
         let thumbnails = stmt.query_map(params![period_id], |row| {
             Ok(Thumbnail {
