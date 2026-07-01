@@ -568,7 +568,7 @@ impl Database {
         Ok(())
     }
 
-    fn get_project_by_id(&self, id: i64) -> Result<Project> {
+    pub fn get_project_by_id(&self, id: i64) -> Result<Project> {
         let conn = self.get_conn();
         conn.query_row("SELECT * FROM projects WHERE id = ?1", params![id], |row| {
             Ok(Project {
@@ -786,6 +786,35 @@ impl Database {
             "SELECT * FROM thumbnails WHERE period_id = ?1 ORDER BY taken_at ASC, id ASC",
         )?;
         let thumbnails = stmt.query_map(params![period_id], |row| {
+            Ok(Thumbnail {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                period_id: row.get(2)?,
+                source_type: row.get(3)?,
+                source_id: row.get(4)?,
+                original_path: row.get(5)?,
+                original_file_name: row.get(6)?,
+                original_width: row.get(7)?,
+                original_height: row.get(8)?,
+                original_file_size: row.get(9)?,
+                base64_data: row.get(10)?,
+                width: row.get(11)?,
+                height: row.get(12)?,
+                is_selected: row.get::<_, i64>(13)? != 0,
+                is_final: row.get::<_, i64>(14)? != 0,
+                taken_at: row.get(15)?,
+                created_at: row.get(16)?,
+            })
+        })?;
+        thumbnails.collect()
+    }
+
+    pub fn get_final_thumbnails_for_project(&self, project_id: i64) -> Result<Vec<Thumbnail>> {
+        let conn = self.get_conn();
+        let mut stmt = conn.prepare(
+            "SELECT * FROM thumbnails WHERE project_id = ?1 AND is_final = 1 ORDER BY period_id ASC, taken_at ASC, id ASC",
+        )?;
+        let thumbnails = stmt.query_map(params![project_id], |row| {
             Ok(Thumbnail {
                 id: row.get(0)?,
                 project_id: row.get(1)?,
