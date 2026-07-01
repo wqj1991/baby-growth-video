@@ -18,6 +18,7 @@ import type {
   PendingItem,
   VideoFrameTemp,
   Thumbnail,
+  ExportPhotosResult,
 } from '../types';
 
 
@@ -385,4 +386,13 @@ export async function deleteThumbnail(thumbnailId: number): Promise<void> {
 
 export async function getOriginalFile(thumbnailId: number): Promise<string> {
   return invoke('get_original_file', { thumbnailId });
+}
+
+// ==================== 导出照片 ====================
+
+export async function exportProjectPhotos(
+  projectId: number,
+  savePath: string
+): Promise<ExportPhotosResult> {
+  return invoke('export_project_photos', { projectId, savePath });
 }
