@@ -17,9 +17,19 @@ use tauri_plugin_shell::init as init_shell;
 use base64::Engine;
 use uuid::Uuid;
 use walkdir::WalkDir;
+use std::io::Write;
 
 struct AppState {
     db: Arc<Mutex<Database>>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct ExportPhotosResult {
+    file_path: String,
+    photo_count: usize,
+    skipped_count: usize,
+    total_size: u64,
+    period_count: usize,
 }
 
 // ==================== 数据库操作 ====================
@@ -676,6 +686,132 @@ fn get_temp_frames(
     db.get_temp_frames(video_id).map_err(|e| e.to_string())
 }
 
+// ==================== 照片导出 ====================
+
+#[tauri::command]
+fn export_project_photos(
+    project_id: i64,
+    save_path: String,
+    state: State<AppState>,
+) -> Result<ExportPhotosResult, String> {
+    use zip::write::SimpleFileOptions;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    
+    // Get project info (needed for DB lock scope)
+    let _project = db.get_project_by_id(project_id).map_err(|e| e.to_string())?;
+    // Get ALL periods sorted by start_date
+    let periods = db.get_periods(project_id).map_err(|e| e.to_string())?;
+    // Get all final thumbnails
+    let final_thumbnails = db.get_final_thumbnails_for_project(project_id).map_err(|e| e.to_string())?;
+    
+    // Drop DB lock - no more DB access needed
+    drop(db);
+    
+    if final_thumbnails.is_empty() {
+        return Err("没有可导出的照片，请先在周期中确认最终照片".to_string());
+    }
+    
+    // Group thumbnails by period_id
+    let period_map: std::collections::HashMap<i64, Vec<&db::Thumbnail>> = {
+        let mut map: std::collections::HashMap<i64, Vec<&db::Thumbnail>> = std::collections::HashMap::new();
+        for thumb in &final_thumbnails {
+            map.entry(thumb.period_id).or_default().push(thumb);
+        }
+        map
+    };
+    
+    // Helper: format date string to yyyyMMdd
+    let format_date = |date_str: &str| -> String {
+        // Try multiple formats
+        if let Ok(d) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+            return d.format("%Y%m%d").to_string();
+        }
+        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S") {
+            return dt.format("%Y%m%d").to_string();
+        }
+        // Fallback: filter digits
+        date_str.chars().filter(|c| c.is_ascii_digit()).take(8).collect()
+    };
+    
+    // Calculate earliest start / latest end across all periods (not just those with finals)
+    let _earliest_start = periods.iter()
+        .filter_map(|p| Some(format_date(&p.start_date)))
+        .min().unwrap_or_default();
+    let _latest_end = periods.iter()
+        .filter_map(|p| Some(format_date(&p.end_date)))
+        .max().unwrap_or_default();
+    
+    // Create ZIP in temp dir first, then copy to final path
+    let temp_dir = std::env::temp_dir();
+    let temp_zip_name = format!("export_{}.zip", std::process::id());
+    let temp_zip_path = temp_dir.join(&temp_zip_name);
+    
+    let zip_file = std::fs::File::create(&temp_zip_path)
+        .map_err(|e| format!("创建临时ZIP文件失败: {}", e))?;
+    let mut zip_writer = zip::ZipWriter::new(zip_file);
+    let options = SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    
+    let mut photo_count: usize = 0;
+    let mut skipped_count: usize = 0;
+    let mut period_count: usize = 0;
+    let mut used_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    
+    for period in &periods {
+        let thumbs = match period_map.get(&period.id) {
+            Some(t) if !t.is_empty() => t,
+            _ => continue, // skip periods with no final photos
+        };
+        
+        period_count += 1;
+        let folder_name = format!("{}-{}", format_date(&period.start_date), format_date(&period.end_date));
+        
+        for thumb in thumbs {
+            // Read original file
+            let file_data = match std::fs::read(&thumb.original_path) {
+                Ok(data) => data,
+                Err(_) => {
+                    skipped_count += 1;
+                    continue;
+                }
+            };
+            
+            // Handle filename conflicts within ZIP
+            let mut file_name = thumb.original_file_name.clone();
+            let mut zip_path = format!("{}/{}", folder_name, file_name);
+            while used_names.contains(&zip_path) {
+                file_name = format!("{}_{}", thumb.id, thumb.original_file_name);
+                zip_path = format!("{}/{}", folder_name, file_name);
+            }
+            used_names.insert(zip_path.clone());
+            
+            zip_writer.start_file(&zip_path, options)
+                .map_err(|e| format!("写入ZIP条目失败: {}", e))?;
+            zip_writer.write_all(&file_data)
+                .map_err(|e| format!("写入ZIP数据失败: {}", e))?;
+            
+            photo_count += 1;
+        }
+    }
+    
+    zip_writer.finish().map_err(|e| format!("完成ZIP写入失败: {}", e))?;
+    
+    // Copy temp ZIP to user's chosen path
+    let total_size = std::fs::metadata(&temp_zip_path).map(|m| m.len()).unwrap_or(0);
+    std::fs::copy(&temp_zip_path, &save_path)
+        .map_err(|e| format!("拷贝ZIP到目标路径失败: {}", e))?;
+    std::fs::remove_file(&temp_zip_path).ok(); // Clean up temp
+    
+    Ok(ExportPhotosResult {
+        file_path: save_path,
+        photo_count,
+        skipped_count,
+        total_size,
+        period_count,
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut db = Database::new();
@@ -735,6 +871,7 @@ pub fn run() {
             delete_selected_item,
             get_pending_items,
             get_temp_frames,
+            export_project_photos,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

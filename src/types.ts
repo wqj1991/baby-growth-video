@@ -249,3 +249,11 @@ export interface Thumbnail {
   taken_at?: string;
   created_at: string;
 }
+
+export interface ExportPhotosResult {
+  file_path: string;
+  photo_count: number;
+  skipped_count: number;
+  total_size: number;
+  period_count: number;
+}

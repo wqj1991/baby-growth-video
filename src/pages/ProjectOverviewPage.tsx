@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Baby, Calendar, Image, Clock, Video, History } from 'lucide-react';
+import { Baby, Calendar, Image, Clock, Video, History, Download } from 'lucide-react';
 import { useAppStore } from '../store';
-import { getPeriods } from '../utils/tauriCommands';
+import { showToast } from '../store/toastStore';
+import { getPeriods, exportProjectPhotos, saveFile } from '../utils/tauriCommands';
 import type { Period } from '../types';
 
 export default function ProjectOverviewPage() {
@@ -10,6 +11,7 @@ export default function ProjectOverviewPage() {
   const { currentProject, currentBaby } = useAppStore();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (currentProject) {
@@ -26,6 +28,50 @@ export default function ProjectOverviewPage() {
       console.error('加载周期失败:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!currentProject || isExporting) return;
+
+    const completedPeriods = periods.filter(p => p.selected_photo_id);
+    if (completedPeriods.length === 0) {
+      showToast('warning', '无法导出', '没有可导出的照片，请先在周期中确认最终照片');
+      return;
+    }
+
+    const formatDateShort = (dateStr: string) => {
+      const d = new Date(dateStr);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}${m}${day}`;
+    };
+
+    const earliest = formatDateShort(completedPeriods[0].start_date);
+    const latest = formatDateShort(completedPeriods[completedPeriods.length - 1].end_date);
+    const defaultName = `${currentProject.name}-${earliest}-${latest}.zip`;
+
+    const savePath = await saveFile(defaultName);
+    if (!savePath) return;
+
+    setIsExporting(true);
+    try {
+      const result = await exportProjectPhotos(currentProject.id, savePath);
+      const sizeMB = (result.total_size / 1024 / 1024).toFixed(1);
+      showToast(
+        'success',
+        '导出成功',
+        `${result.photo_count} 张照片 · ${sizeMB} MB`
+      );
+    } catch (error: any) {
+      if (error?.toString?.().includes('没有可导出的照片')) {
+        showToast('warning', '无法导出', error.toString());
+      } else {
+        showToast('error', '导出失败', error?.toString?.() || '导出过程中发生错误');
+      }
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -93,7 +139,7 @@ export default function ProjectOverviewPage() {
           <h2 className="text-lg font-semibold">快捷操作</h2>
         </div>
         <div className="card-body">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <button
               onClick={() => navigate('periods')}
               className="p-5 rounded-xl bg-primary-50 hover:bg-primary-100 transition-all text-left group border border-transparent hover:border-primary-200"
@@ -125,6 +171,20 @@ export default function ProjectOverviewPage() {
               </div>
               <h3 className="font-semibold text-stone-900">历史记录</h3>
               <p className="text-sm text-stone-500 mt-1">查看已生成的视频</p>
+            </button>
+
+            <button
+              onClick={handleExport}
+              disabled={isExporting || selectedCount === 0}
+              className="p-5 rounded-xl bg-warning-bg hover:bg-warning-bg/60 transition-all text-left group border border-transparent hover:border-[var(--color-warning)]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-warning to-error text-white flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-sm">
+                <Download className="w-6 h-6" />
+              </div>
+              <h3 className="font-semibold text-stone-900">
+                {isExporting ? '正在导出...' : '导出照片'}
+              </h3>
+              <p className="text-sm text-stone-500 mt-1">导出确认照片为 ZIP</p>
             </button>
           </div>
         </div>

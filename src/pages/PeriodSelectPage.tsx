@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Download,
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { showToast } from '../store/toastStore';
@@ -24,6 +25,8 @@ import {
   getVideoThumbnail,
   getPeriodStats,
   generateCollage,
+  exportProjectPhotos,
+  saveFile,
 } from '../utils/tauriCommands';
 import type { Video, Thumbnail } from '../types';
 import ThumbnailGrid from '../components/ThumbnailGrid';
@@ -103,6 +106,7 @@ export default function PeriodSelectPage() {
   const [generatingPeriods, setGeneratingPeriods] = useState(false);
   const [addingPeriod, setAddingPeriod] = useState(false);
   const [generatingCollage, setGeneratingCollage] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Thumbnail preview state
   const [previewThumb, setPreviewThumb] = useState<Thumbnail | null>(null);
@@ -556,6 +560,51 @@ export default function PeriodSelectPage() {
   // ============================
 
   const completedCount = periods.filter(p => p.selected_photo_id).length;
+  const currentProject = useAppStore(s => s.currentProject);
+
+  const handleExport = async () => {
+    if (!projectId || isExporting) return;
+
+    const completedPeriods = periods.filter(p => p.selected_photo_id);
+    if (completedPeriods.length === 0) {
+      showToast('warning', '无法导出', '没有可导出的照片，请先在周期中确认最终照片');
+      return;
+    }
+
+    const formatDateShort = (dateStr: string) => {
+      const d = new Date(dateStr);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}${m}${day}`;
+    };
+
+    const earliest = formatDateShort(completedPeriods[0].start_date);
+    const latest = formatDateShort(completedPeriods[completedPeriods.length - 1].end_date);
+    const defaultName = `${currentProject?.name || '导出'}-${earliest}-${latest}.zip`;
+
+    const savePath = await saveFile(defaultName);
+    if (!savePath) return;
+
+    setIsExporting(true);
+    try {
+      const result = await exportProjectPhotos(parseInt(projectId), savePath);
+      const sizeMB = (result.total_size / 1024 / 1024).toFixed(1);
+      showToast(
+        'success',
+        '导出成功',
+        `${result.photo_count} 张照片 · ${sizeMB} MB`
+      );
+    } catch (error: any) {
+      if (error?.toString?.().includes('没有可导出的照片')) {
+        showToast('warning', '无法导出', error.toString());
+      } else {
+        showToast('error', '导出失败', error?.toString?.() || '导出过程中发生错误');
+      }
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col min-h-0">
@@ -593,6 +642,15 @@ export default function PeriodSelectPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            disabled={isExporting || periods.filter(p => p.selected_photo_id).length === 0}
+            className="btn btn-primary btn-sm flex items-center gap-2"
+            title="导出所有周期的最终确认照片为 ZIP"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {isExporting ? '正在导出...' : '导出照片'}
+          </button>
           {currentPeriod && (
             <span className="text-xs text-stone-400">
               {completedCount}/{periods.length} 已完成
