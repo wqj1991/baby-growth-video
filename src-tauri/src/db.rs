@@ -201,6 +201,73 @@ impl Database {
         // Migration 2: video_frames 表添加 thumbnail_path
         let _ = conn.execute("ALTER TABLE video_frames ADD COLUMN thumbnail_path TEXT", []);
 
+        // Migration 3: photos 表添加 source 列
+        let _ = conn.execute("ALTER TABLE photos ADD COLUMN source TEXT NOT NULL DEFAULT 'scan'", []);
+
+        // Migration 4: 修复 videos 表结构（旧版本可能有多余的列或不正确的外键）
+        // 检查 videos 表是否有多余的列（如 project_id），如果有则重建表
+        let mut stmt = conn.prepare("PRAGMA table_info(videos)")?;
+        let columns: Vec<String> = stmt.query_map([], |row| row.get::<_, String>(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+        
+        let expected_columns = [
+            "id", "period_id", "file_path", "file_name", 
+            "file_size", "duration", "width", "height", 
+            "taken_at", "created_at"
+        ];
+        
+        let has_extra_columns = columns.iter().any(|c| !expected_columns.contains(&c.as_str()));
+        let has_missing_columns = expected_columns.iter().any(|c| !columns.contains(&c.to_string()));
+        
+        if has_extra_columns || has_missing_columns {
+            eprintln!("检测到 videos 表结构不匹配，正在重建...");
+            
+            // 开启事务
+            conn.execute("BEGIN TRANSACTION", [])?;
+            
+            // 1. 创建新表
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS videos_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    period_id INTEGER NOT NULL,
+                    file_path TEXT NOT NULL,
+                    file_name TEXT NOT NULL,
+                    file_size INTEGER NOT NULL DEFAULT 0,
+                    duration REAL NOT NULL DEFAULT 0,
+                    width INTEGER NOT NULL DEFAULT 0,
+                    height INTEGER NOT NULL DEFAULT 0,
+                    taken_at TEXT,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
+                )",
+                [],
+            )?;
+            
+            // 2. 复制数据（只复制两表共有的列）
+            let common_columns: Vec<&str> = expected_columns.iter()
+                .filter(|c| columns.contains(&c.to_string()))
+                .copied()
+                .collect();
+            
+            if !common_columns.is_empty() {
+                let cols_str = common_columns.join(", ");
+                let sql = format!("INSERT INTO videos_new ({}) SELECT {} FROM videos", cols_str, cols_str);
+                conn.execute(&sql, [])?;
+            }
+            
+            // 3. 删除旧表
+            conn.execute("DROP TABLE videos", [])?;
+            
+            // 4. 重命名新表
+            conn.execute("ALTER TABLE videos_new RENAME TO videos", [])?;
+            
+            // 5. 提交事务
+            conn.execute("COMMIT", [])?;
+            
+            eprintln!("videos 表重建完成");
+        }
+
         Ok(())
     }
 
@@ -1168,7 +1235,8 @@ impl Database {
                     }
                 }
                 Err(e) => {
-                    // 出错回滚
+                    // 出错回滚，记录具体哪个 period_id 导致外键失败
+                    eprintln!("批量插入视频失败, period_id={}, file={}: {}", video.period_id, video.file_name, e);
                     conn.execute("ROLLBACK", params![]).ok();
                     return Err(e);
                 }

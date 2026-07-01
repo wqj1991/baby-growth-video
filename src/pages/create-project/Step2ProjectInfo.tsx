@@ -222,15 +222,15 @@ export default function Step2ProjectInfo() {
                 className="sr-only peer"
               />
               <div
-                className={`w-12 h-7 rounded-full transition-all duration-300 ${
+                className={`relative w-12 h-7 rounded-full transition-all duration-300 ${
                   localIncludeSpecial
                     ? 'bg-gradient-to-r from-warmth-400 to-rose-400 shadow-md shadow-rose-300/25'
                     : 'bg-stone-200'
                 }`}
               >
                 <div
-                  className={`w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300 mt-1 ${
-                    localIncludeSpecial ? 'ml-6' : 'ml-1'
+                  className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300 ${
+                    localIncludeSpecial ? 'left-6' : 'left-1'
                   }`}
                 />
               </div>
