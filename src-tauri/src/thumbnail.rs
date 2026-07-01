@@ -1,4 +1,6 @@
 use base64::Engine;
+use fast_image_resize::{FilterType, IntoImageView, ResizeAlg, Resizer, ResizeOptions};
+use fast_image_resize::images::Image;
 use std::path::Path;
 
 const THUMB_WIDTH: u32 = 300;
@@ -19,7 +21,19 @@ pub fn generate_thumbnail(
     let ratio = THUMB_WIDTH as f64 / width as f64;
     let new_height = (height as f64 * ratio) as u32;
 
-    let scaled = image::imageops::resize(&img, THUMB_WIDTH, new_height, image::imageops::FilterType::Lanczos3);
+    let pixel_type = img.pixel_type().ok_or("Unsupported pixel type")?;
+    let mut dst_image = Image::new(THUMB_WIDTH, new_height, pixel_type);
+
+    let mut resizer = Resizer::new();
+    let options = ResizeOptions {
+        algorithm: ResizeAlg::Interpolation(FilterType::Bilinear),
+        ..ResizeOptions::default()
+    };
+    resizer.resize(&img, &mut dst_image, Some(&options))
+        .map_err(|e| format!("Failed to resize: {}", e))?;
+
+    let scaled = image::RgbaImage::from_raw(THUMB_WIDTH, new_height, dst_image.buffer().to_vec())
+        .ok_or("Failed to create scaled image")?;
 
     let data_dir = dirs_next::data_dir()
         .ok_or("Cannot get data directory".to_string())?;
@@ -59,7 +73,19 @@ pub fn generate_thumbnail_base64(source_path: &str, thumb_width: u32, _thumb_hei
     let ratio = thumb_width as f64 / width as f64;
     let new_height = (height as f64 * ratio) as u32;
 
-    let scaled = image::imageops::resize(&img, thumb_width, new_height, image::imageops::FilterType::Lanczos3);
+    let pixel_type = img.pixel_type().ok_or("Unsupported pixel type")?;
+    let mut dst_image = Image::new(thumb_width, new_height, pixel_type);
+
+    let mut resizer = Resizer::new();
+    let options = ResizeOptions {
+        algorithm: ResizeAlg::Interpolation(FilterType::Bilinear),
+        ..ResizeOptions::default()
+    };
+    resizer.resize(&img, &mut dst_image, Some(&options))
+        .map_err(|e| format!("Failed to resize: {}", e))?;
+
+    let scaled = image::RgbaImage::from_raw(thumb_width, new_height, dst_image.buffer().to_vec())
+        .ok_or("Failed to create scaled image")?;
 
     let mut buffer = std::io::Cursor::new(Vec::new());
     scaled.write_to(&mut buffer, image::ImageFormat::Jpeg)

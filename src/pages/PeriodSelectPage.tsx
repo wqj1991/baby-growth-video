@@ -27,14 +27,14 @@ import {
   getImageBase64,
   generateVideoFrames,
   generateVideoFramesByInterval,
-  setFinalVideoFrame,
-  cancelFinalVideoFrame,
   getVideoThumbnail,
   getPeriodStats,
   generateCollage,
   createCollagePhoto,
 } from '../utils/tauriCommands';
-import type { Photo, Video, VideoFrame, SelectableItem, PendingItem } from '../types';
+import type { Photo, Video, VideoFrame, Thumbnail } from '../types';
+import ThumbnailGrid from '../components/ThumbnailGrid';
+import ThumbnailPreviewModal from '../components/ThumbnailPreviewModal';
 import VirtualPhotoGrid from '../components/VirtualPhotoGrid';
 import VideoFrameSettingsModal from '../components/VideoFrameSettingsModal';
 import VideoFrameViewerModal from '../components/VideoFrameViewerModal';
@@ -79,6 +79,12 @@ export default function PeriodSelectPage() {
     setShowVideoPlayer,
     currentPlayingVideo,
     setCurrentPlayingVideo,
+    // Thumbnail state
+    thumbnails,
+    loadThumbnails,
+    addThumbToPending,
+    setThumbAsFinal,
+    cancelThumbFinal,
   } = useAppStore();
 
   // ---- Local State ----
@@ -91,7 +97,7 @@ export default function PeriodSelectPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null);
-  const [previewingPendingItem, setPreviewingPendingItem] = useState<PendingItem | null>(null);
+  const [previewingPendingItem, setPreviewingPendingItem] = useState<Thumbnail | null>(null);
 
   const [currentVideoForFrames, setCurrentVideoForFrames] = useState<Video | null>(null);
   const [showFrameSettings, setShowFrameSettings] = useState(false);
@@ -116,6 +122,10 @@ export default function PeriodSelectPage() {
   const [generatingPeriods, setGeneratingPeriods] = useState(false);
   const [addingPeriod, setAddingPeriod] = useState(false);
   const [generatingCollage, setGeneratingCollage] = useState(false);
+
+  // Thumbnail preview state
+  const [previewThumb, setPreviewThumb] = useState<Thumbnail | null>(null);
+  const [thumbShowPreview, setThumbShowPreview] = useState(false);
 
   const handleMouseDown = () => setIsDragging(true);
 
@@ -152,6 +162,7 @@ export default function PeriodSelectPage() {
     if (currentPeriod) {
       loadPeriodMedia(currentPeriod.id);
       loadPendingItems(currentPeriod.id);
+      loadThumbnails(currentPeriod.id);
       setShowPreview(false);
       setPreviewIndex(0);
       setPendingPreviewUrl(null);
@@ -162,6 +173,8 @@ export default function PeriodSelectPage() {
       resetRegionTransforms();
       setCurrentVideoForFrames(null);
       setVideoFrameCounts({});
+      setThumbShowPreview(false);
+      setPreviewThumb(null);
     }
   }, [currentPeriod?.id]);
 
@@ -481,27 +494,6 @@ export default function PeriodSelectPage() {
     finally { setIsExtractingFrames(false); }
   };
 
-  const handleSetFinalVideoFrame = async (frame: VideoFrame) => {
-    if (!currentPeriod) return;
-    try {
-      await setFinalVideoFrame(currentPeriod.id, frame.id);
-      setCurrentVideoFrames(currentVideoFrames.map(f => ({ ...f, is_final: f.id === frame.id })));
-      // 同步待选区中的 is_final 状态
-      setSelectedItems(selectedItems.map(item =>
-        item.type === 'video_frame' && item.item.id === frame.id
-          ? { ...item, item: { ...item.item, is_final: true } }
-          : item
-      ));
-      setPeriods(periods.map(p =>
-        p.id === currentPeriod.id ? { ...p, selected_photo_id: frame.id } : p
-      ));
-      setCurrentPeriod({ ...currentPeriod, selected_photo_id: frame.id });
-      updatePeriodStat(currentPeriod.id, { has_final: true });
-    } catch (error) { console.error('设置最终视频帧失败:', error); }
-  };
-
-
-
   // ============================
   // PREVIEW
   // ============================
@@ -521,89 +513,35 @@ export default function PeriodSelectPage() {
   // PENDING / COLLAGE ACTIONS
   // ============================
 
-  const handleToggleMultiSelect = (item: SelectableItem) => {
-    if (item.type === 'photo') {
-      const photo = item.item as Photo;
-      const updated = { ...photo, is_multi_selected: !photo.is_multi_selected };
-      setCurrentPhotos(currentPhotos.map(p => p.id === photo.id ? updated : p));
-      setSelectedItems(selectedItems.map(i => 
-        i.type === 'photo' && i.item.id === photo.id 
-          ? { type: 'photo' as const, item: updated } 
-          : i
-      ));
-    } else {
-      const frame = item.item as VideoFrame;
-      const updated = { ...frame, is_multi_selected: !frame.is_multi_selected };
-      setCurrentVideoFrames(currentVideoFrames.map(f => f.id === frame.id ? updated : f));
-      setSelectedItems(selectedItems.map(i => 
-        i.type === 'video_frame' && i.item.id === frame.id 
-          ? { type: 'video_frame' as const, item: updated } 
-          : i
-      ));
-    }
+  const handlePendingPreview = (thumb: Thumbnail) => {
+    setPendingPreviewUrl(thumb.base64_data);
+    setPreviewingPendingItem(thumb);
+    setShowPreview(true);
   };
 
-  // 待选区 PendingItem 回调适配
-  const handleTogglePendingMultiSelect = (item: PendingItem) => {
-    if (item.item_type === 'photo' || item.item_type === 'collage') {
-      const photo = currentPhotos.find((p) => p.id === item.id);
-      if (photo) {
-        handleToggleMultiSelect({ type: 'photo', item: { ...photo, is_multi_selected: !photo.is_multi_selected } });
-      }
-    } else if (item.item_type === 'video_frame') {
-      const frame = currentVideoFrames.find((f) => f.id === item.id);
-      if (frame) {
-        handleToggleMultiSelect({ type: 'video_frame', item: { ...frame, is_multi_selected: !frame.is_multi_selected } });
-      }
-    }
+  // ============================
+  // THUMBNAIL HANDLERS
+  // ============================
+
+  // 处理缩略图预览
+  const handleThumbPreview = (thumb: Thumbnail) => {
+    setPreviewThumb(thumb);
+    setThumbShowPreview(true);
   };
 
-  const handlePendingSelectSingle = (item: PendingItem) => {
-    if (item.item_type === 'photo' || item.item_type === 'collage') {
-      const photo = currentPhotos.find((p) => p.id === item.id);
-      if (photo) handleSetFinalPhoto(photo);
-    } else if (item.item_type === 'video_frame') {
-      const frame = currentVideoFrames.find((f) => f.id === item.id);
-      if (frame) handleSetFinalVideoFrame(frame);
-    }
+  // 处理加入候选区
+  const handleAddThumbToPending = (thumb: Thumbnail) => {
+    addThumbToPending(thumb.id);
   };
 
-  const handlePendingCancelFinal = (item: PendingItem) => {
-    if (!currentPeriod) return;
-    if (item.item_type === 'photo' || item.item_type === 'collage') {
-      handleCancelFinalPhoto();
-    } else if (item.item_type === 'video_frame') {
-      cancelFinalVideoFrame(currentPeriod.id).catch(console.error);
-      setCurrentVideoFrames(currentVideoFrames.map((f) => ({ ...f, is_final: false })));
-      setSelectedItems(selectedItems.map((i) =>
-        i.type === 'video_frame' ? { ...i, item: { ...i.item, is_final: false } } : i
-      ));
-      setPeriods(periods.map((p) =>
-        p.id === currentPeriod.id ? { ...p, selected_photo_id: undefined } : p
-      ));
-      setCurrentPeriod({ ...currentPeriod, selected_photo_id: undefined });
-      updatePeriodStat(currentPeriod.id, { has_final: false });
-    }
+  // 处理设为最终
+  const handleSetThumbFinal = (thumb: Thumbnail) => {
+    setThumbAsFinal(thumb.id);
   };
 
-  const handlePendingPreview = async (item: PendingItem) => {
-    if (!item.file_path) return;
-    try {
-      const url = await getImageBase64(item.file_path);
-      setPendingPreviewUrl(url);
-      setPreviewingPendingItem(item);
-      setShowPreview(true);
-    } catch (error) {
-      console.error('加载预览图失败:', error);
-    }
-  };
-
-  const getFileNameForPending = (item: PendingItem): string => {
-    if (item.file_name) return item.file_name;
-    if (item.item_type === 'video_frame') {
-      return `视频截帧 · ${Math.floor((item.time_seconds || 0) / 60)}:${((item.time_seconds || 0) % 60).toString().padStart(2, '0')}`;
-    }
-    return `项目 #${item.id}`;
+  // 处理取消最终
+  const handleCancelThumbFinal = () => {
+    cancelThumbFinal();
   };
 
   const handleEnterCollage = () => {
@@ -905,9 +843,6 @@ export default function PeriodSelectPage() {
           <PendingSelectionPanel
             onGenerateCollage={handleEnterCollage}
             onPreview={handlePendingPreview}
-            onToggleMultiSelect={handleTogglePendingMultiSelect}
-            onSelectSingle={handlePendingSelectSingle}
-            onCancelFinal={handlePendingCancelFinal}
           />
         </div>
         
@@ -949,7 +884,7 @@ export default function PeriodSelectPage() {
                 >
                   <Image className="w-4 h-4" />
                   全部照片
-                  <span className="tab-count-v2">{currentPhotos.length}</span>
+                  <span className="tab-count-v2">{thumbnails.length}</span>
                 </button>
                 <button
                   onClick={() => { setSelectedTab('videos'); }}
@@ -965,11 +900,19 @@ export default function PeriodSelectPage() {
               <div className="flex-1 overflow-hidden">
                 {selectedTab === 'photos' && (
                   <div className="h-full overflow-y-auto">
-                    {currentPhotos.length === 0 ? (
+                    {thumbnails.length > 0 ? (
+                      <ThumbnailGrid
+                        thumbnails={thumbnails}
+                        onPreview={handleThumbPreview}
+                        onAddToPending={handleAddThumbToPending}
+                        onSetFinal={handleSetThumbFinal}
+                        onCancelFinal={handleCancelThumbFinal}
+                      />
+                    ) : currentPhotos.length === 0 ? (
                       <div className="empty-state-v2 flex-1 h-full flex flex-col items-center justify-center">
-                        <Image className="w-16 h-16 text-stone-300 mb-4" />
+                        <div className="empty-icon">📷</div>
                         <h4>暂无照片</h4>
-                        <p>点击「扫描文件夹」导入照片，或从视频中截取画面</p>
+                        <p>扫描文件夹或从视频中截取帧来添加照片</p>
                       </div>
                     ) : (
                       <>
@@ -1085,7 +1028,7 @@ export default function PeriodSelectPage() {
               </div>
               <div className="flex items-center gap-1.5">
                 <Image className="w-4 h-4 text-warmth-500" />
-                <span className="text-xs text-stone-600">照片 <strong className="text-stone-900">{currentPhotos.length}</strong></span>
+                <span className="text-xs text-stone-600">照片 <strong className="text-stone-900">{thumbnails.length}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <VideoIcon className="w-4 h-4 text-success" />
@@ -1130,7 +1073,7 @@ export default function PeriodSelectPage() {
           <div className="max-w-[90vw] max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             <img
               src={previewingPendingItem ? pendingPreviewUrl || '' : loadedImages[currentPhotos[previewIndex].id] || ''}
-              alt={previewingPendingItem ? getFileNameForPending(previewingPendingItem) : currentPhotos[previewIndex].file_name}
+              alt={previewingPendingItem ? previewingPendingItem.original_file_name : currentPhotos[previewIndex].file_name}
               className="max-w-full max-h-[85vh] object-contain"
             />
           </div>
@@ -1138,7 +1081,7 @@ export default function PeriodSelectPage() {
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/80 text-sm">
             <span className="font-medium">
               {previewingPendingItem
-                ? getFileNameForPending(previewingPendingItem)
+                ? previewingPendingItem.original_file_name
                 : currentPhotos[previewIndex].file_name}
             </span>
             {!previewingPendingItem && (
@@ -1188,6 +1131,15 @@ export default function PeriodSelectPage() {
           });
           setShowFrameViewer(false);
         }}
+      />
+
+      {/* ===== THUMBNAIL PREVIEW MODAL ===== */}
+      <ThumbnailPreviewModal
+        visible={thumbShowPreview}
+        thumbnail={previewThumb}
+        thumbnails={thumbnails}
+        onClose={() => setThumbShowPreview(false)}
+        onNavigate={(thumb) => setPreviewThumb(thumb)}
       />
     </div>
   );

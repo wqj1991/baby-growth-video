@@ -234,7 +234,7 @@ pub fn generate_collage(req: &CollageRequest, project_id: i64) -> Result<Collage
         &rgb_output,
         rgb_output.width(),
         rgb_output.height(),
-        ColorType::Rgb8,
+        ColorType::Rgb8.into(),
     )
     .map_err(|e| format!("Failed to write output image: {}", e))?;
 

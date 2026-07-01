@@ -20,6 +20,27 @@ import type {
   VideoFrameTemp,
 } from '../types';
 
+// 本地 Thumbnail 类型定义（用于前端）
+interface Thumbnail {
+  id: number;
+  project_id: number;
+  period_id: number;
+  source_type: 'scan' | 'video_frame' | 'collage';
+  source_id?: number;
+  original_path: string;
+  original_file_name: string;
+  original_width: number;
+  original_height: number;
+  original_file_size: number;
+  base64_data: string;
+  width: number;
+  height: number;
+  is_selected: boolean;
+  is_final: boolean;
+  taken_at?: string;
+  created_at: string;
+}
+
 /**
  * 将本地文件路径转换为可在 WebView 中加载的 media 协议 URL
  * 解决 Tauri 2.0 中 file:// 协议被安全策略阻止的问题
@@ -413,4 +434,34 @@ export async function discardTempFrames(videoId: number): Promise<void> {
 
 export async function getTempFrames(videoId: number): Promise<VideoFrameTemp[]> {
   return invoke('get_temp_frames', { videoId });
+}
+
+// ==================== 缩略图操作 ====================
+
+export async function getPeriodThumbnails(periodId: number): Promise<Thumbnail[]> {
+  return invoke('get_period_thumbnails', { periodId });
+}
+
+export async function addToPending(thumbnailId: number): Promise<void> {
+  return invoke('add_to_pending', { thumbnailId });
+}
+
+export async function removeFromPending(thumbnailId: number): Promise<void> {
+  return invoke('remove_from_pending', { thumbnailId });
+}
+
+export async function setFinalThumbnail(periodId: number, thumbnailId: number): Promise<void> {
+  return invoke('set_final_thumbnail', { periodId, thumbnailId });
+}
+
+export async function cancelFinalThumbnail(periodId: number): Promise<void> {
+  return invoke('cancel_final_thumbnail', { periodId });
+}
+
+export async function deleteThumbnail(thumbnailId: number): Promise<void> {
+  return invoke('delete_thumbnail', { thumbnailId });
+}
+
+export async function getOriginalFile(thumbnailId: number): Promise<string> {
+  return invoke('get_original_file', { thumbnailId });
 }

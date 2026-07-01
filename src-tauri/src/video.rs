@@ -387,7 +387,7 @@ fn render_text_on_photo(
 ) -> Result<(), String> {
     use image::{GenericImageView, Rgba, RgbaImage};
     use imageproc::drawing::draw_text_mut;
-    use rusttype::{Font, Scale};
+    use ab_glyph::{FontArc, PxScale};
 
     let img = image::open(input_path)
         .map_err(|e| format!("读取图片失败: {}", e))?;
@@ -428,11 +428,10 @@ fn render_text_on_photo(
 
     // 加载嵌入式字体
     let font_data: &[u8] = include_bytes!("../resources/Roboto-Regular.ttf");
-    let font = Font::try_from_bytes(font_data)
-        .ok_or_else(|| "无法解析字体文件".to_string())?;
+    let font = FontArc::try_from_slice(font_data)
+        .or_else(|_| Err("无法解析字体文件".to_string()))?;
 
-    // 计算字号
-    let scale = Scale::uniform((bar_height as f32 * 0.55).min(40.0).max(16.0));
+    let scale = PxScale::from((bar_height as f32 * 0.55).min(40.0).max(16.0));
 
     // 文字居中
     let text_width = text.len() as f32 * scale.x * 0.5;

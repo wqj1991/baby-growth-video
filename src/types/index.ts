@@ -179,3 +179,43 @@ export interface Toast {
   message?: string;
   duration?: number; // ms, 默认 4000
 }
+
+// 统一缩略图类型
+export interface Thumbnail {
+  id: number;
+  project_id: number;
+  period_id: number;
+  source_type: 'scan' | 'video_frame' | 'collage';
+  source_id?: number;
+  original_path: string;
+  original_file_name: string;
+  original_width: number;
+  original_height: number;
+  original_file_size: number;
+  base64_data: string;
+  width: number;
+  height: number;
+  is_selected: boolean;
+  is_final: boolean;
+  taken_at?: string;
+  created_at: string;
+}
+
+// 缩略图状态
+export type ThumbnailState = 'in_photos' | 'in_pending' | 'final';
+
+// PendingItem 类型保留用于向后兼容，但内部使用 thumbnail
+export interface PendingItem {
+  item_type: 'photo' | 'video_frame' | 'collage';
+  id: number;
+  period_id: number;
+  file_path: string | null;
+  file_name: string | null;
+  thumbnail_path: string | null;
+  width: number;
+  height: number;
+  time_seconds: number | null;
+  taken_at: string | null;
+  is_final: boolean;
+  source: string | null;
+}

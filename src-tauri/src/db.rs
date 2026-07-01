@@ -73,6 +73,43 @@ pub struct PeriodStats {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Thumbnail {
+    pub id: i64,
+    pub project_id: i64,
+    pub period_id: i64,
+    pub source_type: String,
+    pub source_id: Option<i64>,
+    pub original_path: String,
+    pub original_file_name: String,
+    pub original_width: i64,
+    pub original_height: i64,
+    pub original_file_size: i64,
+    pub base64_data: Option<String>,
+    pub width: i64,
+    pub height: i64,
+    pub is_selected: bool,
+    pub is_final: bool,
+    pub taken_at: Option<String>,
+    pub created_at: String,
+}
+
+pub struct NewThumbnail {
+    pub project_id: i64,
+    pub period_id: i64,
+    pub source_type: String,
+    pub source_id: Option<i64>,
+    pub original_path: String,
+    pub original_file_name: String,
+    pub original_width: i64,
+    pub original_height: i64,
+    pub original_file_size: i64,
+    pub base64_data: Option<String>,
+    pub width: i64,
+    pub height: i64,
+    pub taken_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NewPeriod {
     pub project_id: i64,
     pub name: String,
@@ -324,24 +361,29 @@ impl Database {
             [],
         )?;
 
-        // 照片表
+        // 缩略图表
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS photos (
+            "CREATE TABLE IF NOT EXISTS thumbnails (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
                 period_id INTEGER NOT NULL,
-                file_path TEXT NOT NULL,
-                file_name TEXT NOT NULL,
-                file_size INTEGER NOT NULL DEFAULT 0,
+                source_type TEXT NOT NULL DEFAULT 'scan',
+                source_id INTEGER,
+                original_path TEXT NOT NULL,
+                original_file_name TEXT NOT NULL,
+                original_width INTEGER NOT NULL DEFAULT 0,
+                original_height INTEGER NOT NULL DEFAULT 0,
+                original_file_size INTEGER NOT NULL DEFAULT 0,
+                base64_data TEXT,
                 width INTEGER NOT NULL DEFAULT 0,
                 height INTEGER NOT NULL DEFAULT 0,
-                taken_at TEXT,
-                description TEXT,
                 is_selected INTEGER NOT NULL DEFAULT 0,
                 is_final INTEGER NOT NULL DEFAULT 0,
-                thumbnail_path TEXT,
-                source TEXT NOT NULL DEFAULT 'scan',
+                taken_at TEXT,
                 created_at TEXT NOT NULL,
-                FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE,
+                FOREIGN KEY (source_id) REFERENCES videos(id) ON DELETE CASCADE
             )",
             [],
         )?;
@@ -359,24 +401,6 @@ impl Database {
                 height INTEGER NOT NULL DEFAULT 0,
                 taken_at TEXT,
                 created_at TEXT NOT NULL,
-                FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
-            )",
-            [],
-        )?;
-
-        // 视频截图表
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS video_frames (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                video_id INTEGER NOT NULL,
-                period_id INTEGER NOT NULL,
-                file_path TEXT,
-                time_seconds REAL NOT NULL DEFAULT 0,
-                is_selected INTEGER NOT NULL DEFAULT 0,
-                is_final INTEGER NOT NULL DEFAULT 0,
-                thumbnail_path TEXT,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
                 FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE
             )",
             [],
@@ -787,77 +811,69 @@ impl Database {
         })
     }
 
-    // ==================== 照片操作 ====================
+    // ==================== 缩略图操作 ====================
 
-    pub fn get_period_photos(&self, period_id: i64) -> Result<Vec<Photo>> {
+    pub fn get_period_thumbnails(&self, period_id: i64) -> Result<Vec<Thumbnail>> {
         let conn = self.get_conn();
         let mut stmt = conn.prepare(
-            "SELECT * FROM photos WHERE period_id = ?1 ORDER BY taken_at ASC, id ASC",
+            "SELECT * FROM thumbnails WHERE period_id = ?1 ORDER BY taken_at ASC, id ASC",
         )?;
-        let photos = stmt.query_map(params![period_id], |row| {
-            Ok(Photo {
+        let thumbnails = stmt.query_map(params![period_id], |row| {
+            Ok(Thumbnail {
                 id: row.get(0)?,
-                period_id: row.get(1)?,
-                file_path: row.get(2)?,
-                file_name: row.get(3)?,
-                file_size: row.get(4)?,
-                width: row.get(5)?,
-                height: row.get(6)?,
-                taken_at: row.get(7)?,
-                description: row.get(8)?,
-                is_selected: row.get::<_, i64>(9)? != 0,
-                is_final: row.get::<_, i64>(10)? != 0,
-                thumbnail_path: row.get(11)?,
-                source: row.get::<_, String>(12)?,
-                created_at: row.get(13)?,
+                project_id: row.get(1)?,
+                period_id: row.get(2)?,
+                source_type: row.get(3)?,
+                source_id: row.get(4)?,
+                original_path: row.get(5)?,
+                original_file_name: row.get(6)?,
+                original_width: row.get(7)?,
+                original_height: row.get(8)?,
+                original_file_size: row.get(9)?,
+                base64_data: row.get(10)?,
+                width: row.get(11)?,
+                height: row.get(12)?,
+                is_selected: row.get::<_, i64>(13)? != 0,
+                is_final: row.get::<_, i64>(14)? != 0,
+                taken_at: row.get(15)?,
+                created_at: row.get(16)?,
             })
         })?;
-        photos.collect()
+        thumbnails.collect()
     }
 
-    pub fn delete_period_photos(&self, period_id: i64) -> Result<()> {
-        let conn = self.get_conn();
-        conn.execute("DELETE FROM photos WHERE period_id = ?1", params![period_id])?;
-        Ok(())
-    }
-
-    // 删除单张照片
-    pub fn delete_photo(&self, photo_id: i64) -> Result<()> {
-        let conn = self.get_conn();
-        conn.execute("DELETE FROM photos WHERE id = ?1", params![photo_id])?;
-        Ok(())
-    }
-
-    // 批量插入照片（事务）
-    pub fn add_photos(&self, photos: &[NewPhoto]) -> Result<Vec<Photo>> {
+    pub fn add_thumbnails(&self, thumbnails: &[NewThumbnail]) -> Result<Vec<Thumbnail>> {
         let conn = self.get_conn();
         let now = Self::now();
-        let mut result = Vec::with_capacity(photos.len());
+        let mut result = Vec::with_capacity(thumbnails.len());
 
-        // 开启事务，批量插入性能提升 10-100 倍
         conn.execute("BEGIN TRANSACTION", params![])?;
 
-        for photo in photos {
+        for thumbnail in thumbnails {
             match conn.execute(
-                "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, thumbnail_path, source, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                "INSERT INTO thumbnails (project_id, period_id, source_type, source_id, original_path, original_file_name, original_width, original_height, original_file_size, base64_data, width, height, taken_at, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                 params![
-                    photo.period_id,
-                    photo.file_path,
-                    photo.file_name,
-                    photo.file_size,
-                    photo.width,
-                    photo.height,
-                    photo.taken_at,
-                    photo.thumbnail_path,
-                    photo.source,
+                    thumbnail.project_id,
+                    thumbnail.period_id,
+                    thumbnail.source_type,
+                    thumbnail.source_id,
+                    thumbnail.original_path,
+                    thumbnail.original_file_name,
+                    thumbnail.original_width,
+                    thumbnail.original_height,
+                    thumbnail.original_file_size,
+                    thumbnail.base64_data,
+                    thumbnail.width,
+                    thumbnail.height,
+                    thumbnail.taken_at,
                     &now,
                 ],
             ) {
                 Ok(_) => {
                     let id = conn.last_insert_rowid();
-                    match self.get_photo_by_id(id) {
-                        Ok(photo) => result.push(photo),
+                    match self.get_thumbnail_by_id(id) {
+                        Ok(thumbnail) => result.push(thumbnail),
                         Err(e) => {
                             conn.execute("ROLLBACK", params![]).ok();
                             return Err(e);
@@ -865,7 +881,6 @@ impl Database {
                     }
                 }
                 Err(e) => {
-                    // 出错回滚
                     conn.execute("ROLLBACK", params![]).ok();
                     return Err(e);
                 }
@@ -876,42 +891,84 @@ impl Database {
         Ok(result)
     }
 
-    // 创建拼图照片（持久化到数据库）
-    pub fn create_collage_photo(
-        &self,
-        period_id: i64,
-        file_path: &str,
-        file_name: &str,
-        file_size: i64,
-        width: i64,
-        height: i64,
-        thumbnail_path: Option<String>,
-        description: &str,
-    ) -> Result<Photo> {
+    pub fn update_thumbnail(&self, thumbnail: &Thumbnail) -> Result<Thumbnail> {
         let conn = self.get_conn();
-        let now = Self::now();
-        
         conn.execute(
-            "INSERT INTO photos (period_id, file_path, file_name, file_size, width, height, taken_at, description, is_selected, thumbnail_path, source, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            "UPDATE thumbnails SET is_selected = ?1, is_final = ?2 WHERE id = ?3",
             params![
-                period_id,
-                file_path,
-                file_name,
-                file_size,
-                width,
-                height,
-                &now[..10], // taken_at: YYYY-MM-DD
-                description,
-                1, // is_selected: true
-                thumbnail_path,
-                "collage", // source: mark as collage
-                &now,
+                thumbnail.is_selected as i64,
+                thumbnail.is_final as i64,
+                thumbnail.id,
             ],
         )?;
-        
-        let id = conn.last_insert_rowid();
-        self.get_photo_by_id(id)
+        self.get_thumbnail_by_id(thumbnail.id)
+    }
+
+    pub fn set_final_thumbnail(&self, period_id: i64, thumbnail_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        conn.execute(
+            "UPDATE thumbnails SET is_final = 0 WHERE period_id = ?1",
+            params![period_id],
+        )?;
+        conn.execute(
+            "UPDATE thumbnails SET is_final = 1 WHERE id = ?1",
+            params![thumbnail_id],
+        )?;
+        conn.execute(
+            "UPDATE periods SET selected_photo_id = ?1 WHERE id = ?2",
+            params![thumbnail_id, period_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn cancel_final_thumbnail(&self, period_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        conn.execute(
+            "UPDATE thumbnails SET is_final = 0 WHERE period_id = ?1",
+            params![period_id],
+        )?;
+        conn.execute(
+            "UPDATE periods SET selected_photo_id = NULL WHERE id = ?1",
+            params![period_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_thumbnail(&self, thumbnail_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        conn.execute("DELETE FROM thumbnails WHERE id = ?1", params![thumbnail_id])?;
+        Ok(())
+    }
+
+    pub fn delete_period_thumbnails(&self, period_id: i64) -> Result<()> {
+        let conn = self.get_conn();
+        conn.execute("DELETE FROM thumbnails WHERE period_id = ?1", params![period_id])?;
+        Ok(())
+    }
+
+    fn get_thumbnail_by_id(&self, id: i64) -> Result<Thumbnail> {
+        let conn = self.get_conn();
+        conn.query_row("SELECT * FROM thumbnails WHERE id = ?1", params![id], |row| {
+            Ok(Thumbnail {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                period_id: row.get(2)?,
+                source_type: row.get(3)?,
+                source_id: row.get(4)?,
+                original_path: row.get(5)?,
+                original_file_name: row.get(6)?,
+                original_width: row.get(7)?,
+                original_height: row.get(8)?,
+                original_file_size: row.get(9)?,
+                base64_data: row.get(10)?,
+                width: row.get(11)?,
+                height: row.get(12)?,
+                is_selected: row.get::<_, i64>(13)? != 0,
+                is_final: row.get::<_, i64>(14)? != 0,
+                taken_at: row.get(15)?,
+                created_at: row.get(16)?,
+            })
+        })
     }
 
     pub fn get_pending_items(&self, period_id: i64) -> Result<Vec<PendingItem>> {

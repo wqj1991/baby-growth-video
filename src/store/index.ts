@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
-import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem, PeriodStats, AiSettings, PendingItem, VideoFrameTemp } from '../types';
+import type { Baby, Project, Period, Photo, Video, VideoFrame, ExportRecord, ScanLog, SelectableItem, PeriodStats, AiSettings, PendingItem, VideoFrameTemp, Thumbnail } from '../types';
 import type { CollageTemplate, RegionTransform } from '../utils/collageTemplates';
 import { getTemplateById, DEFAULT_TRANSFORM } from '../utils/collageTemplates';
+import { getPeriodThumbnails, addToPending, removeFromPending, setFinalThumbnail, cancelFinalThumbnail, deleteThumbnail, getOriginalFile } from '../utils/tauriCommands';
 
 interface AppState {
   // 当前选中的宝宝
@@ -133,6 +134,17 @@ interface AppState {
   persistVideoFrame: (tempId: number, projectId: number) => Promise<void>;
   discardTempFrames: (videoId: number) => Promise<void>;
   loadTempFrames: (videoId: number) => Promise<void>;
+
+  // 缩略图相关状态
+  thumbnails: Thumbnail[];
+  setThumbnails: (thumbnails: Thumbnail[]) => void;
+  loadThumbnails: (periodId: number) => Promise<void>;
+  addThumbToPending: (id: number) => Promise<void>;
+  removeThumbFromPending: (id: number) => Promise<void>;
+  setThumbAsFinal: (id: number) => Promise<void>;
+  cancelThumbFinal: () => Promise<void>;
+  deleteThumb: (id: number) => Promise<void>;
+  previewOriginal: (id: number) => Promise<string>;
 }
 
 const DEFAULT_AI_SETTINGS: AiSettings = {
@@ -392,6 +404,89 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.error('Failed to load temp frames:', e);
     }
+  },
+
+  // 缩略图相关
+  thumbnails: [],
+  setThumbnails: (thumbnails) => set({ thumbnails }),
+
+  loadThumbnails: async (periodId: number) => {
+    try {
+      const thumbs = await getPeriodThumbnails(periodId);
+      set({ thumbnails: thumbs });
+    } catch (e) {
+      console.error('Failed to load thumbnails:', e);
+    }
+  },
+
+  addThumbToPending: async (id: number) => {
+    try {
+      await addToPending(id);
+      set((state) => ({
+        thumbnails: state.thumbnails.map(t => 
+          t.id === id ? { ...t, is_selected: true } : t
+        )
+      }));
+    } catch (e) {
+      console.error('Failed to add to pending:', e);
+    }
+  },
+
+  removeThumbFromPending: async (id: number) => {
+    try {
+      await removeFromPending(id);
+      set((state) => ({
+        thumbnails: state.thumbnails.map(t => 
+          t.id === id ? { ...t, is_selected: false } : t
+        )
+      }));
+    } catch (e) {
+      console.error('Failed to remove from pending:', e);
+    }
+  },
+
+  setThumbAsFinal: async (id: number) => {
+    const state = get();
+    if (!state.currentPeriod) return;
+    try {
+      await setFinalThumbnail(state.currentPeriod.id, id);
+      set((state) => ({
+        thumbnails: state.thumbnails.map(t => ({
+          ...t,
+          is_final: t.id === id
+        }))
+      }));
+    } catch (e) {
+      console.error('Failed to set final:', e);
+    }
+  },
+
+  cancelThumbFinal: async () => {
+    const state = get();
+    if (!state.currentPeriod) return;
+    try {
+      await cancelFinalThumbnail(state.currentPeriod.id);
+      set((state) => ({
+        thumbnails: state.thumbnails.map(t => ({ ...t, is_final: false }))
+      }));
+    } catch (e) {
+      console.error('Failed to cancel final:', e);
+    }
+  },
+
+  deleteThumb: async (id: number) => {
+    try {
+      await deleteThumbnail(id);
+      set((state) => ({
+        thumbnails: state.thumbnails.filter(t => t.id !== id)
+      }));
+    } catch (e) {
+      console.error('Failed to delete thumbnail:', e);
+    }
+  },
+
+  previewOriginal: async (id: number): Promise<string> => {
+    return getOriginalFile(id);
   },
 }));
 

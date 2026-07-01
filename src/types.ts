@@ -208,3 +208,25 @@ export interface VideoFrameTemp {
   temp_thumb_path: string;
   created_at: string;
 }
+
+// ==================== 缩略图 ====================
+
+export interface Thumbnail {
+  id: number;
+  project_id: number;
+  period_id: number;
+  source_type: 'scan' | 'video_frame' | 'collage';
+  source_id?: number;
+  original_path: string;
+  original_file_name: string;
+  original_width: number;
+  original_height: number;
+  original_file_size: number;
+  base64_data: string;
+  width: number;
+  height: number;
+  is_selected: boolean;
+  is_final: boolean;
+  taken_at?: string;
+  created_at: string;
+}
