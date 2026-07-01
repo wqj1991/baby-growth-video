@@ -24,6 +24,7 @@ src-tauri/Cargo.lock
 *.sln
 *.sw?
 .workbuddy/
+.worktrees/
 
 # Logs
 logs
