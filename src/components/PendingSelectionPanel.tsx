@@ -84,7 +84,7 @@ export default function PendingSelectionPanel({
               return (
                 <div
                   key={thumb.id}
-                  className={`stash-compare-item relative cursor-pointer group ${isFinal ? 'ring-2 ring-success' : isMultiSelected ? 'multi-selected' : ''}`}
+                  className={`stash-compare-item relative cursor-pointer group ${isMultiSelected ? 'multi-selected' : ''}`}
                   onClick={() => handleToggleMultiSelect(thumb)}
                   onDoubleClick={() => onPreview?.(thumb)}
                 >
