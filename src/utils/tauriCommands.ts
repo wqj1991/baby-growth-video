@@ -287,6 +287,11 @@ export async function saveFile(defaultName: string): Promise<string | null> {
   return result;
 }
 
+// 保存音乐文件
+export async function saveMusicFile(projectId: number, musicData: Uint8Array, musicName: string): Promise<string> {
+  return invoke('save_music_file', { projectId, musicData, musicName });
+}
+
 // ==================== 拼图生成 ====================
 
 export interface CollageRegion {

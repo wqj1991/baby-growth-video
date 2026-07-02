@@ -538,6 +538,24 @@ fn generate_collage(
     Ok(result)
 }
 
+// ==================== 音乐相关 ====================
+
+#[tauri::command]
+fn save_music_file(project_id: i64, music_data: Vec<u8>, music_name: String) -> Result<String, String> {
+    let mut music_dir = media::get_project_data_dir();
+    music_dir.push(project_id.to_string());
+    music_dir.push("music");
+    
+    std::fs::create_dir_all(&music_dir).map_err(|e| format!("创建音乐目录失败: {}", e))?;
+    
+    let file_name = format!("{}_{}.mp3", uuid::Uuid::new_v4(), music_name);
+    let file_path = music_dir.join(&file_name);
+    
+    std::fs::write(&file_path, music_data).map_err(|e| format!("写入音乐文件失败: {}", e))?;
+    
+    Ok(file_path.to_string_lossy().to_string())
+}
+
 // ==================== 设置相关 ====================
 
 #[tauri::command]

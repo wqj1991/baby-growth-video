@@ -6,6 +6,7 @@ import { showToast } from '../store/toastStore';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigate } from 'react-router-dom';
 import type { VideoConfig, PhotoText } from '../types';
+import { MusicLibrary } from '../components/MusicLibrary';
 
 export default function VideoGeneratePage() {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ export default function VideoGeneratePage() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [photoPaths, setPhotoPaths] = useState<string[]>([]);
+  const [musicLibraryOpen, setMusicLibraryOpen] = useState(false);
   const [loadingThumbnails, setLoadingThumbnails] = useState(false);
 
   useEffect(() => {
@@ -455,6 +457,13 @@ export default function VideoGeneratePage() {
                   >
                     {config.background_music ? <Volume2 className="w-4 h-4" /> : <Music className="w-4 h-4" />}
                     {config.background_music ? '更换' : '选择'}
+                  </button>
+                  <button
+                    onClick={() => setMusicLibraryOpen(true)}
+                    className="btn btn-outline"
+                  >
+                    <Film className="w-4 h-4" />
+                    音乐库
                   </button>
                 </div>
                 {!config.background_music && (
@@ -922,6 +931,17 @@ export default function VideoGeneratePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {musicLibraryOpen && (
+        <MusicLibrary
+          projectId={currentProject?.id || 0}
+          onSelect={(musicPath) => {
+            setConfig({ ...config, background_music: musicPath });
+            setMusicLibraryOpen(false);
+          }}
+          onClose={() => setMusicLibraryOpen(false)}
+        />
       )}
       </div>
     </>

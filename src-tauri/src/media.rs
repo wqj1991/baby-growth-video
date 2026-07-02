@@ -465,7 +465,7 @@ fn find_period_for_date(
     None
 }
 
-fn get_project_data_dir() -> PathBuf {
+pub fn get_project_data_dir() -> PathBuf {
     let mut path = dirs_next::data_dir().unwrap_or_else(|| PathBuf::from("."));
     path.push("baby-growth-video");
     path.push("projects");
