@@ -452,6 +452,12 @@ fn get_generation_progress(task_id: String) -> Result<i32, String> {
     Ok(video::get_progress(&task_id))
 }
 
+#[tauri::command]
+fn cancel_generation(task_id: String) -> Result<(), String> {
+    video::cancel_task(&task_id);
+    Ok(())
+}
+
 // ==================== 导出记录 ====================
 
 #[tauri::command]
@@ -932,6 +938,7 @@ pub fn run() {
             get_scan_log,
             generate_growth_video,
             get_generation_progress,
+            cancel_generation,
             get_export_records,
             get_image_base64,
             generate_collage,
