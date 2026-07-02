@@ -225,6 +225,7 @@ export interface VideoFrameTemp {
   period_id: number;
   time_seconds: number;
   temp_thumb_path: string;
+  base64_data?: string;
   created_at: string;
 }
 

@@ -38,6 +38,9 @@ export default function VideoFramePlayer({
   const [processedIds, setProcessedIds] = useState<Set<number>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Record<number, string>>({});
   const [isClosing, setIsClosing] = useState(false);
+  const [showFramePreview, setShowFramePreview] = useState(false);
+  const [framePreviewUrl, setFramePreviewUrl] = useState<string | null>(null);
+  const [framePreviewLoading, setFramePreviewLoading] = useState(false);
   const handleCloseRef = useRef<() => void>(() => {});
 
   const totalDuration = formatDuration(video.duration);
@@ -45,6 +48,33 @@ export default function VideoFramePlayer({
   const projectId = currentProject?.id;
 
   const visibleFrames = tempFrames.filter((f) => !processedIds.has(f.id));
+
+  const getOriginalFramePath = (thumbPath: string) => {
+    return thumbPath.replace(/_thumb(?=\.[^./\\]+$)/, '_frame');
+  };
+
+  const handleCloseFramePreview = () => {
+    setShowFramePreview(false);
+    setFramePreviewUrl(null);
+    setFramePreviewLoading(false);
+  };
+
+  const handleOpenFramePreview = async (frameId: number, thumbPath: string) => {
+    setShowFramePreview(true);
+    setFramePreviewLoading(true);
+    setFramePreviewUrl(null);
+
+    try {
+      const originalPath = getOriginalFramePath(thumbPath);
+      const originalBase64 = await getImageBase64(originalPath);
+      setFramePreviewUrl(originalBase64);
+    } catch (error) {
+      console.error('加载原图失败，回退缩略图预览:', error);
+      setFramePreviewUrl(loadedImages[frameId] || null);
+    } finally {
+      setFramePreviewLoading(false);
+    }
+  };
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -60,18 +90,31 @@ export default function VideoFramePlayer({
           setProgress((p) => Math.min(100, p + 1));
           break;
         case 'Escape':
-          handleCloseRef.current();
+          if (showFramePreview) {
+            handleCloseFramePreview();
+          } else {
+            handleCloseRef.current();
+          }
           break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onBack, video.id]);
+  }, [onBack, video.id, showFramePreview]);
 
   // Load temp frame thumbnails
   useEffect(() => {
     const loadImages = async () => {
-      const framesToLoad = visibleFrames.filter((f) => !loadedImages[f.id]);
+      const framesToHydrate = visibleFrames.filter((f) => !!f.base64_data && !loadedImages[f.id]);
+      if (framesToHydrate.length > 0) {
+        const hydratedImages: Record<number, string> = {};
+        framesToHydrate.forEach((frame) => {
+          if (frame.base64_data) hydratedImages[frame.id] = frame.base64_data;
+        });
+        setLoadedImages((prev) => ({ ...prev, ...hydratedImages }));
+      }
+
+      const framesToLoad = visibleFrames.filter((f) => !f.base64_data && !loadedImages[f.id]);
       if (framesToLoad.length === 0) return;
       const results = await Promise.all(
         framesToLoad.map(async (frame) => {
@@ -300,22 +343,27 @@ export default function VideoFramePlayer({
                 const isPersisting = persistingIds.has(frame.id);
                 const isDiscarding = discardingIds.has(frame.id);
                 const isProcessing = isPersisting || isDiscarding;
+                const previewUrl = frame.base64_data || loadedImages[frame.id];
                 return (
                   <div
                     key={frame.id}
                     className="relative flex-shrink-0 w-28 bg-white rounded-lg border border-stone-200 overflow-hidden"
                   >
-                    <div
-                      className="w-full h-16 bg-cover bg-center"
-                      style={{
-                        backgroundImage: loadedImages[frame.id]
-                          ? `url(${loadedImages[frame.id]})`
-                          : undefined,
-                        background: loadedImages[frame.id]
-                          ? undefined
-                          : 'var(--color-warmth-950)',
-                      }}
-                    />
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt={`temp-frame-${frame.id}`}
+                        className="w-full h-16 object-cover cursor-zoom-in"
+                        loading="lazy"
+                        onDoubleClick={() => handleOpenFramePreview(frame.id, frame.temp_thumb_path)}
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-16 cursor-zoom-in"
+                        style={{ background: 'var(--color-warmth-950)' }}
+                        onDoubleClick={() => handleOpenFramePreview(frame.id, frame.temp_thumb_path)}
+                      />
+                    )}
                     <div className="p-1.5">
                       <div className="text-[9px] text-stone-500 mb-1">
                         {formatDuration(frame.time_seconds)}
@@ -348,6 +396,34 @@ export default function VideoFramePlayer({
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {showFramePreview && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+            onClick={handleCloseFramePreview}
+          >
+            <button
+              className="absolute top-4 right-4 px-3 py-1.5 text-sm text-white/90 hover:text-white"
+              onClick={handleCloseFramePreview}
+            >
+              关闭
+            </button>
+
+            <div className="max-w-[95vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+              {framePreviewLoading ? (
+                <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : framePreviewUrl ? (
+                <img
+                  src={framePreviewUrl}
+                  alt="video-frame-original"
+                  className="max-w-full max-h-[90vh] object-contain"
+                />
+              ) : (
+                <div className="px-4 py-3 text-sm text-white/80 bg-white/10 rounded">原图加载失败</div>
+              )}
             </div>
           </div>
         )}

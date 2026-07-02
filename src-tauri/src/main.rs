@@ -607,17 +607,10 @@ fn persist_video_frame(
     let data_dir = dirs_next::data_dir().ok_or("Cannot get data directory")?;
     let project_dir = data_dir.join("baby-growth-video").join("projects").join(project_id.to_string());
     let frames_dir = project_dir.join("frames");
-    let thumb_dir = project_dir.join("thumbnails");
     std::fs::create_dir_all(&frames_dir).map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
     
     let uuid = uuid::Uuid::new_v4().to_string();
     let dest_frame = frames_dir.join(format!("{}_frame.jpg", uuid));
-    let dest_thumb = thumb_dir.join(format!("{}_thumb.jpg", uuid));
-    
-    // Move thumbnail
-    std::fs::rename(&temp.temp_thumb_path, &dest_thumb)
-        .map_err(|e| format!("Failed to move thumbnail: {}", e))?;
     
     // Derive temp frame path from thumb path using UUID extraction
     let temp_frame_path = {
@@ -628,22 +621,29 @@ fn persist_video_frame(
         parent.join(format!("{}_frame.jpg", frame_stem))
     };
     
-    if temp_frame_path.exists() {
-        std::fs::rename(&temp_frame_path, &dest_frame)
-            .map_err(|e| format!("Failed to move frame: {}", e))?;
+    if !temp_frame_path.exists() {
+        return Err("Failed to locate temp frame source file".to_string());
     }
+    std::fs::rename(&temp_frame_path, &dest_frame)
+        .map_err(|e| format!("Failed to move frame: {}", e))?;
+
+    // 临时缩略图仅用于抽帧阶段，持久化后不再需要
+    let _ = std::fs::remove_file(&temp.temp_thumb_path);
+
+    let frame_base64 = crate::thumbnail::read_file_base64(dest_frame.to_str().unwrap_or_default())
+        .map_err(|e| format!("Failed to encode frame to base64: {}", e))?;
     
     let new_thumbnail = db::NewThumbnail {
         project_id,
         period_id: temp.period_id,
-        source_type: "video".to_string(),
+        source_type: "video_frame".to_string(),
         source_id: Some(temp.video_id),
         original_path: dest_frame.to_string_lossy().to_string(),
         original_file_name: format!("{}_frame.jpg", uuid),
         original_width: 0,
         original_height: 0,
         original_file_size: 0,
-        base64_data: Some(dest_thumb.to_string_lossy().to_string()),
+        base64_data: Some(frame_base64),
         width: 0,
         height: 0,
         taken_at: None,
@@ -651,8 +651,12 @@ fn persist_video_frame(
     
     let mut thumbnails = db.add_thumbnails(&[new_thumbnail]).map_err(|e| e.to_string())?;
     db.delete_temp_frame(temp_id).map_err(|e| e.to_string())?;
-    
-    thumbnails.pop().ok_or("Failed to persist thumbnail".to_string())
+
+    let mut thumbnail = thumbnails
+        .pop()
+        .ok_or("Failed to persist thumbnail".to_string())?;
+    thumbnail.is_selected = true;
+    db.update_thumbnail(&thumbnail).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -717,7 +721,29 @@ fn get_temp_frames(
     state: State<'_, AppState>,
 ) -> Result<Vec<db::VideoFrameTemp>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_temp_frames(video_id).map_err(|e| e.to_string())
+    let frames = db.get_temp_frames(video_id).map_err(|e| e.to_string())?;
+
+    let mut hydrated_frames = Vec::with_capacity(frames.len());
+    let mut stale_ids = Vec::new();
+
+    for mut frame in frames {
+        match thumbnail::read_file_base64(&frame.temp_thumb_path) {
+            Ok(base64) => {
+                frame.base64_data = Some(base64);
+                hydrated_frames.push(frame);
+            }
+            Err(_) => {
+                // 文件已不存在：回收脏数据，避免前端拿到无效帧
+                stale_ids.push(frame.id);
+            }
+        }
+    }
+
+    for temp_id in stale_ids {
+        let _ = db.delete_temp_frame(temp_id);
+    }
+
+    Ok(hydrated_frames)
 }
 
 // ==================== 照片导出 ====================

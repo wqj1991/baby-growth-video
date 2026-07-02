@@ -155,6 +155,7 @@ pub struct VideoFrameTemp {
     pub period_id: i64,
     pub time_seconds: f64,
     pub temp_thumb_path: String,
+    pub base64_data: Option<String>,
     pub created_at: String,
 }
 
@@ -1092,6 +1093,7 @@ impl Database {
             period_id,
             time_seconds,
             temp_thumb_path: temp_thumb_path.to_string(),
+            base64_data: None,
             created_at: now,
         })
     }
@@ -1109,6 +1111,7 @@ impl Database {
                 period_id: row.get(2)?,
                 time_seconds: row.get(3)?,
                 temp_thumb_path: row.get(4)?,
+                base64_data: None,
                 created_at: row.get(5)?,
             })
         })?;
@@ -1127,6 +1130,7 @@ impl Database {
                 period_id: row.get(2)?,
                 time_seconds: row.get(3)?,
                 temp_thumb_path: row.get(4)?,
+                base64_data: None,
                 created_at: row.get(5)?,
             }),
         )
