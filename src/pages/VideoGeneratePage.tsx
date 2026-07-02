@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Video, Play, Settings, Download, Music, Image, Sparkles, AlertCircle, ExternalLink, AlertTriangle, CheckCircle2, Loader2, Film, Type, Wand2, Clock, ChevronRight, Volume2, X } from 'lucide-react';
 import { useAppStore, isAiConfigured } from '../store';
-import { saveFile, generateGrowthVideo, getImageBase64, selectFile, getPeriodThumbnails, fileToMediaUrl } from '../utils/tauriCommands';
+import { saveFile, generateGrowthVideo, cancelGeneration, getImageBase64, selectFile, getPeriodThumbnails, fileToMediaUrl } from '../utils/tauriCommands';
 import { showToast } from '../store/toastStore';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +38,7 @@ export default function VideoGeneratePage() {
 
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [completedVideoPath, setCompletedVideoPath] = useState<string | null>(null);
+  const [taskId, setTaskId] = useState<string>('');
 
   const [photoThumbnails, setPhotoThumbnails] = useState<Record<number, string>>({});
   const [loadingThumbnails, setLoadingThumbnails] = useState<Set<number>>(new Set());
@@ -85,6 +86,16 @@ export default function VideoGeneratePage() {
     setAiEnabled(next);
   };
 
+  const handleCancel = async () => {
+    if (taskId) {
+      await cancelGeneration(taskId);
+      setGenerationStage('cancelled');
+      setGenerationMessage('生成已取消');
+      setIsGenerating(false);
+      setGenerationError('用户已取消');
+    }
+  };
+
   function getDefaultMessage(stage: string, current: number, total: number): string {
     switch (stage) {
       case 'preparing': return '正在准备照片...';
@@ -98,6 +109,7 @@ export default function VideoGeneratePage() {
       case 'agnes_fallback': return 'Agnes 生成失败，回退到标准模式...';
       case 'complete': return '视频生成完成!';
       case 'error': return '生成失败';
+      case 'cancelled': return '生成已取消';
       default: return `${stage}...`;
     }
   }
@@ -115,6 +127,7 @@ export default function VideoGeneratePage() {
       case 'agnes_fallback': return '降级到标准模式';
       case 'complete': return '完成';
       case 'error': return '出错';
+      case 'cancelled': return '已取消';
       default: return stage;
     }
   }
@@ -136,6 +149,9 @@ export default function VideoGeneratePage() {
 
     const outputPath = await saveFile(`成长视频.${config.output_format}`);
     if (!outputPath) return;
+
+    const newTaskId = `generate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setTaskId(newTaskId);
 
     setIsGenerating(true);
     setGenerationProgress(0);
@@ -182,6 +198,7 @@ export default function VideoGeneratePage() {
         outputPath,
         videoMode === 'agnes' ? overallPrompt : undefined,
         videoMode === 'agnes' ? photoTexts : undefined,
+        newTaskId,
       );
       setGenerationProgress(100);
       setGenerationStage('complete');
@@ -727,11 +744,19 @@ export default function VideoGeneratePage() {
 
               {isGenerating && (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <StageIcon stage={generationStage} />
-                    <span className="text-sm font-medium text-stone-700">
-                      {getStageLabel(generationStage)}
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <StageIcon stage={generationStage} />
+                      <span className="text-sm font-medium text-stone-700">
+                        {getStageLabel(generationStage)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleCancel}
+                      className="text-sm text-error hover:text-error/80 font-medium"
+                    >
+                      取消生成
+                    </button>
                   </div>
 
                   {generationFallback && (
@@ -825,6 +850,8 @@ function StageIcon({ stage }: { stage: string }) {
       return <CheckCircle2 className={`${baseClass} text-success`} />;
     case 'error':
       return <AlertCircle className={`${baseClass} text-error`} />;
+    case 'cancelled':
+      return <X className={`${baseClass} text-stone-500`} />;
     default:
       return <Loader2 className={`${baseClass} text-stone-400 animate-spin`} />;
   }
