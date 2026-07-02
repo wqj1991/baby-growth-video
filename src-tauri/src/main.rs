@@ -440,6 +440,7 @@ async fn generate_growth_video(
             photo_texts.unwrap_or_default(),
             output_path,
             app_handle,
+            "agnes_task".to_string(),
         )
         .await
     } else {

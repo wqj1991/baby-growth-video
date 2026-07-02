@@ -515,7 +515,11 @@ pub async fn generate_growth_video_agnes(
     photo_texts: Vec<PhotoText>,
     output_path: String,
     app_handle: tauri::AppHandle,
+    task_id: String,
 ) -> Result<ExportRecord, String> {
+    let cancel_flag = register_cancel_flag(&task_id);
+    let _guard = scopeguard::guard((), |_| unregister_cancel_flag(&task_id));
+
     // ── Phase 1: 读取设置和照片 ──
     let (settings, photos, record) = {
         let db = db.lock().map_err(|e| e.to_string())?;
@@ -554,6 +558,10 @@ pub async fn generate_growth_video_agnes(
 
         (settings, photos, record)
     };
+
+    if is_cancelled(&cancel_flag) {
+        return Err("用户已取消".to_string());
+    }
 
     let total = photos.len();
 
@@ -613,15 +621,19 @@ pub async fn generate_growth_video_agnes(
         }
 
         let _ = app_handle.emit(
-            "generation-progress",
-            GenerationProgress {
-                stage: "preprocessing".to_string(),
-                current: i + 1,
-                total,
-                percentage: 5 + ((i + 1) as f64 / total as f64 * 10.0) as i32,
-                message: format!("正在处理照片 {}/{}...", i + 1, total),
-            },
-        );
+        "generation-progress",
+        GenerationProgress {
+            stage: "preprocessing".to_string(),
+            current: i + 1,
+            total,
+            percentage: 5 + ((i + 1) as f64 / total as f64 * 10.0) as i32,
+            message: format!("正在处理照片 {}/{}...", i + 1, total),
+        },
+    );
+    }
+
+    if is_cancelled(&cancel_flag) {
+        return Err("用户已取消".to_string());
     }
 
     // ── Phase 3: 调用 Agnes API ──
@@ -708,6 +720,10 @@ pub async fn generate_growth_video_agnes(
         }
         Err(e) => {
             // ── 降级：回退到标准 FFmpeg 模式 ──
+            if is_cancelled(&cancel_flag) {
+                return Err("用户已取消".to_string());
+            }
+            
             let _ = app_handle.emit(
                 "generation-progress",
                 GenerationProgress {
