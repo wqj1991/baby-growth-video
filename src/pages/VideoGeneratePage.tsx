@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { Video, Play, Settings, Download, Music, Image, Sparkles, AlertCircle, ExternalLink, AlertTriangle, CheckCircle2, Loader2, Film, Type, Wand2, Clock, ChevronRight, Volume2, X } from 'lucide-react';
 import { useAppStore, isAiConfigured } from '../store';
-import { saveFile, generateGrowthVideo, cancelGeneration, getImageBase64, selectFile, getPeriodThumbnails, fileToMediaUrl } from '../utils/tauriCommands';
+import { saveFile, generateGrowthVideo, cancelGeneration, selectFile, getProjectFinalThumbnails, fileToMediaUrl } from '../utils/tauriCommands';
 import { showToast } from '../store/toastStore';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigate } from 'react-router-dom';
-import type { VideoConfig, PhotoText, Thumbnail } from '../types';
+import type { VideoConfig, PhotoText } from '../types';
 
 export default function VideoGeneratePage() {
   const navigate = useNavigate();
@@ -41,7 +41,10 @@ export default function VideoGeneratePage() {
   const [taskId, setTaskId] = useState<string>('');
 
   const [photoThumbnails, setPhotoThumbnails] = useState<Record<number, string>>({});
-  const [loadingThumbnails, setLoadingThumbnails] = useState<Set<number>>(new Set());
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [photoPaths, setPhotoPaths] = useState<string[]>([]);
+  const [loadingThumbnails, setLoadingThumbnails] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -53,38 +56,74 @@ export default function VideoGeneratePage() {
   }, []);
 
   useEffect(() => {
-    const loadThumbnails = async () => {
-      const completed = periods.filter(p => p.selected_photo_id != null);
-      for (const period of completed) {
-        const photoId = period.selected_photo_id;
-        if (photoId != null && !photoThumbnails[period.id]) {
-          setLoadingThumbnails(prev => new Set([...prev, photoId]));
-          try {
-            const thumbs: Thumbnail[] = await getPeriodThumbnails(period.id);
-            const thumb = thumbs.find((t: Thumbnail) => t.id === photoId);
-            if (thumb) {
-              const base64 = await getImageBase64(thumb.original_path);
-              setPhotoThumbnails(prev => ({ ...prev, [period.id]: base64 }));
+    if (!currentProject) return;
+    
+    const loadFinalThumbnails = async () => {
+      setLoadingThumbnails(true);
+      try {
+        const thumbs = await getProjectFinalThumbnails(currentProject.id);
+        const newThumbnails: Record<number, string> = {};
+        const newPaths: string[] = [];
+        
+        for (const period of periods) {
+          if (period.selected_photo_id != null) {
+            const thumb = thumbs.find(t => t.period_id === period.id && t.is_final);
+            if (thumb && thumb.base64_data) {
+              newThumbnails[period.id] = thumb.base64_data;
+              newPaths.push(thumb.base64_data);
             }
-          } catch (e) {
-            console.error('Failed to load thumbnail:', e);
-          } finally {
-            setLoadingThumbnails(prev => {
-              const next = new Set(prev);
-              next.delete(photoId);
-              return next;
-            });
           }
         }
+        
+        setPhotoThumbnails(newThumbnails);
+        setPhotoPaths(newPaths);
+      } catch (e) {
+        console.error('Failed to load final thumbnails:', e);
+      } finally {
+        setLoadingThumbnails(false);
       }
     };
-    loadThumbnails();
-  }, [periods, photoThumbnails]);
+    
+    loadFinalThumbnails();
+  }, [currentProject, periods]);
 
   const handleAiToggle = () => {
     const next = !aiEnabled;
     setAiEnabled(next);
   };
+
+  const openLightbox = (periodId: number) => {
+    const index = completedPeriods.findIndex(p => p.id === periodId);
+    if (index >= 0) {
+      setLightboxIndex(index);
+      setLightboxOpen(true);
+    }
+  };
+
+  const closeLightbox = () => {
+    setLightboxOpen(false);
+  };
+
+  const navigateLightbox = (direction: 'prev' | 'next') => {
+    setLightboxIndex(prev => {
+      if (direction === 'prev') {
+        return prev > 0 ? prev - 1 : photoPaths.length - 1;
+      } else {
+        return prev < photoPaths.length - 1 ? prev + 1 : 0;
+      }
+    });
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!lightboxOpen) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') navigateLightbox('prev');
+      if (e.key === 'ArrowRight') navigateLightbox('next');
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen]);
 
   const handleCancel = async () => {
     if (taskId) {
@@ -235,10 +274,11 @@ export default function VideoGeneratePage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="grid grid-cols-12 gap-6">
-        <div className="col-span-5">
-          <div className="card">
+    <>
+      <div className="h-full overflow-y-auto p-6">
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-5">
+            <div className="card">
             <div className="card-header">
               <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Settings className="w-5 h-5" />
@@ -472,7 +512,7 @@ export default function VideoGeneratePage() {
                   <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
                     {completedPeriods.map((period, idx) => (
                       <div key={period.id} className="relative flex-shrink-0">
-                        <div className="w-28 rounded-xl overflow-hidden border border-stone-200 bg-stone-50 shadow-sm">
+                        <div className="w-28 rounded-xl overflow-hidden border border-stone-200 bg-stone-50 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onDoubleClick={() => openLightbox(period.id)}>
                           <div className="aspect-[4/3] bg-gradient-to-br from-warmth-100 to-warmth-200 flex items-center justify-center relative overflow-hidden">
                             {photoThumbnails[period.id] ? (
                               <img
@@ -480,7 +520,7 @@ export default function VideoGeneratePage() {
                                 alt={period.name}
                                 className="w-full h-full object-cover"
                               />
-                            ) : (period.selected_photo_id != null && loadingThumbnails.has(period.selected_photo_id)) ? (
+                            ) : (period.selected_photo_id != null && loadingThumbnails) ? (
                               <div className="w-full h-full skeleton" />
                             ) : (
                               <Sparkles className="w-5 h-5 text-warmth-400" />
@@ -545,14 +585,14 @@ export default function VideoGeneratePage() {
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {completedPeriods.map((period) => (
                     <div key={period.id} className="flex-shrink-0 w-20">
-                      <div className="aspect-square bg-stone-200 rounded-lg mb-1 flex items-center justify-center overflow-hidden">
+                      <div className="aspect-square bg-stone-200 rounded-lg mb-1 flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all" onDoubleClick={() => openLightbox(period.id)}>
                         {photoThumbnails[period.id] ? (
                           <img
                             src={photoThumbnails[period.id]}
                             alt={period.name}
                             className="w-full h-full object-cover"
                           />
-                        ) : (period.selected_photo_id != null && loadingThumbnails.has(period.selected_photo_id)) ? (
+                        ) : (period.selected_photo_id != null && loadingThumbnails) ? (
                           <div className="w-full h-full skeleton" />
                         ) : (
                           <Image className="w-6 h-6 text-stone-400" />
@@ -823,7 +863,68 @@ export default function VideoGeneratePage() {
           </div>
         </div>
       </div>
-    </div>
+
+      {lightboxOpen && photoPaths.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          onClick={closeLightbox}
+        >
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigateLightbox('prev');
+            }}
+            className="absolute left-4 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <ChevronRight className="w-6 h-6 text-white rotate-180" />
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigateLightbox('next');
+            }}
+            className="absolute right-4 p-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <ChevronRight className="w-6 h-6 text-white" />
+          </button>
+
+          <div
+            className="max-w-[90vw] max-h-[90vh] relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={photoPaths[lightboxIndex]}
+              alt={`Photo ${lightboxIndex + 1}`}
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 rounded-b-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white font-medium">
+                    {completedPeriods[lightboxIndex]?.name}
+                  </p>
+                  <p className="text-white/70 text-sm">
+                    {completedPeriods[lightboxIndex]?.start_date}
+                  </p>
+                </div>
+                <span className="text-white/70 text-sm">
+                  {lightboxIndex + 1} / {photoPaths.length}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </>
   );
 }
 

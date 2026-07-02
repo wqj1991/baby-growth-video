@@ -153,6 +153,12 @@ fn get_period_pending_thumbnails(period_id: i64, state: State<AppState>) -> Resu
 }
 
 #[tauri::command]
+fn get_project_final_thumbnails(project_id: i64, state: State<AppState>) -> Result<Vec<db::Thumbnail>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.get_final_thumbnails_for_project(project_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn update_thumbnail(thumbnail: db::Thumbnail, state: State<AppState>) -> Result<db::Thumbnail, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     db.update_thumbnail(&thumbnail).map_err(|e| e.to_string())
@@ -924,6 +930,7 @@ pub fn run() {
             get_period_stats,
             get_period_thumbnails,
             get_period_pending_thumbnails,
+            get_project_final_thumbnails,
             update_thumbnail,
             set_final_thumbnail,
             cancel_final_thumbnail,

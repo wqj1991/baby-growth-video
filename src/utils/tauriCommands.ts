@@ -376,6 +376,10 @@ export async function getPeriodThumbnails(periodId: number): Promise<Thumbnail[]
   return invoke('get_period_thumbnails', { periodId });
 }
 
+export async function getProjectFinalThumbnails(projectId: number): Promise<Thumbnail[]> {
+  return invoke('get_project_final_thumbnails', { projectId });
+}
+
 export async function getPeriodPendingThumbnails(periodId: number): Promise<Thumbnail[]> {
   return invoke('get_period_pending_thumbnails', { periodId });
 }
