@@ -22,6 +22,7 @@ import {
   selectFolder,
   generateVideoFrames,
   generateVideoFramesByInterval,
+  getTempFrames,
   getVideoThumbnail,
   getPeriodStats,
   generateCollage,
@@ -91,7 +92,7 @@ export default function PeriodSelectPage() {
 
   const [currentVideoForFrames, setCurrentVideoForFrames] = useState<Video | null>(null);
   const [showFrameSettings, setShowFrameSettings] = useState(false);
-  const [isExtractingFrames, setIsExtractingFrames] = useState(false);
+  const [extractingVideoId, setExtractingVideoId] = useState<number | null>(null);
   const [videoFrameCounts, setVideoFrameCounts] = useState<Record<number, number>>({});
   const [videoThumbnails, setVideoThumbnails] = useState<Record<number, string>>({});
 
@@ -162,6 +163,7 @@ export default function PeriodSelectPage() {
       resetRegionTransforms();
       setCurrentVideoForFrames(null);
       setVideoFrameCounts({});
+      setExtractingVideoId(null);
       setThumbShowPreview(false);
       setPreviewThumb(null);
     }
@@ -220,6 +222,39 @@ export default function PeriodSelectPage() {
   // DATA LOADING
   // ============================
 
+  const refreshVideoFrameCount = async (videoId: number) => {
+    try {
+      const frames = await getTempFrames(videoId);
+      const count = frames.length;
+      setVideoFrameCounts(prev => ({ ...prev, [videoId]: count }));
+      return count;
+    } catch (error) {
+      console.error('加载临时帧计数失败:', error);
+      setVideoFrameCounts(prev => ({ ...prev, [videoId]: 0 }));
+      return 0;
+    }
+  };
+
+  const refreshAllVideoFrameCounts = async (videos: Video[]) => {
+    const results = await Promise.all(
+      videos.map(async (video) => {
+        try {
+          const frames = await getTempFrames(video.id);
+          return [video.id, frames.length] as const;
+        } catch (error) {
+          console.error('加载临时帧计数失败:', video.id, error);
+          return [video.id, 0] as const;
+        }
+      })
+    );
+
+    const next: Record<number, number> = {};
+    results.forEach(([id, count]) => {
+      next[id] = count;
+    });
+    setVideoFrameCounts(next);
+  };
+
   const loadPeriods = async (pid: number) => {
     try {
       const [periodsData, statsData] = await Promise.all([
@@ -240,6 +275,7 @@ export default function PeriodSelectPage() {
       loadedImageIds.current.clear();
       const videos = await getPeriodVideos(periodId);
       setCurrentVideos(videos);
+      await refreshAllVideoFrameCounts(videos);
       setSelectedTab('photos');
     } catch (error) { console.error('加载周期媒体失败:', error); }
     finally { setLoadingMedia(false); }
@@ -341,26 +377,42 @@ export default function PeriodSelectPage() {
   // VIDEO / FRAME ACTIONS
   // ============================
 
-  const handleExtractFrames = (video: Video) => {
+  const handleExtractFrames = async (video: Video) => {
+    const existingCount = videoFrameCounts[video.id] || 0;
+    if (existingCount > 0) {
+      await loadTempFrames(video.id);
+      setCurrentPlayingVideo(video);
+      setShowVideoPlayer(true);
+      setShowInlinePlayer(true);
+      return;
+    }
+
     setCurrentVideoForFrames(video);
     setShowFrameSettings(true);
   };
 
   const handleGenerateFrames = async (mode: 'count' | 'interval', value: number) => {
+    if (!currentVideoForFrames) return;
+
+    const video = currentVideoForFrames;
     setShowFrameSettings(false);
-    setIsExtractingFrames(true);
+    setExtractingVideoId(video.id);
     try {
       if (mode === 'count') {
-        await generateVideoFrames(currentVideoForFrames!.id, value);
+        await generateVideoFrames(video.id, value);
       } else {
-        await generateVideoFramesByInterval(currentVideoForFrames!.id, value);
+        await generateVideoFramesByInterval(video.id, value);
       }
-      await loadTempFrames(currentVideoForFrames!.id);
-      setCurrentPlayingVideo(currentVideoForFrames);
+      await loadTempFrames(video.id);
+      await refreshVideoFrameCount(video.id);
+      setCurrentPlayingVideo(video);
       setShowVideoPlayer(true);
       setShowInlinePlayer(true);
-    } catch (error) { showToast('error', '抽帧失败', '请重试'); }
-    finally { setIsExtractingFrames(false); }
+    } catch (error) {
+      console.error('抽帧失败:', error);
+      showToast('error', '抽帧失败', '请重试');
+    }
+    finally { setExtractingVideoId(null); }
   };
 
   // ============================
@@ -544,10 +596,15 @@ export default function PeriodSelectPage() {
     setShowInlinePlayer(true);
   };
 
-  const handleCloseInlinePlayer = () => {
+  const handleCloseInlinePlayer = async () => {
+    const closingVideo = currentPlayingVideo;
     setShowInlinePlayer(false);
     setShowVideoPlayer(false);
     setCurrentPlayingVideo(null);
+
+    if (closingVideo) {
+      await refreshVideoFrameCount(closingVideo.id);
+    }
   };
 
   // ============================
@@ -870,9 +927,13 @@ export default function PeriodSelectPage() {
                                 <button
                                   onClick={() => handleExtractFrames(video)}
                                   className="btn btn-primary btn-sm flex-1 text-[11px]"
-                                  disabled={isExtractingFrames}
+                                  disabled={extractingVideoId === video.id}
                                 >
-                                  {isExtractingFrames ? '抽帧中...' : videoFrameCounts[video.id] > 0 ? `查看(${videoFrameCounts[video.id]})` : '截取画面'}
+                                  {extractingVideoId === video.id
+                                    ? '抽帧中...'
+                                    : (videoFrameCounts[video.id] || 0) > 0
+                                      ? `查看(${videoFrameCounts[video.id]})`
+                                      : '截取画面'}
                                 </button>
                                 <button
                                   onClick={() => handleOpenInlinePlayer(video)}
