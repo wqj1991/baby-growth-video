@@ -224,6 +224,7 @@ export async function generateGrowthVideo(
   outputPath: string,
   overallPrompt?: string,
   photoTexts?: PhotoText[],
+  taskId?: string,
 ): Promise<ExportRecord> {
   return invoke('generate_growth_video', {
     projectId,
@@ -231,12 +232,18 @@ export async function generateGrowthVideo(
     outputPath,
     overallPrompt: overallPrompt || null,
     photoTexts: photoTexts || null,
+    taskId: taskId || null,
   });
 }
 
 // 获取生成进度
 export async function getGenerationProgress(taskId: string): Promise<number> {
   return invoke('get_generation_progress', { taskId });
+}
+
+// 取消视频生成
+export async function cancelGeneration(taskId: string): Promise<void> {
+  return invoke('cancel_generation', { taskId });
 }
 
 // ==================== 导出记录 ====================
