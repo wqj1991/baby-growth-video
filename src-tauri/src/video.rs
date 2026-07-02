@@ -239,6 +239,20 @@ fn get_ai_frames_dir(project_id: i64) -> PathBuf {
     path
 }
 
+fn cleanup_ai_frames(project_id: i64) {
+    let ai_frames_dir = get_ai_frames_dir(project_id);
+    if ai_frames_dir.exists() {
+        let _ = std::fs::remove_dir_all(&ai_frames_dir);
+    }
+}
+
+fn cleanup_agnes_temp(project_id: i64) {
+    let temp_dir = get_ai_frames_dir(project_id).join("agnes_temp");
+    if temp_dir.exists() {
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+}
+
 /// 为每对相邻照片生成 AI 过渡帧
 /// 返回 AI 帧路径列表，失败或未配置则返回 Err
 fn generate_ai_frames(
@@ -720,7 +734,9 @@ pub async fn generate_growth_video_agnes(
         }
         Err(e) => {
             // ── 降级：回退到标准 FFmpeg 模式 ──
+            cleanup_agnes_temp(project_id);
             if is_cancelled(&cancel_flag) {
+                cleanup_ai_frames(project_id);
                 return Err("用户已取消".to_string());
             }
             
@@ -936,6 +952,7 @@ pub async fn generate_growth_video_async(
             Ok(updated_record)
         }
         Err(e) => {
+            cleanup_ai_frames(project_id);
             let _ = app_handle.emit(
                 "generation-progress",
                 GenerationProgress {
