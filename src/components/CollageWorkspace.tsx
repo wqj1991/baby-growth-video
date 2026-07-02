@@ -207,9 +207,36 @@ export default function CollageWorkspace({
     e.preventDefault();
     const fromIdx = dragIdxRef.current;
     if (fromIdx === null || fromIdx === dropIndex) { resetOrderDrag(); return; }
+    const slots = template
+      ? template.regions
+        .map((region, regionIndex) => ({ regionIndex, slotOrder: region.order }))
+        .sort((a, b) => a.slotOrder - b.slotOrder)
+      : selectedItems.map((_, idx) => ({ regionIndex: idx, slotOrder: idx }));
+
+    const entries = slots
+      .map((slot) => {
+        const itemIdx = order[slot.slotOrder];
+        const item = itemIdx !== undefined ? selectedItems[itemIdx] : undefined;
+        if (!item || itemIdx === undefined) return null;
+        return { ...slot, itemIdx };
+      })
+      .filter((entry): entry is { regionIndex: number; slotOrder: number; itemIdx: number } => Boolean(entry));
+
+    if (fromIdx >= entries.length || dropIndex >= entries.length) {
+      resetOrderDrag();
+      return;
+    }
+
+    const reorderedItemIdx = entries.map((entry) => entry.itemIdx);
+    const [moved] = reorderedItemIdx.splice(fromIdx, 1);
+    // 右侧列表使用“插入”语义：拖到某项上方后，该项及其后续依次下移
+    const insertIndex = fromIdx < dropIndex ? Math.max(0, dropIndex - 1) : dropIndex;
+    reorderedItemIdx.splice(insertIndex, 0, moved);
+
     const newOrder = [...order];
-    const [moved] = newOrder.splice(fromIdx, 1);
-    newOrder.splice(dropIndex, 0, moved);
+    entries.forEach((entry, idx) => {
+      newOrder[entry.slotOrder] = reorderedItemIdx[idx];
+    });
     setCollagePhotoOrder(newOrder);
     resetOrderDrag();
   };
@@ -291,7 +318,9 @@ export default function CollageWorkspace({
   const pickSwapCandidate = (sourceRegionIdx: number, pointerX: number, pointerY: number) => {
     if (!template) return null;
 
-    const candidates: Array<{ idx: number; distance: number }> = [];
+    const SNAP_THRESHOLD_PX = 24;
+    const SNAP_RECT_MARGIN_PX = 10;
+    const candidates: Array<{ idx: number; distance: number; inside: boolean }> = [];
     template.regions.forEach((_, idx) => {
       if (idx === sourceRegionIdx) return;
       const targetItemIdx = order[template.regions[idx]?.order ?? idx];
@@ -302,13 +331,21 @@ export default function CollageWorkspace({
       const rect = el.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      candidates.push({ idx, distance: Math.hypot(pointerX - cx, pointerY - cy) });
+      const distance = Math.hypot(pointerX - cx, pointerY - cy);
+      const inside =
+        pointerX >= rect.left - SNAP_RECT_MARGIN_PX
+        && pointerX <= rect.right + SNAP_RECT_MARGIN_PX
+        && pointerY >= rect.top - SNAP_RECT_MARGIN_PX
+        && pointerY <= rect.bottom + SNAP_RECT_MARGIN_PX;
+
+      if (!inside && distance > SNAP_THRESHOLD_PX) return;
+      candidates.push({ idx, distance, inside });
     });
 
     if (candidates.length === 0) return null;
-    candidates.sort((a, b) => (a.distance - b.distance) || (a.idx - b.idx));
+    candidates.sort((a, b) => (Number(b.inside) - Number(a.inside)) || (a.distance - b.distance) || (a.idx - b.idx));
     const nearest = candidates[0];
-    if (nearest.distance > 24) return null;
+    if (!nearest.inside && nearest.distance > SNAP_THRESHOLD_PX) return null;
     return nearest.idx;
   };
 
@@ -490,6 +527,36 @@ export default function CollageWorkspace({
     ? selectedItems[order[selectedRegion.order]]
     : null;
 
+  // 右侧列表项与左侧画布保持一致（仅显示画布实际有图的格子）
+  const rightPanelEntries = useMemo(() => {
+    const slots = template
+      ? template.regions
+        .map((region, regionIndex) => ({ regionIndex, slotOrder: region.order }))
+        .sort((a, b) => a.slotOrder - b.slotOrder)
+      : selectedItems.map((_, idx) => ({ regionIndex: idx, slotOrder: idx }));
+
+    return slots
+      .map((slot) => {
+        const itemIdx = order[slot.slotOrder];
+        const item = itemIdx !== undefined ? selectedItems[itemIdx] : undefined;
+        if (!item || itemIdx === undefined) return null;
+        return {
+          key: `${item.source_type}-${item.id}-${slot.regionIndex}`,
+          regionIndex: slot.regionIndex,
+          slotOrder: slot.slotOrder,
+          item,
+          itemIdx,
+        };
+      })
+      .filter((entry): entry is {
+        key: string;
+        regionIndex: number;
+        slotOrder: number;
+        item: Thumbnail;
+        itemIdx: number;
+      } => Boolean(entry));
+  }, [template, selectedItems, order]);
+
   // 预估文件大小
   const estimatedSize = useMemo(
     () => estimateFileSize(collageOutputSize * collageOutputSize, collageQuality),
@@ -513,7 +580,7 @@ export default function CollageWorkspace({
         <span className="text-stone-200">|</span>
         <span className="text-sm font-medium text-stone-600">拼图工作区</span>
         <span className="badge badge-primary ml-2 text-xs">
-          {selectedItems.length} 张照片
+          {rightPanelEntries.length} 张照片
         </span>
         {template && (
           <span className="text-[11px] text-stone-400 ml-1">
@@ -886,16 +953,14 @@ export default function CollageWorkspace({
             <h4>照片顺序</h4>
             <p className="text-[10px] text-stone-400 mb-2">拖拽排序 · 也可直接在画布中拖拽照片到另一区域</p>
             <div className="flex flex-col gap-1">
-              {selectedItems.map((selItem, idx) => {
+              {rightPanelEntries.map((entry, idx) => {
+                const selItem = entry.item;
                 const imageUrl = loadedImages[selItem.id];
-                const regionIdx = template?.regions.find(
-                  (r) => r.order === idx
-                );
                 const isDragging = dragIdx === idx;
                 const isDragOver = dragOverIdx === idx;
                 const isBetween = dragOverIdx !== null && dragIdx !== null
                   && ((dragIdx < dragOverIdx && idx > dragIdx && idx <= dragOverIdx)
-                    || (dragIdx > dragOverIdx && idx >= dragOverIdx && idx < dragOverIdx));
+                    || (dragIdx > dragOverIdx && idx >= dragOverIdx && idx < dragIdx));
 
                 return (
                   <div
@@ -907,7 +972,7 @@ export default function CollageWorkspace({
                     onDrop={(e) => handleOrderDrop(idx, e)}
                     onDragEnd={handleOrderDragEnd}
                     className={`source-item-v2 cursor-grab active:cursor-grabbing transition-all ${
-                      selectedRegionIndex === regionIdx?.order
+                      selectedRegionIndex === entry.regionIndex
                         ? 'ring-2 ring-warmth-500 bg-warmth-50'
                         : ''
                     } ${
@@ -918,15 +983,8 @@ export default function CollageWorkspace({
                       isBetween ? 'transform -translate-y-1' : ''
                     }`}
                     onClick={() => {
-                      if (regionIdx !== undefined) {
-                        const rIdx = template?.regions.findIndex(
-                          (r) => r.order === regionIdx.order
-                        );
-                        if (rIdx !== undefined && rIdx >= 0) {
-                          setSelectedRegionIndex(rIdx);
-                          setShowReplacer(false);
-                        }
-                      }
+                      setSelectedRegionIndex(entry.regionIndex);
+                      setShowReplacer(false);
                     }}
                   >
                     <GripVertical className={`w-3.5 h-3.5 transition-colors cursor-grab active:cursor-grabbing ${
@@ -947,9 +1005,7 @@ export default function CollageWorkspace({
                       </div>
                       <div className="text-[9px] text-stone-400">
                         {selItem.source_type === 'scan' ? '扫描照片' : selItem.source_type === 'video_frame' ? '视频截帧' : '拼图'}
-                        {regionIdx !== undefined && (
-                          <span className="ml-1">· 区域 #{idx + 1}</span>
-                        )}
+                        <span className="ml-1">· 区域 #{entry.slotOrder + 1}</span>
                       </div>
                     </div>
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
@@ -957,7 +1013,7 @@ export default function CollageWorkspace({
                         ? 'text-primary-600 bg-primary-100 border-primary-200'
                         : 'text-warmth-800 bg-warmth-100 border-warmth-200'
                     }`}>
-                      #{idx + 1}
+                      #{entry.slotOrder + 1}
                     </span>
                   </div>
                 );
