@@ -1106,3 +1106,35 @@ pub fn generate_video_frames(
 
     Ok(frames)
 }
+
+pub fn generate_video_frames_by_interval(
+    db: &crate::db::Database,
+    video_id: i64,
+    interval_seconds: f64,
+) -> Result<Vec<crate::db::VideoFrameTemp>, String> {
+    if interval_seconds <= 0.0 {
+        return Err("抽帧间隔必须大于 0".to_string());
+    }
+
+    let video = db.get_video_by_id(video_id).map_err(|e| e.to_string())?;
+    let duration = if video.duration > 0.0 {
+        video.duration
+    } else {
+        let (d, _, _) = get_video_info(&video.file_path)?;
+        d
+    };
+
+    if duration <= 0.0 {
+        return Err("视频时长无效".to_string());
+    }
+
+    let mut count = (duration / interval_seconds).floor() as i64;
+    if count < 1 {
+        count = 1;
+    }
+    if count > 100 {
+        count = 100;
+    }
+
+    generate_video_frames(db, video_id, count)
+}

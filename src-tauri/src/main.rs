@@ -223,6 +223,17 @@ fn generate_video_frames(
     video::generate_video_frames(&db, video_id, count).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn generate_video_frames_by_interval(
+    video_id: i64,
+    interval_seconds: f64,
+    state: State<AppState>,
+) -> Result<Vec<db::VideoFrameTemp>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    video::generate_video_frames_by_interval(&db, video_id, interval_seconds)
+        .map_err(|e| e.to_string())
+}
+
 // ==================== 扫描文件 ====================
 
 #[tauri::command]
@@ -872,6 +883,7 @@ pub fn run() {
             remove_from_pending,
             get_period_videos,
             generate_video_frames,
+            generate_video_frames_by_interval,
             get_video_thumbnail,
             scan_media_folder,
             scan_period_folder,
