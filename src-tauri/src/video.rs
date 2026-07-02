@@ -130,11 +130,14 @@ fn generate_ffmpeg_command(
     let mut args = Vec::new();
 
     // 输入参数
+    let photo_count = photos.len() as f64;
+    let total_duration = photo_count * config.photo_duration;
+
     for (_, photo) in photos {
         args.push("-loop".to_string());
         args.push("1".to_string());
         args.push("-t".to_string());
-        args.push(config.photo_duration.to_string());
+        args.push(total_duration.to_string());
         args.push("-i".to_string());
         args.push(photo.original_path.clone());
     }
@@ -163,15 +166,15 @@ fn generate_ffmpeg_command(
         for i in 1..photo_count {
             let transition_name = match config.transition.as_str() {
                 "fade" => "fade",
-                "slide" => "slide",
-                "zoom" => "fade", // zoom用fade替代，简化实现
+                "slide" => "slideleft",
+                "zoom" => "fade",
                 _ => "fade",
             };
 
-            let offset = (config.photo_duration - config.transition_duration).max(0.0);
+            let offset = (i as f64 * config.photo_duration) - config.transition_duration;
 
             filter_complex.push_str(&format!(
-                "[{}][v{}]{}=duration={}:offset={}:alpha=1[out{}];",
+                "[{}][v{}]xfade=transition={}:duration={}:offset={}[out{}];",
                 current, i, transition_name, config.transition_duration, offset, i
             ));
             current = format!("out{}", i);
@@ -906,7 +909,11 @@ pub async fn generate_growth_video_async(
             },
         );
 
-        let output = Command::new(get_ffmpeg_path())
+        let ffmpeg_path = get_ffmpeg_path();
+        let args_str = ffmpeg_args.join(" ");
+        println!("FFmpeg command: {} {}", ffmpeg_path.display(), args_str);
+        
+        let output = Command::new(ffmpeg_path)
             .args(&ffmpeg_args)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -915,8 +922,13 @@ pub async fn generate_growth_video_async(
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            let error_msg = if stderr.len() > 1000 {
-                format!("视频生成失败: {}", &stderr[..1000])
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            println!("FFmpeg stdout: {}", stdout);
+            println!("FFmpeg stderr: {}", stderr);
+            println!("FFmpeg exit code: {:?}", output.status.code());
+            
+            let error_msg = if stderr.len() > 2000 {
+                format!("视频生成失败: {}", &stderr[..2000])
             } else {
                 format!("视频生成失败: {}", stderr)
             };
