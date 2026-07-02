@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Video, Play, Settings, Download, Music, Image, Sparkles, AlertCircle, ExternalLink, AlertTriangle, CheckCircle2, Loader2, Film, Type, Wand2, Clock, ChevronRight, Volume2, X } from 'lucide-react';
 import { useAppStore, isAiConfigured } from '../store';
-import { saveFile, generateGrowthVideo, getImageBase64, selectFile, getPeriodThumbnails } from '../utils/tauriCommands';
+import { saveFile, generateGrowthVideo, getImageBase64, selectFile, getPeriodThumbnails, fileToMediaUrl } from '../utils/tauriCommands';
 import { showToast } from '../store/toastStore';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigate } from 'react-router-dom';
@@ -439,7 +439,7 @@ export default function VideoGeneratePage() {
               {completedVideoPath ? (
                 <div className="aspect-video bg-stone-900 rounded-lg overflow-hidden">
                   <video
-                    src={`media://localhost/${encodeURIComponent(completedVideoPath)}`}
+                    src={fileToMediaUrl(completedVideoPath)}
                     controls
                     className="w-full h-full object-contain"
                   >

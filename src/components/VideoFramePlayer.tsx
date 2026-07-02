@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Camera, Play, Pause, SkipBack, SkipForward, Loader2, Check } from 'lucide-react';
 import { useAppStore } from '../store';
-import { getImageBase64, generateVideoFrames } from '../utils/tauriCommands';
+import { fileToMediaUrl, getImageBase64, generateVideoFrameAtTime } from '../utils/tauriCommands';
 import { showToast } from '../store/toastStore';
 import type { Video } from '../types';
 
@@ -19,10 +19,12 @@ export default function VideoFramePlayer({
   video,
   onBack,
 }: VideoFramePlayerProps) {
-  const [progress, setProgress] = useState(38);
+  const [progress, setProgress] = useState(0);
   const [speed, setSpeed] = useState(1);
-  const currentTime = '0:52';
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentSeconds, setCurrentSeconds] = useState(0);
   const playerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const {
     tempFrames,
@@ -44,10 +46,18 @@ export default function VideoFramePlayer({
   const handleCloseRef = useRef<() => void>(() => {});
 
   const totalDuration = formatDuration(video.duration);
+  const currentTimeLabel = formatDuration(currentSeconds);
   const availableSpeeds = [0.25, 0.5, 1, 2];
   const projectId = currentProject?.id;
 
-  const visibleFrames = tempFrames.filter((f) => !processedIds.has(f.id));
+  const visibleFrames = tempFrames.filter((f) => f.video_id === video.id && !processedIds.has(f.id));
+
+  // 进入播放器时默认加载当前视频已有的缓存帧
+  useEffect(() => {
+    setProcessedIds(new Set());
+    setLoadedImages({});
+    loadTempFrames(video.id);
+  }, [video.id, loadTempFrames]);
 
   const getOriginalFramePath = (thumbPath: string) => {
     return thumbPath.replace(/_thumb(?=\.[^./\\]+$)/, '_frame');
@@ -79,15 +89,24 @@ export default function VideoFramePlayer({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const el = videoRef.current;
       switch (e.key) {
         case ' ':
           e.preventDefault();
+          if (!el) return;
+          if (el.paused) {
+            el.play().catch(() => undefined);
+          } else {
+            el.pause();
+          }
           break;
         case 'ArrowLeft':
-          setProgress((p) => Math.max(0, p - 1));
+          if (!el) return;
+          el.currentTime = Math.max(0, el.currentTime - 5);
           break;
         case 'ArrowRight':
-          setProgress((p) => Math.min(100, p + 1));
+          if (!el) return;
+          el.currentTime = Math.min(video.duration, el.currentTime + 5);
           break;
         case 'Escape':
           if (showFramePreview) {
@@ -100,7 +119,42 @@ export default function VideoFramePlayer({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onBack, video.id, showFramePreview]);
+  }, [onBack, video.id, video.duration, showFramePreview]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = speed;
+    }
+  }, [speed]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    const onTimeUpdate = () => {
+      const current = el.currentTime || 0;
+      const duration = el.duration || video.duration || 0;
+      setCurrentSeconds(current);
+      if (duration > 0) {
+        setProgress((current / duration) * 100);
+      } else {
+        setProgress(0);
+      }
+    };
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+
+    el.addEventListener('timeupdate', onTimeUpdate);
+    el.addEventListener('play', onPlay);
+    el.addEventListener('pause', onPause);
+
+    return () => {
+      el.removeEventListener('timeupdate', onTimeUpdate);
+      el.removeEventListener('play', onPlay);
+      el.removeEventListener('pause', onPause);
+    };
+  }, [video.duration]);
 
   // Load temp frame thumbnails
   useEffect(() => {
@@ -149,7 +203,8 @@ export default function VideoFramePlayer({
     }
     setIsGenerating(true);
     try {
-      await generateVideoFrames(video.id, 1);
+      const atTime = videoRef.current?.currentTime ?? currentSeconds;
+      await generateVideoFrameAtTime(video.id, atTime);
       await loadTempFrames(video.id);
     } catch (error) {
       console.error('截帧失败:', error);
@@ -208,14 +263,6 @@ export default function VideoFramePlayer({
   };
   handleCloseRef.current = handleClose;
 
-  // Nearby frame previews (simulated)
-  const nearbyFrames = Array.from({ length: 8 }, (_, i) => ({
-    id: i,
-    offset: -4 + i,
-    isActive: i === 3,
-    isBlur: i === 5,
-  }));
-
   return (
     <div className="flex flex-col h-full">
       {/* Top Bar */}
@@ -237,15 +284,37 @@ export default function VideoFramePlayer({
           {video.file_name}
         </span>
         <div className="ml-auto">
-          <span className="info-pill-v2">💡 ←→ 逐帧 · 空格暂停</span>
+          <span className="info-pill-v2">💡 ←→ 跳转5秒 · 空格播放/暂停</span>
         </div>
       </div>
 
       <div className="video-inline-player flex-1">
         {/* Player Stage */}
         <div className="video-player-stage flex-1" ref={playerRef}>
-          <button className="big-play-btn">
-            <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
+          <video
+            ref={videoRef}
+            src={fileToMediaUrl(video.file_path)}
+            className="w-full h-full object-contain bg-black"
+            preload="metadata"
+          />
+
+          <button
+            className="big-play-btn"
+            onClick={() => {
+              const el = videoRef.current;
+              if (!el) return;
+              if (el.paused) {
+                el.play().catch(() => undefined);
+              } else {
+                el.pause();
+              }
+            }}
+          >
+            {isPlaying ? (
+              <Pause className="w-5 h-5 text-white" />
+            ) : (
+              <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
+            )}
           </button>
 
           {/* Controls */}
@@ -254,7 +323,13 @@ export default function VideoFramePlayer({
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const pct = ((e.clientX - rect.left) / rect.width) * 100;
-                setProgress(Math.max(0, Math.min(100, pct)));
+                const clamped = Math.max(0, Math.min(100, pct));
+                setProgress(clamped);
+                const el = videoRef.current;
+                if (el) {
+                  const duration = el.duration || video.duration || 0;
+                  el.currentTime = (clamped / 100) * duration;
+                }
               }}
             >
               <div className="video-progress-fill" style={{ width: `${progress}%` }} />
@@ -262,16 +337,33 @@ export default function VideoFramePlayer({
             </div>
 
             <div className="video-ctrl-row">
-              <button className="video-ctrl-btn" onClick={() => setProgress(0)}>
+              <button className="video-ctrl-btn" onClick={() => {
+                if (videoRef.current) {
+                  videoRef.current.currentTime = 0;
+                }
+              }}>
                 <SkipBack className="w-3 h-3" />
               </button>
-              <button className="video-ctrl-btn">
-                <Pause className="w-3 h-3" />
+              <button className="video-ctrl-btn" onClick={() => {
+                const el = videoRef.current;
+                if (!el) return;
+                if (el.paused) {
+                  el.play().catch(() => undefined);
+                } else {
+                  el.pause();
+                }
+              }}>
+                {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               </button>
-              <button className="video-ctrl-btn">
+              <button className="video-ctrl-btn" onClick={() => {
+                if (videoRef.current) {
+                  const duration = videoRef.current.duration || video.duration;
+                  videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 5);
+                }
+              }}>
                 <SkipForward className="w-3 h-3" />
               </button>
-              <span className="video-timecode">{currentTime} / {totalDuration}</span>
+              <span className="video-timecode">{currentTimeLabel} / {totalDuration}</span>
 
               {availableSpeeds.map((s) => (
                 <button
@@ -299,44 +391,9 @@ export default function VideoFramePlayer({
           </div>
         </div>
 
-        {/* Nearby Frame Strip */}
-        <div className="frame-strip">
-          <div className="frame-strip-label">附近帧预览（点击跳转）</div>
-          <div className="frames-row">
-            {nearbyFrames.map((f) => (
-              <div
-                key={f.id}
-                className={`frame-thumb ${f.isActive ? 'active' : ''} ${f.isBlur ? 'blur-warn' : ''}`}
-                onClick={() => setProgress(Math.max(0, Math.min(100, progress + f.offset)))}
-              >
-                {f.isBlur && (
-                  <div className="absolute top-0.5 right-0.5 bg-warning text-white text-[8px] px-1 py-px rounded">
-                    ⚠️
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Capture Result Actions */}
-        <div className="capture-result-bar">
-          <div className="cr-thumb" style={{
-            background: 'var(--color-warmth-950)',
-          }} />
-          <div className="cr-info">
-            <div className="cr-title">截帧预览 · {currentTime}</div>
-            <div className="cr-warn">⚠️ 检测到轻微运动模糊，建议前后各试 1–2 帧</div>
-          </div>
-          <div className="cr-actions">
-            <button className="btn btn-secondary btn-sm">加入待选区</button>
-            <button className="btn btn-primary btn-sm">直接选定</button>
-          </div>
-        </div>
-
         {/* Temp Frames */}
         {visibleFrames.length > 0 && (
-          <div className="p-3 px-4 bg-stone-50 border-t border-stone-200">
+          <div className="temp-frames-panel p-3 px-4 bg-stone-50 border-t border-stone-200">
             <div className="text-[11px] text-stone-400 mb-2">待处理截帧 ({visibleFrames.length})</div>
             <div className="flex gap-3 overflow-x-auto pb-1">
               {visibleFrames.map((frame) => {

@@ -1260,6 +1260,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
 .video-player-stage {
@@ -1269,11 +1270,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  min-height: 300px;
+  flex: 1 1 0;
+  min-height: 220px;
+  max-height: 52vh;
 }
 
 .video-player-stage .big-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -1422,26 +1429,14 @@ body {
 .frame-thumb.active { border-color: var(--color-brand); }
 .frame-thumb.blur-warn { opacity: 0.6; position: relative; }
 
-/* 截帧结果 */
-.capture-result-bar {
-  padding: 10px 16px;
+/* 临时帧底部面板（紧凑布局，避免压缩视频区域） */
+.temp-frames-panel {
+  min-height: 150px;
+  max-height: 34vh;
+  overflow-y: auto;
   background: #fafaf8;
-  border-bottom: 1px solid #e8e6de;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.capture-result-bar .cr-thumb {
-  width: 64px;
-  height: 40px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, #2a1a10, #0d0805);
   flex-shrink: 0;
 }
-.capture-result-bar .cr-info { flex: 1; }
-.capture-result-bar .cr-title { font-size: 12px; font-weight: 500; color: #33312d; }
-.capture-result-bar .cr-warn { font-size: 10px; color: var(--color-warning); margin-top: 2px; }
-.capture-result-bar .cr-actions { display: flex; gap: 6px; }
 
 /* ============================================
    Collage Layout Options (mini previews)

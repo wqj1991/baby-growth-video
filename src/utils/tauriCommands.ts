@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type {
@@ -28,9 +28,8 @@ import type {
  * 解决 Tauri 2.0 中 file:// 协议被安全策略阻止的问题
  */
 export function fileToMediaUrl(filePath: string): string {
-  // 对文件路径进行 URL 编码，保留路径分隔符
-  const encoded = encodeURIComponent(filePath).replace(/%2F/g, '/').replace(/%5C/g, '/');
-  return `media://localhost/${encoded}`;
+  // 使用 Tauri 官方协议转换，避免 WebView 无法识别自定义 scheme
+  return convertFileSrc(filePath);
 }
 
 /**
@@ -146,6 +145,11 @@ export async function generateVideoFrames(videoId: number, count: number): Promi
 // 生成视频截图（按间隔）
 export async function generateVideoFramesByInterval(videoId: number, intervalSeconds: number): Promise<VideoFrameTemp[]> {
   return invoke('generate_video_frames_by_interval', { videoId, intervalSeconds });
+}
+
+// 在指定时间点截取单帧
+export async function generateVideoFrameAtTime(videoId: number, timeSeconds: number): Promise<VideoFrameTemp> {
+  return invoke('generate_video_frame_at_time', { videoId, timeSeconds });
 }
 
 // 获取视频缩略图

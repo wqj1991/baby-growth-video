@@ -1142,3 +1142,100 @@ pub fn generate_video_frames_by_interval(
 
     generate_video_frames(db, video_id, count)
 }
+
+pub fn generate_video_frame_at_time(
+    db: &crate::db::Database,
+    video_id: i64,
+    time_seconds: f64,
+) -> Result<crate::db::VideoFrameTemp, String> {
+    use uuid::Uuid;
+
+    let video = db.get_video_by_id(video_id).map_err(|e| e.to_string())?;
+    let duration = if video.duration > 0.0 {
+        video.duration
+    } else {
+        let (d, _, _) = get_video_info(&video.file_path)?;
+        d
+    };
+
+    if duration <= 0.0 {
+        return Err("视频时长无效".to_string());
+    }
+
+    let safe_time = time_seconds.max(0.0).min((duration - 0.01).max(0.0));
+
+    let temp_dir = dirs_next::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("baby-growth-video")
+        .join("temp_frames");
+    if !temp_dir.exists() {
+        std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+    }
+
+    let uuid = Uuid::new_v4().to_string();
+    let frame_path = temp_dir.join(format!("{}_frame.jpg", uuid));
+    let thumb_path = temp_dir.join(format!("{}_thumb.jpg", uuid));
+
+    let status = Command::new(get_ffmpeg_path())
+        .args([
+            "-ss", &safe_time.to_string(),
+            "-i", &video.file_path,
+            "-vframes", "1",
+            "-q:v", "2",
+            "-y",
+            "-v", "error",
+            frame_path.to_str().unwrap_or("frame.jpg"),
+        ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map_err(|e| format!("截图失败: {}", e))?;
+
+    if !status.success() {
+        let _ = std::fs::remove_file(&frame_path);
+        let _ = std::fs::remove_file(&thumb_path);
+        return Err("ffmpeg截图失败".to_string());
+    }
+
+    let thumb_result = (|| -> Result<(), String> {
+        let img = image::open(&frame_path)
+            .map_err(|e| format!("读取帧图片失败: {}", e))?;
+        let rgba_img = img.to_rgba8();
+        let ratio = 400.0 / rgba_img.width() as f64;
+        let new_height = (rgba_img.height() as f64 * ratio) as u32;
+
+        let mut dst_image = Image::new(400, new_height, fast_image_resize::PixelType::U8x4);
+        let mut resizer = Resizer::new();
+        let options = ResizeOptions {
+            algorithm: ResizeAlg::Interpolation(FilterType::Bilinear),
+            ..ResizeOptions::default()
+        };
+        resizer.resize(&rgba_img, &mut dst_image, Some(&options))
+            .map_err(|e| format!("Failed to resize image: {}", e))?;
+        let scaled_rgba = image::RgbaImage::from_raw(400, new_height, dst_image.buffer().to_vec())
+            .ok_or("Failed to create scaled image")?;
+
+        let mut rgb_data = Vec::with_capacity((400 * new_height * 3) as usize);
+        for pixel in scaled_rgba.pixels() {
+            rgb_data.extend_from_slice(&[pixel[0], pixel[1], pixel[2]]);
+        }
+        let scaled_rgb = image::RgbImage::from_raw(400, new_height, rgb_data)
+            .ok_or("Failed to create RGB image")?;
+
+        let mut output = std::fs::File::create(&thumb_path)
+            .map_err(|e| format!("创建缩略图文件失败: {}", e))?;
+        scaled_rgb.write_to(&mut output, image::ImageFormat::Jpeg)
+            .map_err(|e| format!("写入缩略图失败: {}", e))?;
+        Ok(())
+    })();
+
+    if let Err(e) = thumb_result {
+        let _ = std::fs::remove_file(&frame_path);
+        let _ = std::fs::remove_file(&thumb_path);
+        return Err(e);
+    }
+
+    let thumb_path_str = thumb_path.to_string_lossy().to_string();
+    db.insert_video_frame_temp(video_id, video.period_id, safe_time, &thumb_path_str)
+        .map_err(|e| e.to_string())
+}
