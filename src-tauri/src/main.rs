@@ -426,10 +426,12 @@ async fn generate_growth_video(
     output_path: String,
     overall_prompt: Option<String>,
     photo_texts: Option<Vec<video::PhotoText>>,
+    task_id: Option<String>,
     state: State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<db::ExportRecord, String> {
     let db = state.db.clone();
+    let tid = task_id.unwrap_or_else(|| format!("task_{}", uuid::Uuid::new_v4()));
 
     if config.video_mode == "agnes" {
         video::generate_growth_video_agnes(
@@ -440,11 +442,11 @@ async fn generate_growth_video(
             photo_texts.unwrap_or_default(),
             output_path,
             app_handle,
-            "agnes_task".to_string(),
+            tid,
         )
         .await
     } else {
-        video::generate_growth_video_async(db, project_id, config, output_path, app_handle, "standard_task".to_string()).await
+        video::generate_growth_video_async(db, project_id, config, output_path, app_handle, tid).await
     }
 }
 
