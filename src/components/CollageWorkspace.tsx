@@ -82,30 +82,31 @@ export default function CollageWorkspace({
   const dragOverIdxRef = useRef<number | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
-  // 画布区域拖拽状态（直接在预览画布上拖拽照片排序）
-  const [canvasDragState, setCanvasDragState] = useState<{
-    isDragging: boolean;
-    fromRegionIdx: number | null;
-    overRegionIdx: number | null;
-  }>({ isDragging: false, fromRegionIdx: null, overRegionIdx: null });
-  // 空格拖拽模式：选中区域后按空格进入照片内拖拽模式
-  const [spaceDragMode, setSpaceDragMode] = useState(false);
-  // 拖拽状态
-  const dragState = useRef<{
-    isDragging: boolean;
-    regionIndex: number | null;
+  type GesturePhase = 'idle' | 'pressing' | 'panning' | 'swapping' | 'settling';
+  const [gestureState, setGestureState] = useState<{
+    phase: GesturePhase;
+    pointerId: number | null;
+    sourceRegionIdx: number | null;
     startX: number;
     startY: number;
     startOffsetX: number;
     startOffsetY: number;
+    currentX: number;
+    currentY: number;
+    swapCandidateRegionIdx: number | null;
   }>({
-    isDragging: false,
-    regionIndex: null,
+    phase: 'idle',
+    pointerId: null,
+    sourceRegionIdx: null,
     startX: 0,
     startY: 0,
     startOffsetX: 0,
     startOffsetY: 0,
+    currentX: 0,
+    currentY: 0,
+    swapCandidateRegionIdx: null,
   });
+  const longPressTimerRef = useRef<number | null>(null);
   // 区域元素引用（用于计算尺寸）
   const regionRefs = useRef<Record<number, HTMLDivElement | null>>({});
   // 图片尺寸缓存
@@ -221,83 +222,20 @@ export default function CollageWorkspace({
     setDragOverIdx(null);
   };
 
-  // ── 画布区域拖拽排序 handlers（直接拖拽照片到另一个区域） ──
-
-  /** 开始拖拽画布中的照片 */
-  const handleCanvasDragStart = (regionIdx: number, e: React.DragEvent) => {
-    const itemIdx = order[template?.regions[regionIdx]?.order ?? regionIdx];
-    if (itemIdx === undefined) return; // 该区域没有照片，不允许拖拽
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('application/region-index', String(regionIdx));
-    setCanvasDragState({ isDragging: true, fromRegionIdx: regionIdx, overRegionIdx: null });
-  };
-
-  /** 拖拽经过画布中的区域 */
-  const handleCanvasDragOver = (_regionIdx: number, e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setCanvasDragState((prev) => ({ ...prev, overRegionIdx: _regionIdx }));
-  };
-
-  /** 拖拽离画布区域 */
-  const handleCanvasDragLeave = (_regionIdx: number) => {
-    setCanvasDragState((prev) => {
-      if (prev.overRegionIdx === _regionIdx) {
-        return { ...prev, overRegionIdx: null };
-      }
-      return prev;
-    });
-  };
-
-  /** 在画布区域中放下照片 */
-  const handleCanvasDrop = (toRegionIdx: number, e: React.DragEvent) => {
-    e.preventDefault();
-    const fromRegionIdx = canvasDragState.fromRegionIdx;
-    if (fromRegionIdx === null || fromRegionIdx === toRegionIdx) {
-      setCanvasDragState({ isDragging: false, fromRegionIdx: null, overRegionIdx: null });
-      return;
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
-    if (!template) return;
-    const fromOrder = template.regions[fromRegionIdx]?.order;
-    const toOrder = template.regions[toRegionIdx]?.order;
-    if (fromOrder === undefined || toOrder === undefined) return;
-
-    // 交换两张照片的位置
-    const newOrder = [...order];
-    const temp = newOrder[fromOrder];
-    newOrder[fromOrder] = newOrder[toOrder];
-    newOrder[toOrder] = temp;
-    setCollagePhotoOrder(newOrder);
-    setCanvasDragState({ isDragging: false, fromRegionIdx: null, overRegionIdx: null });
   };
 
-  /** 画布拖拽结束 */
-  const handleCanvasDragEnd = () => {
-    setCanvasDragState({ isDragging: false, fromRegionIdx: null, overRegionIdx: null });
-  };
-
-  /** 开始拖拽 */
-  const handleDragStart = (regionIndex: number, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const current = regionTransforms[regionIndex] ?? DEFAULT_TRANSFORM;
-    dragState.current = {
-      isDragging: true,
-      regionIndex,
-      startX: e.clientX,
-      startY: e.clientY,
-      startOffsetX: current.offsetX,
-      startOffsetY: current.offsetY,
-    };
-  };
-
-  /** 拖拽移动 */
-  const handleDragMove = (e: MouseEvent) => {
-    if (!dragState.current.isDragging || dragState.current.regionIndex === null) return;
-    const { regionIndex, startX, startY, startOffsetX, startOffsetY } = dragState.current;
-    const deltaX = e.clientX - startX;
-    const deltaY = e.clientY - startY;
-    
+  const applyPanOffset = (
+    regionIndex: number,
+    startOffsetX: number,
+    startOffsetY: number,
+    deltaX: number,
+    deltaY: number,
+  ) => {
     const regionEl = regionRefs.current[regionIndex];
     if (!regionEl) {
       setRegionTransform(regionIndex, {
@@ -311,18 +249,18 @@ export default function CollageWorkspace({
     const itemIdx = order[template?.regions[regionIndex]?.order ?? regionIndex];
     const item = selectedItems[itemIdx];
     const imgSize = item ? imageSizes.current[item.id] : null;
-    
+
     if (imgSize && imgSize.width > 0 && imgSize.height > 0) {
       const regionWidth = regionEl.offsetWidth;
       const regionHeight = regionEl.offsetHeight;
       const scale = current.scale;
-      
+
       const imgRatio = imgSize.width / imgSize.height;
       const regionRatio = regionWidth / regionHeight;
-      
+
       let scaledImgWidth: number;
       let scaledImgHeight: number;
-      
+
       if (imgRatio > regionRatio) {
         scaledImgHeight = regionHeight * scale;
         scaledImgWidth = scaledImgHeight * imgRatio;
@@ -330,29 +268,153 @@ export default function CollageWorkspace({
         scaledImgWidth = regionWidth * scale;
         scaledImgHeight = scaledImgWidth / imgRatio;
       }
-      
+
       const maxOffsetX = Math.max(0, (scaledImgWidth - regionWidth) / 2);
       const maxOffsetY = Math.max(0, (scaledImgHeight - regionHeight) / 2);
-      
+
       const newOffsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, startOffsetX + deltaX));
       const newOffsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, startOffsetY + deltaY));
-      
+
       setRegionTransform(regionIndex, {
         offsetX: newOffsetX,
         offsetY: newOffsetY,
       });
-    } else {
-      setRegionTransform(regionIndex, {
-        offsetX: startOffsetX + deltaX,
-        offsetY: startOffsetY + deltaY,
-      });
+      return;
     }
+
+    setRegionTransform(regionIndex, {
+      offsetX: startOffsetX + deltaX,
+      offsetY: startOffsetY + deltaY,
+    });
   };
 
-  /** 结束拖拽 */
-  const handleDragEnd = () => {
-    dragState.current.isDragging = false;
-    dragState.current.regionIndex = null;
+  const pickSwapCandidate = (sourceRegionIdx: number, pointerX: number, pointerY: number) => {
+    if (!template) return null;
+
+    const candidates: Array<{ idx: number; distance: number }> = [];
+    template.regions.forEach((_, idx) => {
+      if (idx === sourceRegionIdx) return;
+      const targetItemIdx = order[template.regions[idx]?.order ?? idx];
+      if (targetItemIdx === undefined) return;
+      const el = regionRefs.current[idx];
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      candidates.push({ idx, distance: Math.hypot(pointerX - cx, pointerY - cy) });
+    });
+
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => (a.distance - b.distance) || (a.idx - b.idx));
+    const nearest = candidates[0];
+    if (nearest.distance > 24) return null;
+    return nearest.idx;
+  };
+
+  const startRegionPointerGesture = (regionIndex: number, e: React.PointerEvent<HTMLDivElement>) => {
+    const itemIdx = order[template?.regions[regionIndex]?.order ?? regionIndex];
+    if (itemIdx === undefined) return;
+
+    const current = regionTransforms[regionIndex] ?? DEFAULT_TRANSFORM;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    setSelectedRegionIndex(regionIndex);
+    setShowReplacer(false);
+
+    clearLongPressTimer();
+    setGestureState({
+      phase: 'pressing',
+      pointerId: e.pointerId,
+      sourceRegionIdx: regionIndex,
+      startX: e.clientX,
+      startY: e.clientY,
+      startOffsetX: current.offsetX,
+      startOffsetY: current.offsetY,
+      currentX: e.clientX,
+      currentY: e.clientY,
+      swapCandidateRegionIdx: null,
+    });
+
+    longPressTimerRef.current = window.setTimeout(() => {
+      setGestureState((prev) => {
+        if (prev.phase !== 'pressing' || prev.sourceRegionIdx !== regionIndex) {
+          return prev;
+        }
+        const moved = Math.hypot(prev.currentX - prev.startX, prev.currentY - prev.startY);
+        if (moved > 4) return prev;
+        return { ...prev, phase: 'swapping' };
+      });
+    }, 300);
+  };
+
+  const moveRegionPointerGesture = (regionIndex: number, e: React.PointerEvent<HTMLDivElement>) => {
+    const prev = gestureState;
+    if (prev.pointerId !== e.pointerId || prev.sourceRegionIdx !== regionIndex) {
+      return;
+    }
+
+    const next = { ...prev, currentX: e.clientX, currentY: e.clientY };
+    const deltaX = e.clientX - prev.startX;
+    const deltaY = e.clientY - prev.startY;
+    const moveDistance = Math.hypot(deltaX, deltaY);
+
+    if (next.phase === 'pressing' && moveDistance > 4) {
+      clearLongPressTimer();
+      applyPanOffset(regionIndex, prev.startOffsetX, prev.startOffsetY, deltaX, deltaY);
+      setGestureState({ ...next, phase: 'panning' });
+      return;
+    }
+
+    if (next.phase === 'panning') {
+      applyPanOffset(regionIndex, prev.startOffsetX, prev.startOffsetY, deltaX, deltaY);
+      setGestureState(next);
+      return;
+    }
+
+    if (next.phase === 'swapping') {
+      setGestureState({
+        ...next,
+        swapCandidateRegionIdx: pickSwapCandidate(regionIndex, e.clientX, e.clientY),
+      });
+      return;
+    }
+
+    setGestureState(next);
+  };
+
+  const endRegionPointerGesture = (regionIndex: number, e: React.PointerEvent<HTMLDivElement>) => {
+    const prev = gestureState;
+    if (prev.pointerId !== e.pointerId || prev.sourceRegionIdx !== regionIndex) {
+      return;
+    }
+
+    if (prev.phase === 'swapping' && prev.swapCandidateRegionIdx !== null && template) {
+      const fromOrder = template.regions[regionIndex]?.order;
+      const toOrder = template.regions[prev.swapCandidateRegionIdx]?.order;
+      if (fromOrder !== undefined && toOrder !== undefined && fromOrder !== toOrder) {
+        const newOrder = [...order];
+        const temp = newOrder[fromOrder];
+        newOrder[fromOrder] = newOrder[toOrder];
+        newOrder[toOrder] = temp;
+        setCollagePhotoOrder(newOrder);
+      }
+    }
+
+    setGestureState({
+      phase: 'idle',
+      pointerId: null,
+      sourceRegionIdx: null,
+      startX: 0,
+      startY: 0,
+      startOffsetX: 0,
+      startOffsetY: 0,
+      currentX: 0,
+      currentY: 0,
+      swapCandidateRegionIdx: null,
+    });
+
+    clearLongPressTimer();
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
   };
 
   /** 图片加载完成时记录尺寸 */
@@ -364,42 +426,9 @@ export default function CollageWorkspace({
     };
   };
 
-  // 全局鼠标事件监听
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => handleDragMove(e);
-    const onMouseUp = () => handleDragEnd();
-    
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
+  useEffect(() => () => {
+    clearLongPressTimer();
   }, []);
-
-  // 全局键盘事件：空格键切换照片内拖拽模式
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      // 忽略在输入框等元素中按下的空格
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement
-      ) return;
-
-      if (e.code === 'Space' && selectedRegionIndex !== null) {
-        e.preventDefault();
-        setSpaceDragMode((prev) => !prev);
-      }
-      // ESC 退出拖拽模式
-      if (e.code === 'Escape') {
-        setSpaceDragMode(false);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedRegionIndex]);
 
   /** 替换照片：从待选区 pendingItems 中选择 */
   const handleReplacePhoto = (pendingItem: Thumbnail) => {
@@ -528,24 +557,11 @@ export default function CollageWorkspace({
         {/* Preview Canvas */}
         <div className="collage-preview">
             <div className="flex flex-col items-center gap-3">
-            {/* 空格拖拽模式指示器 */}
-            {spaceDragMode && selectedRegionIndex !== null && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-warmth-500/20 border border-warmth-500/40 rounded-lg text-[11px] text-warmth-500">
-                <Move className="w-3.5 h-3.5" />
-                <span>拖拽调整模式 · 拖动画布中照片调整位置</span>
-                <span className="text-[10px] text-warmth-500/70 ml-1">按空格退出</span>
-              </div>
-            )}
             <div className="text-[11px] text-white/40">
-              点击区域选中 · 拖拽照片到另一区域可交换顺序
+              短按拖拽调整位置 · 长按 0.3s 后拖拽可换位
               {selectedRegionIndex !== null && (
                 <span className="ml-2 text-warmth-500">
                   已选中区域 #{selectedRegionIndex + 1}
-                </span>
-              )}
-              {!spaceDragMode && selectedRegionIndex !== null && (
-                <span className="ml-2 text-white/30">
-                  · 按空格拖拽调整位置
                 </span>
               )}
             </div>
@@ -564,6 +580,10 @@ export default function CollageWorkspace({
                     const isSelected = selectedRegionIndex === idx;
                     const currentTf = regionTransforms[idx] ?? DEFAULT_TRANSFORM;
                     const hasTransform = currentTf.offsetX !== 0 || currentTf.offsetY !== 0 || currentTf.scale !== 1;
+                    const isSwapSource = gestureState.phase === 'swapping' && gestureState.sourceRegionIdx === idx;
+                    const isSwapCandidate = gestureState.phase === 'swapping' && gestureState.swapCandidateRegionIdx === idx;
+                    const gestureDeltaX = gestureState.currentX - gestureState.startX;
+                    const gestureDeltaY = gestureState.currentY - gestureState.startY;
 
                     return (
                       <div
@@ -574,15 +594,7 @@ export default function CollageWorkspace({
                             ? 'ring-[3px] ring-warmth-500 ring-offset-0 z-10'
                             : ''
                         } ${!isSelected ? 'hover:ring-2 hover:ring-white/30' : ''} ${
-                          canvasDragState.isDragging && canvasDragState.fromRegionIdx === idx
-                            ? 'opacity-40'
-                            : ''
-                        } ${
-                          canvasDragState.isDragging && canvasDragState.fromRegionIdx !== null && canvasDragState.fromRegionIdx !== idx && canvasDragState.overRegionIdx !== idx
-                            ? 'ring-2 ring-warmth-500/50 bg-warmth-500/10'
-                            : ''
-                        } ${
-                          canvasDragState.overRegionIdx === idx
+                          isSwapCandidate
                             ? 'ring-[3px] ring-warmth-500 bg-warmth-500/20'
                             : ''
                         }`}
@@ -596,26 +608,35 @@ export default function CollageWorkspace({
                           background: imageUrl
                             ? undefined
                             : PREVIEW_COLORS[idx % PREVIEW_COLORS.length],
-                          cursor: spaceDragMode && isSelected
-                            ? 'move'
-                            : imageUrl && isSelected
-                              ? 'grab'
-                              : 'pointer',
+                          cursor: imageUrl ? 'grab' : 'pointer',
+                          transform: isSwapSource
+                            ? `translate(${gestureDeltaX}px, ${gestureDeltaY}px) scale(1.04)`
+                            : undefined,
+                          border: isSwapSource ? '2px dashed rgba(245, 139, 61, 0.9)' : undefined,
+                          boxShadow: isSwapSource ? '0 14px 28px rgba(0, 0, 0, 0.28)' : undefined,
+                          opacity: isSwapSource ? 0.9 : undefined,
+                          zIndex: isSwapSource ? 30 : undefined,
+                          transition: gestureState.phase === 'idle' ? 'transform 0.18s ease, box-shadow 0.18s ease' : undefined,
                         }}
                         onClick={(e) => handleRegionClick(idx, e)}
-                        onMouseDown={(e) => {
-                          if (spaceDragMode && imageUrl && isSelected) {
-                            handleDragStart(idx, e);
-                          } else if (imageUrl && isSelected && !spaceDragMode) {
-                            handleDragStart(idx, e);
-                          }
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!imageUrl) return;
+                          startRegionPointerGesture(idx, e);
                         }}
-                        draggable={imageUrl !== null && !spaceDragMode}
-                        onDragStart={(e) => handleCanvasDragStart(idx, e)}
-                        onDragOver={(e) => handleCanvasDragOver(idx, e)}
-                        onDragLeave={() => handleCanvasDragLeave(idx)}
-                        onDrop={(e) => handleCanvasDrop(idx, e)}
-                        onDragEnd={handleCanvasDragEnd}
+                        onPointerMove={(e) => {
+                          if (!imageUrl) return;
+                          moveRegionPointerGesture(idx, e);
+                        }}
+                        onPointerUp={(e) => {
+                          if (!imageUrl) return;
+                          endRegionPointerGesture(idx, e);
+                        }}
+                        onPointerCancel={(e) => {
+                          if (!imageUrl) return;
+                          endRegionPointerGesture(idx, e);
+                        }}
                       >
                         {imageUrl ? (
                           <div className="w-full h-full relative overflow-hidden">
@@ -662,7 +683,7 @@ export default function CollageWorkspace({
                         {/* 拖拽提示 */}
                         {isSelected && imageUrl && (
                           <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/60 rounded text-[9px] text-white/80 pointer-events-none z-10 whitespace-nowrap">
-                            {spaceDragMode ? '拖拽调整位置中...' : '拖拽调整位置 · 按空格进入拖拽模式'}
+                            {isSwapSource ? '换位拖拽中...' : '短按拖拽调整位置 · 长按进入换位'}
                           </div>
                         )}
                       </div>
