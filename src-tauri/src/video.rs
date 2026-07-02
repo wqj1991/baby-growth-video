@@ -857,15 +857,21 @@ pub async fn generate_growth_video_async(
             },
         );
 
-        let status = Command::new(get_ffmpeg_path())
+        let output = Command::new(get_ffmpeg_path())
             .args(&ffmpeg_args)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .output()
             .map_err(|e| format!("执行 FFmpeg 失败: {}", e))?;
 
-        if !status.success() {
-            return Err("视频生成失败（FFmpeg 返回非零状态码）".to_string());
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let error_msg = if stderr.len() > 1000 {
+                format!("视频生成失败: {}", &stderr[..1000])
+            } else {
+                format!("视频生成失败: {}", stderr)
+            };
+            return Err(error_msg);
         }
 
         let file_size = std::fs::metadata(&output_clone)
