@@ -1000,26 +1000,30 @@ pub fn generate_video_frames(
     // 计算截图时间点
     let interval = actual_duration / (count + 1) as f64;
 
+    // 先清理当前视频已存在的临时帧记录与文件，避免重复数据和脏计数
+    let old_paths = db.delete_all_temp_frames(video_id).map_err(|e| e.to_string())?;
+    for p in &old_paths {
+        let frame_path = {
+            let parent = std::path::Path::new(p).parent().unwrap_or(std::path::Path::new("."));
+            let stem = std::path::Path::new(p)
+                .file_stem().unwrap_or_default().to_string_lossy();
+            let frame_stem = stem.strip_suffix("_thumb").unwrap_or(&stem);
+            parent.join(format!("{}_frame.jpg", frame_stem))
+        };
+        let _ = std::fs::remove_file(p);
+        let _ = std::fs::remove_file(&frame_path);
+    }
+
     // 创建临时帧保存目录
     let temp_dir = dirs_next::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("baby-growth-video")
         .join("temp_frames");
-    
-    // 使用 walkdir 确保目录存在（如果不存在则创建）
+
+    // 确保目录存在（如果不存在则创建）
     if !temp_dir.exists() {
         std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
-    } else {
-        // 如果目录已存在，清理旧文件
-        for entry in WalkDir::new(&temp_dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_file())
-            .collect::<Vec<_>>()
-        {
-            std::fs::remove_file(entry.path()).ok();
-        }
-    };
+    }
 
     let mut frames = Vec::new();
 

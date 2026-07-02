@@ -672,10 +672,14 @@ fn discard_temp_frames(
             parent.join(format!("{}_frame.jpg", frame_stem))
         };
         if let Err(e) = std::fs::remove_file(p) {
-            eprintln!("Failed to remove temp thumb file {}: {}", p, e);
+            if e.kind() != std::io::ErrorKind::NotFound {
+                eprintln!("Failed to remove temp thumb file {}: {}", p, e);
+            }
         }
         if let Err(e) = std::fs::remove_file(&frame_path) {
-            eprintln!("Failed to remove temp frame file {}: {}", frame_path.display(), e);
+            if e.kind() != std::io::ErrorKind::NotFound {
+                eprintln!("Failed to remove temp frame file {}: {}", frame_path.display(), e);
+            }
         }
     }
     Ok(())
