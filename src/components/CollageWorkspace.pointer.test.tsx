@@ -61,6 +61,18 @@ function renderWorkspace() {
 }
 
 describe('CollageWorkspace pointer gestures', () => {
+  const rect = (left: number, top: number, width: number, height: number) => ({
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  });
+
   it('short move enters panning and updates transform state', async () => {
     const { container } = renderWorkspace();
     const regions = container.querySelectorAll('.collage-canvas .absolute');
@@ -92,6 +104,65 @@ describe('CollageWorkspace pointer gestures', () => {
 
       expect(source.style.border).toContain('dashed');
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('swaps regions when long-press drag snaps to target', async () => {
+    vi.useFakeTimers();
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const idx = this.getAttribute('data-region-idx');
+      if (idx === '0') return rect(50, 50, 100, 100) as DOMRect;
+      if (idx === '1') return rect(160, 50, 100, 100) as DOMRect;
+      return rect(0, 0, 0, 0) as DOMRect;
+    });
+    try {
+      const { container } = renderWorkspace();
+      const regions = container.querySelectorAll('.collage-canvas .absolute');
+      const source = regions[0] as HTMLElement;
+
+      fireEvent.pointerDown(source, { pointerId: 3, clientX: 100, clientY: 100 });
+      act(() => {
+        vi.advanceTimersByTime(310);
+      });
+
+      fireEvent.pointerMove(source, { pointerId: 3, clientX: 205, clientY: 100 });
+      expect(source.style.border).toContain('dashed');
+      fireEvent.pointerUp(source, { pointerId: 3, clientX: 205, clientY: 100 });
+
+      expect(useAppStore.getState().collagePhotoOrder).toEqual([1, 0]);
+    } finally {
+      rectSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('rebound keeps order when long-press drop is outside snap threshold', async () => {
+    vi.useFakeTimers();
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const idx = this.getAttribute('data-region-idx');
+      if (idx === '0') return rect(50, 50, 100, 100) as DOMRect;
+      if (idx === '1') return rect(160, 50, 100, 100) as DOMRect;
+      return rect(0, 0, 0, 0) as DOMRect;
+    });
+    try {
+      const { container } = renderWorkspace();
+      const regions = container.querySelectorAll('.collage-canvas .absolute');
+      const source = regions[0] as HTMLElement;
+
+      fireEvent.pointerDown(source, { pointerId: 4, clientX: 100, clientY: 100 });
+      act(() => {
+        vi.advanceTimersByTime(310);
+      });
+
+      act(() => {
+        fireEvent.pointerMove(source, { pointerId: 4, clientX: 420, clientY: 300 });
+        fireEvent.pointerUp(source, { pointerId: 4, clientX: 420, clientY: 300 });
+      });
+
+      expect(useAppStore.getState().collagePhotoOrder).toEqual([0, 1]);
+    } finally {
+      rectSpy.mockRestore();
       vi.useRealTimers();
     }
   });

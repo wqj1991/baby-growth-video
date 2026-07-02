@@ -589,6 +589,7 @@ export default function CollageWorkspace({
                       <div
                         key={idx}
                         ref={(el) => { regionRefs.current[idx] = el; }}
+                        data-region-idx={idx}
                         className={`absolute transition-all duration-200 ${
                           isSelected
                             ? 'ring-[3px] ring-warmth-500 ring-offset-0 z-10'
