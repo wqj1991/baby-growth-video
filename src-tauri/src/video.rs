@@ -738,6 +738,7 @@ pub async fn generate_growth_video_agnes(
                 fallback_config,
                 output_path,
                 app_handle,
+                "fallback_task".to_string(),
             ))
             .await
         }
@@ -750,7 +751,11 @@ pub async fn generate_growth_video_async(
     config: VideoConfig,
     output_path: String,
     app_handle: tauri::AppHandle,
+    task_id: String,
 ) -> Result<ExportRecord, String> {
+    let cancel_flag = register_cancel_flag(&task_id);
+    let _guard = scopeguard::guard((), |_| unregister_cancel_flag(&task_id));
+
     // ── Phase 1: 读取照片 + 创建导出记录 ──
     let (photos, record) = {
         let db = db.lock().map_err(|e| e.to_string())?;
@@ -787,6 +792,10 @@ pub async fn generate_growth_video_async(
             .map_err(|e| e.to_string())?;
         (photos, record)
     };
+
+    if is_cancelled(&cancel_flag) {
+        return Err("用户已取消".to_string());
+    }
 
     let _ = app_handle.emit(
         "generation-progress",
@@ -833,6 +842,10 @@ pub async fn generate_growth_video_async(
         None
     };
 
+    if is_cancelled(&cancel_flag) {
+        return Err("用户已取消".to_string());
+    }
+
     // ── Phase 3: 构建 FFmpeg 命令 ──
     let ffmpeg_args = match &ai_data {
         Some((frames, duration)) => {
@@ -840,6 +853,10 @@ pub async fn generate_growth_video_async(
         }
         None => generate_ffmpeg_command(&photos, &config, &output_path),
     };
+
+    if is_cancelled(&cancel_flag) {
+        return Err("用户已取消".to_string());
+    }
 
     // ── Phase 4: 执行 FFmpeg ──
     let ah = app_handle.clone();

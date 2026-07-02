@@ -443,7 +443,7 @@ async fn generate_growth_video(
         )
         .await
     } else {
-        video::generate_growth_video_async(db, project_id, config, output_path, app_handle).await
+        video::generate_growth_video_async(db, project_id, config, output_path, app_handle, "standard_task".to_string()).await
     }
 }
 
