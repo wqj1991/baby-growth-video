@@ -64,6 +64,7 @@ pub struct VideoConfig {
 // 全局进度跟踪
 lazy_static::lazy_static! {
     static ref PROGRESS_MAP: Mutex<HashMap<String, i32>> = Mutex::new(HashMap::new());
+    static ref CANCEL_MAP: Mutex<HashMap<String, Arc<std::sync::atomic::AtomicBool>>> = Mutex::new(HashMap::new());
 }
 
 pub fn get_progress(task_id: &str) -> i32 {
@@ -72,6 +73,26 @@ pub fn get_progress(task_id: &str) -> i32 {
     } else {
         0
     }
+}
+
+pub fn register_cancel_flag(task_id: &str) -> Arc<std::sync::atomic::AtomicBool> {
+    let flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    CANCEL_MAP.lock().unwrap().insert(task_id.to_string(), Arc::clone(&flag));
+    flag
+}
+
+pub fn unregister_cancel_flag(task_id: &str) {
+    CANCEL_MAP.lock().unwrap().remove(task_id);
+}
+
+pub fn cancel_task(task_id: &str) {
+    if let Some(flag) = CANCEL_MAP.lock().unwrap().get(task_id) {
+        flag.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+pub fn is_cancelled(flag: &Arc<std::sync::atomic::AtomicBool>) -> bool {
+    flag.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 fn get_resolution_size(resolution: &str) -> (i64, i64) {
